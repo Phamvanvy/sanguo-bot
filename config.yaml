@@ -1,0 +1,115 @@
+# Sanguo auto-quest bot config
+
+game:
+  url: "https://minhchautamquoc.com/play/"
+  canvas_selector: "#screen"
+  # Playwright persistent profile dir (keeps login/session between runs)
+  profile_dir: "./.browser-profile"
+  # M0 RESULT (confirmed): playwright_persistent gets blocked -- guard.js
+  # shows "Da phat hien cong cu debug" as soon as the page's own JS runs,
+  # because Playwright drives the page over CDP and enabling the Runtime
+  # domain (needed for any page.evaluate/screenshot/console read) triggers
+  # the classic getter-preview devtools-detection trick. This is NOT fixable
+  # with stealth init scripts -- it's inherent to CDP, so cdp_attach would
+  # very likely be caught the same way. control_mode is now os_input:
+  # a real browser process launched with a plain, unmodified command line
+  # (no --remote-debugging-port, no CDP client ever attached), driven purely
+  # by OS-level input (pydirectinput) and OS-level screen capture (mss).
+  # Values: auto | playwright_persistent | cdp_attach | os_input
+  control_mode: "os_input"
+  cdp:
+    # Used only when control_mode = cdp_attach. Launch the real browser
+    # yourself first with: brave.exe --remote-debugging-port=9222
+    endpoint: "http://localhost:9222"
+  os_input:
+    # Tried switching to Edge (2026-07-10) to avoid colliding with the
+    # user's everyday Brave window -- reverted immediately: this machine's
+    # Edge is enterprise-managed (Entra "Work" profile, see the
+    # "Asia Provisioning Policy WIN11 Entra" window and a policy-injected
+    # "Clear Cache" extension). It ignored our --user-data-dir entirely and
+    # opened the game as a tab inside the real signed-in Work profile --
+    # not isolable, and not safe to keep automating against. Back to Brave,
+    # which passed M0 cleanly with a fully separate profile dir.
+    browser_exe: "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+    # Separate profile dir so this doesn't collide with the user's main
+    # Brave profile/history/bookmarks.
+    user_data_dir: "./.brave-os-profile"
+    window_title_hint: "Sanguo"
+    # Filled in by tools/calibrate.py: the game canvas's position/size
+    # *within the browser window*, as fractions of the window's client
+    # area. Fractions only hold exactly for the fixed window.width/height
+    # below (chrome/toolbar height is a constant pixel count, not a constant
+    # fraction, so changing window size requires remeasuring).
+    # Measured at window.width/height=1366x900 (logical) -- see
+    # logs/boot_fixed_size.png / logs/canvas_crop_check2.png.
+    canvas_region: {x: 0.003, y: 0.0896, w: 0.9935, h: 0.905}
+  window:
+    # Launched with --window-size/--window-position (plain Chromium flags,
+    # not automation-related) so every run starts at the exact same size --
+    # needed because the game's low native resolution means click-target
+    # fractions only stay accurate if the window never gets ad-hoc resized.
+    width: 1366
+    height: 900
+    pos_x: 0
+    pos_y: 0
+
+vision:
+  ocr:
+    # engine: auto | paddleocr | easyocr
+    engine: "auto"
+    lang: "vi"
+    min_confidence: 0.5
+  template:
+    match_threshold: 0.82
+
+llm:
+  enabled: true
+  # Local llama-server (llama.cpp), confirmed up at 2026-07-10 running
+  # Qwen3.6-35B-A3B with an mmproj vision projector loaded -- capabilities
+  # reported by /v1/models include "multimodal", so this endpoint accepts
+  # image_url content parts in chat messages, not just text.
+  base_url: "http://localhost:8080/v1"
+  api_key: "not-needed"
+  model: "E:\\model\\HauhauCS\\Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive\\Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf"
+  vision: true
+  # Only invoked when OCR text for a quest detail is ambiguous / needs
+  # structuring into {tag, title, target_npc, target_coord}. Because this
+  # model is multimodal, vision/ocr.py can also route straight to it with
+  # the cropped quest-row image instead of a two-step OCR-then-LLM pass --
+  # worth trying first for the pixel-font Vietnamese text in M2.
+  use_for_quest_parsing: true
+
+quests:
+  panel_name: "Nhiệm vụ quản lý"
+  # Explicit allow/deny lists. Empty allow_tags = allow everything not denied.
+  allow_tags: []
+  deny_tags: []
+  skip_titles: []
+  max_attempts_per_quest: 3
+  quest_timeout_seconds: 90
+  poll_interval_seconds: 1.0
+
+combat:
+  hp_low_threshold_pct: 40
+  hp_critical_threshold_pct: 20
+  hp_potion_slot: "hp_potion"   # template name in templates/
+  check_interval_seconds: 0.75
+
+# Canvas-relative coordinates (0..1 of canvas width/height), NOT hard-coded
+# pixels — kept resolution/DPI independent. Filled in by tools/calibrate.py.
+ui:
+  menu_button: null            # {x: 0.xx, y: 0.xx}
+  back_button: null
+  quest_management_entry: null
+  quest_row_start: null        # top of first row
+  quest_row_height: null       # fraction of canvas height per row
+  claim_reward_button: null
+  hp_bar_region: null          # {x, y, w, h} fractions
+  hp_potion_slot: null
+
+runtime:
+  dry_run: true          # when true: read + log intended actions, never click
+  headless: false
+  slow_mo_ms: 50
+  log_dir: "./logs"
+  save_debug_screenshots: true

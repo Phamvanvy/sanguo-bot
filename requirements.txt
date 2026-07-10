@@ -1,0 +1,31 @@
+# --- Browser control ---
+# playwright is kept for M1 dev/calibration convenience only (e.g. quickly
+# inspecting DOM/selectors on a non-guarded page). It CANNOT drive the live
+# game -- confirmed blocked by guard.js's devtools/CDP detection (see
+# config.yaml comments). The live bot uses the os_input backend below.
+playwright>=1.45
+
+# --- OS-level control (the mode that actually works against the guard) ---
+mss>=9.0                # screen capture by window/region, no browser API involved
+pydirectinput>=1.0.4    # SendInput-based mouse/keyboard, indistinguishable from a real user
+pygetwindow>=0.0.9      # find/focus/position the Brave window by title
+pywin32>=306            # win32gui/win32process, used to get precise client-area rects
+
+# --- Vision: OCR ---
+# PaddleOCR is the primary engine (accurate Vietnamese support) but has a heavy
+# install (paddlepaddle) and can be flaky on Windows. easyocr is the fallback;
+# vision/ocr.py auto-detects whichever is importable at runtime.
+paddleocr>=2.7; python_version < "3.13"
+paddlepaddle>=2.6; python_version < "3.13"
+easyocr>=1.7
+
+# --- Vision: template / color matching ---
+opencv-python>=4.9
+numpy>=1.26
+
+# --- Config / utils ---
+PyYAML>=6.0
+Pillow>=10.0
+
+# --- Optional: local LLM (TabbyAPI / llama.cpp openai-compatible endpoint) ---
+openai>=1.30
