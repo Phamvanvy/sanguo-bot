@@ -29,3 +29,8 @@ Pillow>=10.0
 
 # --- Optional: local LLM (TabbyAPI / llama.cpp openai-compatible endpoint) ---
 openai>=1.30
+
+# --- Memory / RAG (src/memory) ---
+# TF-IDF + cosine similarity for the local embedder; also provides
+# cosine_similarity for the optional cloud (OpenAI) embedder path.
+scikit-learn>=1.4

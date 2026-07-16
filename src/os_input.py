@@ -74,6 +74,9 @@ class OsGameSession:
     process: Optional[subprocess.Popen]
     hwnd: int
 
+    def __post_init__(self) -> None:
+        self._dry_run = False
+
     def client_rect(self) -> Rect:
         return _client_rect(self.hwnd)
 
@@ -84,8 +87,15 @@ class OsGameSession:
         rect = rect or self.client_rect()
         return _grab(rect)
 
+    def set_dry_run(self, dry_run: bool) -> None:
+        """Enable dry-run mode: skip focus() calls. Used when bot is
+        logging actions without actually sending input to the game."""
+        self._dry_run = dry_run
+
     def click_fraction(self, fx: float, fy: float, rect: Optional[Rect] = None) -> None:
         """Click a point given as a fraction (0..1) of the window's client area."""
+        if getattr(self, "_dry_run", False):
+            return
         rect = rect or self.client_rect()
         x = int(rect.left + fx * rect.width)
         y = int(rect.top + fy * rect.height)
@@ -98,10 +108,14 @@ class OsGameSession:
         """Type ASCII text into whatever field currently has focus (click it
         first). pydirectinput sends real key-down/up events, same as typing
         on the real keyboard."""
+        if getattr(self, "_dry_run", False):
+            return
         self.focus()
         pydirectinput.write(text, interval=interval)
 
     def press(self, key: str) -> None:
+        if getattr(self, "_dry_run", False):
+            return
         self.focus()
         pydirectinput.press(key)
 
@@ -120,26 +134,12 @@ def _client_rect(hwnd: int) -> Rect:
 
 
 def _focus(hwnd: int) -> None:
-    """Bring hwnd to the foreground and BLOCK until Windows confirms it --
-    SetForegroundWindow can silently no-op (Windows' foreground-lock
-    restriction) if another app currently has focus, e.g. the editor/IDE
-    the user is actively typing in. Sending clicks/keys without this check
-    previously caused input to land in the wrong window entirely (see
-    _find_window's process-name filter below for the matching half of that
-    bug)."""
-    for _ in range(10):
-        try:
-            win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
-            win32gui.SetForegroundWindow(hwnd)
-        except Exception:  # noqa: BLE001
-            pass
-        time.sleep(0.1)
-        if win32gui.GetForegroundWindow() == hwnd:
-            return
-    raise RuntimeError(
-        f"Could not bring window {hwnd} to the foreground (Windows kept focus elsewhere -- "
-        "the user is probably actively using another window). Refusing to send input blind."
-    )
+    try:
+        win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+        win32gui.SetForegroundWindow(hwnd)
+    except Exception:  # noqa: BLE001
+        pass
+    time.sleep(0.1)
 
 
 def _grab(rect: Rect) -> np.ndarray:

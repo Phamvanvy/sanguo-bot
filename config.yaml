@@ -42,7 +42,10 @@ game:
     # fraction, so changing window size requires remeasuring).
     # Measured at window.width/height=1366x900 (logical) -- see
     # logs/boot_fixed_size.png / logs/canvas_crop_check2.png.
-    canvas_region: {x: 0.003, y: 0.0896, w: 0.9935, h: 0.905}
+    # Recalibrated 2026-07-11 for actual client_rect 1350x666
+    # (window was launched at 1366x900 outer but client area is 1350x666).
+    # Canvas pixels: (4,80) to (1345,661) -> 1341x581
+    canvas_region: {x: 0.003, y: 0.1201, w: 0.9933, h: 0.8724}
   window:
     # Launched with --window-size/--window-position (plain Chromium flags,
     # not automation-related) so every run starts at the exact same size --
@@ -64,13 +67,11 @@ vision:
 
 llm:
   enabled: true
-  # Local llama-server (llama.cpp), confirmed up at 2026-07-10 running
-  # Qwen3.6-35B-A3B with an mmproj vision projector loaded -- capabilities
-  # reported by /v1/models include "multimodal", so this endpoint accepts
-  # image_url content parts in chat messages, not just text.
-  base_url: "http://localhost:8080/v1"
+  # Qwen2.5-VL-3B-Instruct running on port 1234 for multimodal OCR fallback.
+  # Lightweight 3B parameter model with vision capability, runs in ~2GB VRAM.
+  base_url: "http://127.0.0.1:1234/v1"
   api_key: "not-needed"
-  model: "E:\\model\\HauhauCS\\Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive\\Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf"
+  model: "qwen2.5-vl-3b-instruct"
   vision: true
   # Only invoked when OCR text for a quest detail is ambiguous / needs
   # structuring into {tag, title, target_npc, target_coord}. Because this
@@ -78,6 +79,14 @@ llm:
   # the cropped quest-row image instead of a two-step OCR-then-LLM pass --
   # worth trying first for the pixel-font Vietnamese text in M2.
   use_for_quest_parsing: true
+
+memory:
+  # SQLite store of quests seen + outcomes you log by hand (src/memory/store.py).
+  db_path: "./data/memory.db"
+  # local: TF-IDF cosine similarity, no network, no extra credentials.
+  # cloud: OpenAI embeddings API -- requires cloud.openai_api_key in secrets.yaml.
+  embedder: "local"
+  cloud_embedding_model: "text-embedding-3-small"
 
 quests:
   panel_name: "Nhiệm vụ quản lý"
@@ -101,11 +110,18 @@ ui:
   menu_button: null            # {x: 0.xx, y: 0.xx}
   back_button: null
   quest_management_entry: null
-  quest_row_start: null        # top of first row
-  quest_row_height: null       # fraction of canvas height per row
-  claim_reward_button: null
-  hp_bar_region: null          # {x, y, w, h} fractions
-  hp_potion_slot: null
+  # Quest list panel region (fractions of canvas):
+  # Measured from logs/quest_panel2.png (1679x1009 canvas).
+  quest_row_start_x: 0.05      # left margin of quest text area
+  quest_row_start_y: 0.12      # top of first quest row (below header)
+  quest_row_height: 0.038      # each row height as fraction of canvas
+  quest_row_click_x: 0.25      # X to click in the middle of a row
+  # Quest detail panel (appears after clicking a row):
+  claim_button_x: 0.78         # "Nhận thưởng" button
+  claim_button_y: 0.85
+  # HP potion slot (bottom toolbar):
+  hp_potion_x: 0.5
+  hp_potion_y: 0.92
 
 runtime:
   dry_run: true          # when true: read + log intended actions, never click

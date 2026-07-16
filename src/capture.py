@@ -50,6 +50,9 @@ class GameControl:
         self.session = session
         self.cfg = cfg
 
+    def focus(self) -> None:
+        self.session.focus()
+
     def canvas_rect(self) -> Rect:
         window_rect = self.session.client_rect()
         region = self.cfg["game"]["os_input"].get("canvas_region")
@@ -77,6 +80,9 @@ class GameControl:
 
     def press(self, key: str) -> None:
         self.session.press(key)
+
+    def set_dry_run(self, dry_run: bool) -> None:
+        self.session.set_dry_run(dry_run)
 
     def close(self) -> None:
         self.session.close()
