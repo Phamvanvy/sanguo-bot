@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+    <title>Sanguo Flows</title>
+  </head>
+  <body>
+    <header>
+      <div class="crest">三</div>
+      <div><h1>Sanguo Flows</h1><p>Điều khiển bot nhiệm vụ</p></div>
+      <span id="connection" class="dot offline" title="Controller"></span>
+    </header>
+    <main>
+      <div id="status" class="status">Đang kết nối controller…</div>
+      <section id="flows" class="flows"></section>
+      <button id="stop" class="stop" type="button" disabled>Dừng flow đang chạy</button>
+    </main>
+    <footer>Game cần mở trong cửa sổ Brave đã calibrate.</footer>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -182,6 +182,22 @@ def _find_window(title_hint: str, process_exe: Optional[str] = None, timeout: fl
     )
 
 
+def attach_existing(cfg: Optional[dict] = None, title_hint: Optional[str] = None) -> OsGameSession:
+    """Attach to an already-open browser window without launching anything.
+
+    The extension passes the active tab title. Chromium exposes that title in
+    the native window caption, which lets OS input target the same window while
+    keeping the game page free of CDP/devtools automation.
+    """
+    cfg = cfg or load_config()
+    oi = cfg["game"]["os_input"]
+    hint = title_hint or oi["window_title_hint"]
+    hwnd = _find_window(hint, process_exe=oi["browser_exe"], timeout=3.0)
+    session = OsGameSession(process=None, hwnd=hwnd)
+    session.focus()
+    return session
+
+
 def launch(cfg: Optional[dict] = None) -> OsGameSession:
     """Start Brave as a normal process (no debugging/automation flags) and
     navigate it to the game URL by passing the URL as a command-line arg,

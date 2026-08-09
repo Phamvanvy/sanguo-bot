@@ -1,7 +1,7 @@
 # Sanguo auto-quest bot config
 
 game:
-  url: "https://minhchautamquoc.com/play/"
+  url: "https://play.minhchauh5.com/"
   canvas_selector: "#screen"
   # Playwright persistent profile dir (keeps login/session between runs)
   profile_dir: "./.browser-profile"
@@ -34,7 +34,7 @@ game:
     # Separate profile dir so this doesn't collide with the user's main
     # Brave profile/history/bookmarks.
     user_data_dir: "./.brave-os-profile"
-    window_title_hint: "Sanguo"
+    window_title_hint: "Minh Châu H5"
     # Filled in by tools/calibrate.py: the game canvas's position/size
     # *within the browser window*, as fractions of the window's client
     # area. Fractions only hold exactly for the fixed window.width/height
@@ -46,6 +46,9 @@ game:
     # (window was launched at 1366x900 outer but client area is 1350x666).
     # Canvas pixels: (4,80) to (1345,661) -> 1341x581
     canvas_region: {x: 0.003, y: 0.1201, w: 0.9933, h: 0.8724}
+    # Extension controller converts these fixed browser chrome/canvas insets
+    # to fractions at runtime, so maximized and 1366x900 windows both work.
+    canvas_insets_px: {left: 4, top: 80, right: 5, bottom: 5}
   window:
     # Launched with --window-size/--window-position (plain Chromium flags,
     # not automation-related) so every run starts at the exact same size --
@@ -98,6 +101,79 @@ quests:
   quest_timeout_seconds: 90
   poll_interval_seconds: 1.0
 
+quest_actions:
+  path_start_delay_seconds: 2.0
+  return_settle_seconds: 2.0
+  dialog_settle_seconds: 1.5
+  npc_dialog_delay_seconds: 1.0
+  auto_accept_nearby: true
+  accept_map_quests_before_run: true
+  max_map_quests_to_accept: 10
+  map_open_delay_seconds: 1.0
+  quest_marker_hsv_lower: [18, 120, 150]
+  quest_marker_hsv_upper: [42, 255, 255]
+  quest_marker_npc_offset_y: 0.09
+  arrival_timeout_seconds: 20.0
+  arrival_poll_seconds: 0.75
+  arrival_stable_threshold: 0.035
+  arrival_stable_samples: 3
+  movement_roi: [0.24, 0.16, 0.50, 0.62]
+  click_interval_seconds: 0.35
+  collection_keywords: ["thu thap", "nhat", "hai", "luom", "dao", "lay", "tim"]
+  combat_target_points:
+    - [0.48, 0.50]
+    - [0.42, 0.58]
+    - [0.54, 0.60]
+    - [0.47, 0.68]
+  collection_target_points:
+    - [0.48, 0.50]
+    - [0.42, 0.57]
+    - [0.55, 0.57]
+    - [0.50, 0.65]
+  combat_skill_points:
+    - [0.86, 0.54]
+    - [0.80, 0.66]
+    - [0.79, 0.81]
+    - [0.86, 0.82]
+    - [0.94, 0.80]
+
+# Các flow hoạt động hiển thị tự động trong popup extension.
+activity_macros:
+  blessing:
+    label: "Cầu phúc"
+    description: "Cầu phúc 10 lần liên tục đến khi Stop"
+    icon: "福"
+    runner: "blessing_loop"
+    open_point: [0.73, 0.07]
+    ten_times_point: [0.66, 0.84]
+    ok_point: [0.70, 0.64]
+    open_delay_seconds: 1.5
+    click_delay_seconds: 0.55
+    confirm_delay_seconds: 0.8
+    result_delay_seconds: 1.5
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
+  code_redeem:
+    label: "Đổi code"
+    description: "Nhập tuần tự toàn bộ code tại NPC đổi mã"
+    icon: "券"
+    runner: "code_redeem_loop"
+    # Tọa độ theo ảnh NPC tại Tân Giang Tân Thôn.
+    npc_point: [0.29, 0.39]
+    option_point: [0.50, 0.43]
+    input_point: [0.50, 0.51]
+    submit_point: [0.50, 0.57]
+    open_delay_seconds: 1.0
+    option_delay_seconds: 1.0
+    submit_delay_seconds: 1.4
+    dismiss_delay_seconds: 0.8
+    notification_dismiss_key: "enter"
+    codes:
+      - "MCH5EXPH1-100"
+    code_ranges:
+      - {prefix: "MCH5VIP", start: 1, end: 12}
+      - {prefix: "MCH5TEST", start: 1, end: 100}
+
 combat:
   hp_low_threshold_pct: 40
   hp_critical_threshold_pct: 20
@@ -108,6 +184,11 @@ combat:
 # pixels — kept resolution/DPI independent. Filled in by tools/calibrate.py.
 ui:
   menu_button: null            # {x: 0.xx, y: 0.xx}
+  active_quest: {x: 0.14, y: 0.23}
+  interact_skill: {x: 0.86, y: 0.82}
+  quest_dialog_action: {x: 0.86, y: 0.82}
+  map_button: {x: 0.85, y: 0.07}
+  available_quest_npc_fallback: null
   back_button: null
   quest_management_entry: null
   # Quest list panel region (fractions of canvas):

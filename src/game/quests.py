@@ -16,6 +16,7 @@ import numpy as np
 
 from src.capture import GameControl, Frame
 from src.config import load_config
+from src.game.actions import GameActions
 from src.vision.ocr import QuestEntry, parse_quest_list_from_image
 
 import re
@@ -136,6 +137,7 @@ class QuestExecutor:
         self.gc = control
         self.cfg = cfg or load_config()
         self.reader = QuestReader(self.cfg)
+        self.actions = GameActions(control, self.cfg)
 
     def open_quest_panel(self) -> None:
         """Open the quest management panel via menu shortcut key '6'."""
@@ -148,49 +150,43 @@ class QuestExecutor:
         time.sleep(0.5)
 
     def execute_quest(self, quest: QuestState) -> bool:
-        """Execute a single quest: click it, wait for completion, claim reward.
-
-        Returns True if the quest status changed to completed.
-        """
+        """Track a quest, auto-path to it, fight/collect, and check completion."""
         if quest.is_done:
             print(f"  [executor] SKIP [{quest.index}] [{quest.tag}] {quest.title} (already done)")
             return True
 
         print(f"  [executor] START [{quest.index}] [{quest.tag}] {quest.title}")
+        self.actions.click_quest_row(quest.row_position)
+        self.actions.close_any_panel()
+        self.actions.activate_tracked_quest()
+        arrived = self.actions.wait_for_arrival()
+        print(f"  [executor] ARRIVAL {'detected' if arrived else 'timeout; continuing'}")
 
-        # Click the quest row
-        cx, cy = quest.click_coord
-        self.gc.click(cx, cy)
-        time.sleep(1.0)
-
-        # After clicking, game typically auto-paths and auto-fights.
-        # Wait for completion (monitor by re-reading panel).
         timeout = self.cfg.get("quests", {}).get("quest_timeout_seconds", 90)
         start = time.time()
-
         while time.time() - start < timeout:
-            # Check combat HP (simple: if HP low, use potion)
+            self.actions.perform_action_round(quest.title)
             self._check_hp_and_heal()
+            time.sleep(float(self.cfg.get("quests", {}).get("poll_interval_seconds", 1.0)))
 
-            time.sleep(self.cfg.get("quests", {}).get("poll_interval_seconds", 1.0))
-
-            # Re-open panel to check status
-            self.gc.press("6")
-            time.sleep(1.5)
-            frame = self.gc.capture()
-            panel = self.reader.read_panel(frame)
-
-            # Find this quest in the updated panel
-            for q in panel.quests:
-                if q.index == quest.index and q.tag == quest.tag and q.is_done:
+            self.actions.open_quest_panel()
+            panel = self.reader.read_panel(self.gc.capture())
+            for current in panel.quests:
+                same_quest = current.index == quest.index and current.tag == quest.tag
+                if same_quest and current.is_done:
+                    self.actions.close_any_panel()
+                    print(f"  [executor] OBJECTIVE DONE [{quest.index}] {quest.title}; returning to NPC")
+                    returned = self.actions.return_to_quest_giver()
+                    print(f"  [executor] RETURN {'arrived' if returned else 'timeout; pressing complete'}")
+                    self.actions.click_dialog_action()
                     print(f"  [executor] COMPLETED [{quest.index}] {quest.title}")
-                    # Claim reward if needed
-                    self._claim_reward(q)
-                    self.close_panel()
+                    if self.cfg.get("quest_actions", {}).get("auto_accept_nearby", True):
+                        accepted = self.actions.accept_all_map_quests()
+                        print(f"  [executor] NEW QUESTS accepted={accepted}")
                     return True
 
-            # Still incomplete — close panel and keep waiting
-            self.close_panel()
+            self.actions.close_any_panel()
+            self.actions.activate_tracked_quest()
 
         print(f"  [executor] TIMEOUT [{quest.index}] {quest.title} after {timeout}s")
         return False
@@ -202,9 +198,8 @@ class QuestExecutor:
 
     def _claim_reward(self, quest: QuestState) -> None:
         """Click the claim/reward button for a completed quest."""
-        # The "Nhận thưởng" button typically appears when a completed quest is selected
-        # For now, just click the quest row again (may auto-claim)
-        time.sleep(0.3)
+        self.actions.click_quest_row(quest.row_position)
+        self.actions.claim_reward()
 
     def run_all_incomplete(self, max_quests: int = 0) -> int:
         """Run all incomplete quests in the current panel.
@@ -215,26 +210,32 @@ class QuestExecutor:
         Returns:
             Number of quests completed this session.
         """
-        # Read current panel state
-        frame = self.gc.capture()
-        panel = self.reader.read_panel(frame)
-        incomplete = panel.incomplete
-
-        if not incomplete:
-            print(f"[executor] All {panel.completed_count}/{panel.total_count} quests done!")
-            return 0
-
-        print(f"[executor] {len(incomplete)} incomplete quests: {[q.title for q in incomplete]}")
-
         completed = 0
-        for i, quest in enumerate(incomplete):
-            if max_quests and completed >= max_quests:
+        attempts: dict[tuple[int, str, str], int] = {}
+        max_attempts = int(self.cfg.get("quests", {}).get("max_attempts_per_quest", 3))
+        while not max_quests or completed < max_quests:
+            # Refresh every pass so a newly accepted NPC quest is picked up too.
+            self.actions.open_quest_panel()
+            panel = self.reader.read_panel(self.gc.capture())
+            eligible = []
+            for quest in panel.incomplete:
+                key = (quest.index, quest.tag, quest.title)
+                if attempts.get(key, 0) < max_attempts:
+                    eligible.append(quest)
+
+            if not eligible:
+                print(f"[executor] No runnable quests ({panel.completed_count}/{panel.total_count} done)")
+                self.actions.close_any_panel()
                 break
 
+            quest = eligible[0]
+            key = (quest.index, quest.tag, quest.title)
             if self.execute_quest(quest):
                 completed += 1
-
-            # Small pause between quests
+                attempts.pop(key, None)
+            else:
+                attempts[key] = attempts.get(key, 0) + 1
+                self.actions.close_any_panel()
             time.sleep(1.0)
 
         print(f"[executor] Session done: {completed} quests completed")

@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Sanguo Flow Controller",
+  "version": "0.1.0",
+  "description": "Chạy các flow nhiệm vụ Sanguo từ popup.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["http://127.0.0.1:8765/*"],
+  "action": {
+    "default_title": "Sanguo flows",
+    "default_popup": "popup.html"
+  }
+}
