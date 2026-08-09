@@ -105,7 +105,12 @@ async function runCodeRedeem(target, token, macro) {
   const codes = expandCodes(macro);
   for (let index = 0; index < codes.length; index += 1) {
     ensureActive(token);
-    await clickAt(target, token, macro.npc_point || [0.29, 0.39]);
+    nativeFlow = {
+      state: "running",
+      flow: "code_redeem",
+      message: `Mở lại NPC cho code ${index + 1}/${codes.length}`,
+    };
+    await clickAt(target, token, macro.npc_point || [0.288, 0.465]);
     await nativeDelay(macro.open_delay_seconds || 1);
     await clickAt(target, token, macro.option_point || [0.50, 0.43]);
     await nativeDelay(macro.option_delay_seconds || 1);
@@ -116,7 +121,7 @@ async function runCodeRedeem(target, token, macro) {
     await pressKey(target, "Enter", "Enter", 13);
     await nativeDelay(macro.dismiss_delay_seconds || 0.8);
     await pressKey(target, "Escape", "Escape", 27);
-    await nativeDelay(macro.dismiss_delay_seconds || 0.8);
+    await nativeDelay(macro.reopen_delay_seconds || 1);
     nativeFlow = {
       state: "running",
       flow: "code_redeem",

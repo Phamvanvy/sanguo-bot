@@ -158,8 +158,8 @@ activity_macros:
     description: "Nhập tuần tự toàn bộ code tại NPC đổi mã"
     icon: "券"
     runner: "code_redeem_loop"
-    # Tọa độ theo ảnh NPC tại Tân Giang Tân Thôn.
-    npc_point: [0.29, 0.39]
+    # Giữa thân NPC "Nhân viên đổi mã kích hoạt" tại Tân Giang Tân Thôn.
+    npc_point: [0.288, 0.465]
     option_point: [0.50, 0.43]
     input_point: [0.50, 0.51]
     submit_point: [0.50, 0.57]
@@ -167,6 +167,7 @@ activity_macros:
     option_delay_seconds: 1.0
     submit_delay_seconds: 1.4
     dismiss_delay_seconds: 0.8
+    reopen_delay_seconds: 1.0
     notification_dismiss_key: "enter"
     codes:
       - "MCH5EXPH1-100"
