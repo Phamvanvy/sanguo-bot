@@ -83,6 +83,18 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertAlmostEqual(80 / 1000, region["y"])
         self.assertAlmostEqual(915 / 1000, region["h"])
 
+    def test_canvas_uses_full_client_area_in_fullscreen(self):
+        cfg = {"game": {"os_input": {"canvas_insets_px": {
+            "left": 4, "top": 80, "right": 5, "bottom": 5,
+        }}}}
+        control = FakeControl()
+        control.session = FakeSession()
+        adapt_canvas_region(control, cfg, fullscreen=True)
+        self.assertEqual(
+            {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0},
+            cfg["game"]["os_input"]["canvas_region"],
+        )
+
     def test_catalog_contains_core_and_configured_flows(self):
         cfg = {"activity_macros": {"blessing": {"label": "Cầu phúc", "steps": []}}}
         ids = {flow["id"] for flow in flow_catalog(cfg)}

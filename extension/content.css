@@ -1,0 +1,71 @@
+#sanguo-flow-panel {
+  all: initial;
+  position: fixed;
+  inset: 18px 18px auto auto;
+  z-index: 2147483647;
+  width: min(352px, calc(100vw - 24px));
+  margin: 0;
+  padding: 0;
+  border: 1px solid #49351f;
+  border-radius: 13px;
+  color: #f8ecd0;
+  background: #17130f;
+  box-shadow: 0 16px 48px #000a;
+  overflow: hidden;
+  font-family: Inter, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+#sanguo-flow-panel, #sanguo-flow-panel * { box-sizing: border-box; }
+#sanguo-flow-panel.sg-hidden { display: none !important; }
+#sanguo-flow-panel .sg-header {
+  display: flex; align-items: center; gap: 10px; padding: 12px;
+  border-bottom: 1px solid #49351f;
+  background: linear-gradient(135deg, #352210, #17130f);
+  cursor: grab; user-select: none; touch-action: none;
+}
+#sanguo-flow-panel .sg-header:active { cursor: grabbing; }
+#sanguo-flow-panel .sg-crest {
+  display: grid; place-items: center; width: 38px; height: 38px;
+  border: 1px solid #d9a441; border-radius: 10px; color: #25170b;
+  background: linear-gradient(#ffd976, #bd741e); font: 800 21px serif;
+}
+#sanguo-flow-panel .sg-title { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+#sanguo-flow-panel .sg-title strong { color: #f8ecd0; font-size: 15px; line-height: 1.25; }
+#sanguo-flow-panel .sg-title small { margin-top: 2px; color: #ad9b80; font-size: 11px; }
+#sanguo-flow-panel .sg-dot { width: 9px; height: 9px; border-radius: 50%; }
+#sanguo-flow-panel .sg-online { background: #69d77d; box-shadow: 0 0 9px #69d77d; }
+#sanguo-flow-panel .sg-offline { background: #d45d53; }
+#sanguo-flow-panel .sg-collapse {
+  width: 28px; height: 28px; padding: 0; border: 1px solid #654724;
+  border-radius: 7px; color: #ffd77b; background: #2b2117; cursor: pointer;
+  font: 700 18px/1 sans-serif;
+}
+#sanguo-flow-panel .sg-body { padding: 12px; }
+#sanguo-flow-panel.sg-collapsed { width: 270px; }
+#sanguo-flow-panel.sg-collapsed .sg-body { display: none; }
+#sanguo-flow-panel .sg-status {
+  min-height: 38px; margin-bottom: 10px; padding: 9px 10px;
+  border: 1px solid #3e3226; border-radius: 8px; color: #cbbca6;
+  background: #211b15; font-size: 12px; line-height: 1.45;
+}
+#sanguo-flow-panel .sg-status.sg-active { border-color: #9f7028; color: #ffd77b; }
+#sanguo-flow-panel .sg-flows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#sanguo-flow-panel .sg-flow {
+  min-height: 78px; padding: 10px; text-align: left; border: 1px solid #493824;
+  border-radius: 10px; color: #f8ecd0; background: linear-gradient(145deg, #2b2117, #201912);
+  cursor: pointer; font-family: inherit;
+}
+#sanguo-flow-panel .sg-flow:hover { border-color: #d69b3b; transform: translateY(-1px); }
+#sanguo-flow-panel .sg-flow:disabled { opacity: .45; cursor: default; transform: none; }
+#sanguo-flow-panel .sg-flow span { display: block; margin-bottom: 6px; color: #ffc95d; font-size: 18px; font-weight: 800; }
+#sanguo-flow-panel .sg-flow strong { display: block; color: #f8ecd0; font-size: 12px; }
+#sanguo-flow-panel .sg-flow small { display: block; margin-top: 3px; color: #a99880; font-size: 9px; line-height: 1.3; }
+#sanguo-flow-panel .sg-stop {
+  width: 100%; margin-top: 10px; padding: 9px; border: 1px solid #823d35;
+  border-radius: 8px; color: #ffb7ac; background: #351c19; cursor: pointer; font-family: inherit;
+}
+#sanguo-flow-panel .sg-stop:disabled { opacity: .4; cursor: default; }
+#sanguo-flow-panel footer { margin-top: 9px; color: #776b5d; font-size: 9px; }
+#sanguo-flow-panel.sg-running { pointer-events: none; opacity: .82; }
+#sanguo-flow-panel.sg-running .sg-stop,
+#sanguo-flow-panel.sg-running .sg-collapse { pointer-events: auto; }

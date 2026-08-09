@@ -14,7 +14,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from src.capture import GameControl
 from src.config import PROJECT_ROOT, load_config
@@ -52,6 +52,7 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
             "label": str(macro.get("label", flow_id)),
             "description": str(macro.get("description", "Hoạt động nhanh")),
             "icon": str(macro.get("icon", "◆")),
+            "runner": str(macro.get("runner", "macro")),
         })
     return flows
 
@@ -141,8 +142,11 @@ def run_code_redeem(control: GameControl, cfg: dict, flow_id: str = "code_redeem
         print(f"[extension] code {index}/{len(codes)} submitted: {code}", flush=True)
 
 
-def adapt_canvas_region(control: GameControl, cfg: dict) -> None:
+def adapt_canvas_region(control: GameControl, cfg: dict, fullscreen: bool = False) -> None:
     """Convert constant browser-chrome pixel insets for the current window size."""
+    if fullscreen:
+        cfg["game"]["os_input"]["canvas_region"] = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+        return
     insets = cfg.get("game", {}).get("os_input", {}).get("canvas_insets_px")
     if not insets:
         return
@@ -161,7 +165,7 @@ def adapt_canvas_region(control: GameControl, cfg: dict) -> None:
     }
 
 
-def run_worker(flow_id: str, tab_title: str) -> int:
+def run_worker(flow_id: str, tab_title: str, fullscreen: bool = False) -> int:
     cfg = load_config()
     cfg["runtime"]["dry_run"] = False
     valid_ids = {flow["id"] for flow in flow_catalog(cfg)}
@@ -169,7 +173,7 @@ def run_worker(flow_id: str, tab_title: str) -> int:
         raise ValueError(f"Unknown flow: {flow_id}")
 
     control = GameControl(session=attach_existing(cfg, tab_title), cfg=cfg)
-    adapt_canvas_region(control, cfg)
+    adapt_canvas_region(control, cfg, fullscreen=fullscreen)
     control.set_dry_run(False)
     try:
         actions = GameActions(control, cfg)
@@ -216,7 +220,7 @@ def _refresh_status() -> dict[str, Any]:
         return dict(_last_result)
 
 
-def start_flow(flow_id: str, tab_title: str, tab_url: str) -> dict[str, Any]:
+def start_flow(flow_id: str, tab_title: str, tab_url: str, fullscreen: bool = False) -> dict[str, Any]:
     global _process, _log_handle, _active_flow, _last_result
     _refresh_status()
     valid_ids = {flow["id"] for flow in flow_catalog()}
@@ -232,8 +236,7 @@ def start_flow(flow_id: str, tab_title: str, tab_url: str) -> dict[str, Any]:
         _log_handle.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] START {flow_id}\n")
         _log_handle.flush()
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        _process = subprocess.Popen(
-            [
+        worker_args = [
                 sys.executable,
                 "-m",
                 "src.extension_server",
@@ -241,7 +244,11 @@ def start_flow(flow_id: str, tab_title: str, tab_url: str) -> dict[str, Any]:
                 flow_id,
                 "--tab-title",
                 tab_title,
-            ],
+            ]
+        if fullscreen:
+            worker_args.append("--fullscreen")
+        _process = subprocess.Popen(
+            worker_args,
             cwd=PROJECT_ROOT,
             stdout=_log_handle,
             stderr=subprocess.STDOUT,
@@ -304,10 +311,18 @@ class ExtensionHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/api/flows":
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/flows":
             self._send(200, {"flows": flow_catalog()})
-        elif self.path == "/api/status":
+        elif parsed.path == "/api/status":
             self._send(200, _refresh_status())
+        elif parsed.path == "/api/macro":
+            flow_id = parse_qs(parsed.query).get("id", [""])[0]
+            macro = load_config().get("activity_macros", {}).get(flow_id)
+            if not macro:
+                self._send(404, {"error": "Flow không tồn tại"})
+            else:
+                self._send(200, {"id": flow_id, "macro": macro})
         else:
             self._send(404, {"error": "Not found"})
 
@@ -326,6 +341,7 @@ class ExtensionHandler(BaseHTTPRequestHandler):
                 str(data.get("flow", "")),
                 str(data.get("tabTitle", "")),
                 str(data.get("tabUrl", "")),
+                bool(data.get("fullscreen", False)),
             )
             self._send(200 if result.get("ok") else 409, result)
         elif self.path == "/api/stop":
@@ -354,11 +370,12 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=PORT)
     parser.add_argument("--worker", metavar="FLOW")
     parser.add_argument("--tab-title", default="")
+    parser.add_argument("--fullscreen", action="store_true")
     args = parser.parse_args()
     if args.worker:
         if not args.tab_title:
             parser.error("--tab-title is required with --worker")
-        raise SystemExit(run_worker(args.worker, args.tab_title))
+        raise SystemExit(run_worker(args.worker, args.tab_title, fullscreen=args.fullscreen))
     serve(args.port)
 
 

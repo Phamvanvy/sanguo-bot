@@ -3,8 +3,9 @@
 1. Chạy `start-extension-server.ps1` từ thư mục project.
 2. Mở `brave://extensions`, bật **Developer mode**.
 3. Chọn **Load unpacked** và trỏ tới thư mục `extension` này.
-4. Mở `https://play.minhchauh5.com/`, ghim extension, bấm icon ngay trên tab game và chọn flow.
+4. Mở `https://play.minhchauh5.com/` và reload tab. Panel được ghim trực tiếp trên game.
 
-Popup gửi title của tab đang chọn cho controller tại `127.0.0.1:8765`; controller
-chỉ bám vào cửa sổ chứa tab đó và không mở tab mới. Mọi click thật vẫn đi qua
-Python OS-input; extension không inject script vào game và không dùng CDP.
+Panel có thể kéo thả và thu gọn bằng nút `−`; bấm icon extension để ẩn/hiện.
+`Cầu phúc` và `Đổi code` dùng Chrome Debugger Protocol nên không chiếm chuột hệ
+thống và có thể chạy khi tab nằm nền. Các flow cần computer vision vẫn đi qua
+Python OS-input. Đóng DevTools của tab game trước khi chạy flow không-chuột.
