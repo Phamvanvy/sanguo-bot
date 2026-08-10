@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="240x320"/>
+	<classpathentry kind="src" path="Midp2Touch"/>
+	<classpathentry excluding="240x320/" kind="src" path="client_res"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="D:/tools/KEmulator.0.8.8/KEmulator.jar"/>
+	<classpathentry kind="lib" path="libs/CMBilling.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

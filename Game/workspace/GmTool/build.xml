@@ -1,0 +1,410 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="gm工具" default="pipgm">
+	<property name="tmp.dir" value="out.bin"/>
+	<path id="base.path">
+		<pathelement path="${classpath}"/>
+		<fileset dir="lib">
+			<include name="**/*.jar"/>
+		</fileset>
+		<pathelement location="classes"/>
+	</path>
+	<tstamp>
+		<format property="BUILD_TIME" pattern="MMddHH" locale="zh,CN"/>
+	</tstamp>
+	<!-- 升级软件版本，在主版本后面添加日期和时间 -->
+	<target name="versionUp">
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern=" 版本 ([0-9]+)\.([0-9]+)\.([0-9]+)"/>
+			<substitution expression=" 版本 \1.\2\.${BUILD_TIME}"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+	</target>
+	<!-- GM工具打包 -->
+	<target name="all">
+		<jar jarfile="dist/PIPGM.jar">
+			<fileset dir="bin"/>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+	<target name="pipgm">
+		<!-- 准备编译环境 -->
+		<delete dir="${tmp.dir}"/>
+		<mkdir dir="${tmp.dir}"/>
+		<path id="src.2.be.compile">
+			<pathelement location="src"/>
+			<pathelement location="src.message"/>
+			<pathelement location="src.util"/>
+			<pathelement location="src.uwap"/>
+			<pathelement location="resources"/>
+			<pathelement location="res_zh"/>
+			<pathelement location="src.f3g"/>
+			<pathelement location="res_zh.f3g"/>
+			<pathelement location="src.502"/>
+			<pathelement location="src.fit"/>
+			<pathelement location="src.sanguo"/>
+			<pathelement location="res_zh.sanguo"/>
+			<pathelement location="src.xiyou"/>
+			<pathelement location="res_zh.xiyou"/>
+			<pathelement location="src.xuanyuan"/>
+			<pathelement location="res_zh.xuanyuan"/>
+			<pathelement location="src.wapwll"/>
+		</path>
+		<!-- 修改内部配置文件 -->
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern="public static final int BRANCH = .+;"/>
+			<substitution expression="public static final int BRANCH = BRANCH_PIP;"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+		<!-- 编译所有源程序 -->
+		<javac destdir="${tmp.dir}" fork="true" verbose="on">
+			<src>
+				<path refid="src.2.be.compile"/>
+			</src>
+			<classpath>
+				<path refid="base.path"/>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+		<!-- 打包 -->
+		<mkdir dir="dist"/>
+		<jar jarfile="dist/PIPGM.jar">
+			<fileset dir="${tmp.dir}"/>
+			<fileset dir="resources">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.502">
+				  <include name="**/*.png"/>
+				  <include name="**/*.xml"/>
+			</fileset>
+			<fileset dir="src.f3g">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.fit">
+				  <include name="**/*.png"/>
+				  <include name="**/*.xml"/>
+			</fileset>
+			<fileset dir="src.sanguo">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.xiyou">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh.xiyou">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<fileset dir="src.xuanyuan">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh.xuanyuan">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<fileset dir="res_zh.f3g">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<fileset dir="res_zh.sanguo">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<fileset dir="src.wapwll">
+				  <include name="**/*.png"/>
+				  <include name="**/*.xml"/>
+			</fileset>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+	
+	<target name="gmtw"> <!-- 为台湾“极致”准备的GM工具，仅包含明珠三国 -->
+		<!-- 准备编译环境 -->
+		<delete dir="${tmp.dir}"/>
+		<mkdir dir="${tmp.dir}"/>
+		<path id="src.2.be.compile">
+			<pathelement location="src"/>
+			<pathelement location="src.message"/>
+			<pathelement location="src.util"/>
+			<pathelement location="src.uwap"/>
+			<pathelement location="resources"/>
+			<pathelement location="res_zh_tw"/>
+			<pathelement location="src.sanguo"/>
+			<pathelement location="res_zh_tw.sanguo"/>
+		</path>
+		<!-- 修改内部配置文件 -->
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern="public static final int BRANCH = .+;"/>
+			<substitution expression="public static final int BRANCH = BRANCH_TW;"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+		<!-- 编译所有源程序 -->
+		<javac destdir="${tmp.dir}" fork="true" verbose="on">
+			<src>
+				<path refid="src.2.be.compile"/>
+			</src>
+			<classpath>
+				<path refid="base.path"/>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+		<!-- 打包 -->
+		<mkdir dir="dist/tw"/>
+		<jar jarfile="dist/tw/PIPGM.jar">
+			<fileset dir="${tmp.dir}"/>
+			<fileset dir="resources">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.f3g">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh_tw.sanguo">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+	<target name="gm5d"> <!-- 为畅游互动准备的GM工具，仅包含Flash三国版本 -->
+		<!-- 准备编译环境 -->
+		<delete dir="${tmp.dir}"/>
+		<mkdir dir="${tmp.dir}"/>
+		<path id="src.2.be.compile">
+			<pathelement location="src"/>
+			<pathelement location="src.message"/>
+			<pathelement location="src.util"/>
+			<pathelement location="src.uwap"/>
+			<pathelement location="resources"/>
+			<pathelement location="res_zh"/>
+			<pathelement location="src.f3g"/>
+			<pathelement location="res_zh.f3g"/>
+		</path>
+		<!-- 修改内部配置文件 -->
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern="public static final int BRANCH = .+;"/>
+			<substitution expression="public static final int BRANCH = BRANCH_5DING;"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+		<!-- 编译所有源程序 -->
+		<javac destdir="${tmp.dir}" fork="true" verbose="on">
+			<src>
+				<path refid="src.2.be.compile"/>
+			</src>
+			<classpath>
+				<path refid="base.path"/>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+		<!-- 打包 -->
+		<mkdir dir="dist/5ding"/>
+		<jar jarfile="dist/5ding/PIPGM.jar">
+			<fileset dir="${tmp.dir}"/>
+			<fileset dir="resources">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.f3g">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh.f3g">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+	
+	<target name="gmShuWei"> <!-- 为畅游互动准备的GM工具，仅包含Flash三国版本 -->
+			<!-- 准备编译环境 -->
+			<delete dir="${tmp.dir}"/>
+			<mkdir dir="${tmp.dir}"/>
+			<path id="src.2.be.compile">
+				<pathelement location="src"/>
+				<pathelement location="src.message"/>
+				<pathelement location="src.util"/>
+				<pathelement location="src.uwap"/>
+				<pathelement location="resources"/>
+				<pathelement location="res_zh"/>
+				<pathelement location="src.f3g"/>
+				<pathelement location="res_zh.f3g"/>
+			</path>
+			<!-- 修改内部配置文件 -->
+			<replaceregexp byline="true" encoding="GBK">
+				<regexp pattern="public static final int BRANCH = .+;"/>
+				<substitution expression="public static final int BRANCH = BRANCH_SHUWEI;"/>
+				<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+			</replaceregexp>
+			<!-- 编译所有源程序 -->
+			<javac destdir="${tmp.dir}" fork="true" verbose="on">
+				<src>
+					<path refid="src.2.be.compile"/>
+				</src>
+				<classpath>
+					<path refid="base.path"/>
+				</classpath>
+				<include name="**/*.java"/>
+			</javac>
+			<!-- 打包 -->
+			<mkdir dir="dist/shuwei"/>
+			<jar jarfile="dist/shuwei/PIPGM.jar">
+				<fileset dir="${tmp.dir}"/>
+				<fileset dir="resources">
+					  <include name="**/*.png"/>
+				</fileset>
+				<fileset dir="src.f3g">
+					  <include name="**/*.png"/>
+				</fileset>
+				<fileset dir="res_zh.f3g">
+					  <include name="**/*.xml"/>
+				</fileset>
+				<manifest>
+					<attribute name="Main-Class" value="pip.util.boot.Main"/>
+				</manifest>
+			</jar>
+		</target>
+	
+	<target name="gmf3gtw"> <!-- 为台湾Flash三国准备的GM工具，游戏新干线，仅包含Flash三国 -->
+		<!-- 准备编译环境 -->
+		<delete dir="${tmp.dir}"/>
+		<mkdir dir="${tmp.dir}"/>
+		<path id="src.2.be.compile">
+			<pathelement location="src"/>
+			<pathelement location="src.message"/>
+			<pathelement location="src.util"/>
+			<pathelement location="src.uwap"/>
+			<pathelement location="resources"/>
+			<pathelement location="res_zh_tw"/>
+			<pathelement location="src.f3g"/>
+			<pathelement location="res_zh_tw.f3g"/>
+		</path>
+		<!-- 修改内部配置文件 -->
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern="public static final int BRANCH = .+;"/>
+			<substitution expression="public static final int BRANCH = BRANCH_GameFlier;"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+		<!-- 编译所有源程序 -->
+		<javac destdir="${tmp.dir}" fork="true" verbose="on">
+			<src>
+				<path refid="src.2.be.compile"/>
+			</src>
+			<classpath>
+				<path refid="base.path"/>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+		<!-- 打包 -->
+		<mkdir dir="dist/f3gtw"/>
+		<jar jarfile="dist/f3gtw/PIPGM.jar">
+			<fileset dir="${tmp.dir}"/>
+			<fileset dir="resources">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.f3g">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh_tw.f3g">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+	
+	<target name="gmf3gmy"> <!-- 为马来西亚Flash三国准备的GM工具，仅包含Flash三国版本 -->
+		<!-- 准备编译环境 -->
+		<delete dir="${tmp.dir}"/>
+		<mkdir dir="${tmp.dir}"/>
+		<path id="src.2.be.compile">
+			<pathelement location="src"/>
+			<pathelement location="src.message"/>
+			<pathelement location="src.util"/>
+			<pathelement location="src.uwap"/>
+			<pathelement location="resources"/>
+			<pathelement location="res_zh"/>
+			<pathelement location="src.f3g"/>
+			<pathelement location="res_zh.f3g"/>
+		</path>
+		<!-- 修改内部配置文件 -->
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern="public static final int BRANCH = .+;"/>
+			<substitution expression="public static final int BRANCH = BRANCH_MY;"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+		<!-- 编译所有源程序 -->
+		<javac destdir="${tmp.dir}" fork="true" verbose="on">
+			<src>
+				<path refid="src.2.be.compile"/>
+			</src>
+			<classpath>
+				<path refid="base.path"/>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+		<!-- 打包 -->
+		<mkdir dir="dist/malaysia"/>
+		<jar jarfile="dist/malaysia/PIPGM.jar">
+			<fileset dir="${tmp.dir}"/>
+			<fileset dir="resources">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.f3g">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh.f3g">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+	<target name="gmtinhvan"> <!-- 为越南 tinhVan 准备的GM工具，仅包含明珠三国(暂时用中文版，稍后用英文版) -->
+		<!-- 准备编译环境 -->
+		<delete dir="${tmp.dir}"/>
+		<mkdir dir="${tmp.dir}"/>
+		<path id="src.2.be.compile">
+			<pathelement location="src"/>
+			<pathelement location="src.message"/>
+			<pathelement location="src.util"/>
+			<pathelement location="src.uwap"/>
+			<pathelement location="resources"/>
+			<pathelement location="res_zh"/>
+			<pathelement location="src.sanguo"/>
+			<pathelement location="res_zh.sanguo"/>
+		</path>
+		<!-- 修改内部配置文件 -->
+		<replaceregexp byline="true" encoding="GBK">
+			<regexp pattern="public static final int BRANCH = .+;"/>
+			<substitution expression="public static final int BRANCH = BRANCH_TW;"/>
+			<fileset dir="src/pip/gm/fw" includes="BaseConfig.java"/>
+		</replaceregexp>
+		<!-- 编译所有源程序 -->
+		<javac destdir="${tmp.dir}" fork="true" verbose="on">
+			<src>
+				<path refid="src.2.be.compile"/>
+			</src>
+			<classpath>
+				<path refid="base.path"/>
+			</classpath>
+			<include name="**/*.java"/>
+		</javac>
+		<!-- 打包 -->
+		<mkdir dir="dist/tinhvan"/>
+		<jar jarfile="dist/tinhvan/PIPGM.jar">
+			<fileset dir="${tmp.dir}"/>
+			<fileset dir="resources">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="src.f3g">
+				  <include name="**/*.png"/>
+			</fileset>
+			<fileset dir="res_zh_tw.sanguo">
+				  <include name="**/*.xml"/>
+			</fileset>
+			<manifest>
+				<attribute name="Main-Class" value="pip.util.boot.Main"/>
+			</manifest>
+		</jar>
+	</target>
+</project>

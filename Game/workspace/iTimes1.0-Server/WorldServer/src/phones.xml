@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="GBK"?>
+
+<phone-types>
+    <phone-type name="NK-6600"   interval="30" filetype="pkg">Nokia 6600/7610</phone-type>
+    <phone-type name="NK-Big"    interval="30" filetype="pkgem">Nokia N73</phone-type>
+    <phone-type name="NK-403"    interval="30" filetype="pkgem">Nokia 6270</phone-type>
+    <phone-type name="MIDP2-All" interval="30" filetype="pkg">MIDP2-All</phone-type>
+    <phone-type name="Moto-All"  interval="30" filetype="pkg">Moto-All</phone-type>
+    <phone-type name="NK-NGage"  interval="300" filetype="pkgem">Nokia N-Gage/N-GageQD</phone-type>
+    <phone-type name="NK-6681"   interval="30" filetype="pkgem">Nokia 6681</phone-type>
+    <phone-type name="SE-K700"   interval="30" filetype="pkg">SonyEricsson/K700</phone-type>
+    <phone-type name="NK-3250"   interval="30" filetype="pkgem">Nokia 3250</phone-type>
+    <phone-type name="NK-40-2"   interval="30" filetype="pkgs">Nokia 402</phone-type>
+    <phone-type name="MotoV300"  interval="30" filetype="pkgs">Moto 300</phone-type>
+    <phone-type name="MotoE680"  interval="30" filetype="pkg">Moto E680</phone-type>
+    <phone-type name="SE-K500"  interval="30" filetype="pkg">SonyEricsson/K500</phone-type>
+    <phone-type name="SE-K300"  interval="30" filetype="pkg">SonyEricsson/K300</phone-type>
+    <phone-type name="SE-S700"  interval="30" filetype="pkg">SonyEricsson/S700</phone-type>
+    <phone-type name="SE-K790"  interval="30" filetype="pkg">SonyEricsson/K790</phone-type>
+    <phone-type name="NK-403S"  interval="30" filetype="pkg">Nokia 5200</phone-type>
+    <phone-type name="DOPOD-585"  interval="30" filetype="pkg">DOPOD-585</phone-type>
+    <phone-type name="HEDY-M958"  interval="30" filetype="pkgem">HEDY-M958</phone-type>
+</phone-types>

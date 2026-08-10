@@ -1,0 +1,953 @@
+package peony.game.chat;
+
+import java.text.MessageFormat;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.regex.Pattern;
+
+import org.apache.log4j.Logger;
+import org.apache.mina.common.ByteBuffer;
+
+import peony.channel.Channel;
+import peony.channel.ChannelFilter;
+import peony.channel.ChannelService;
+import peony.game.Actor;
+import peony.game.Admin;
+import peony.game.ChatOption;
+import peony.game.ChatOptions;
+import peony.game.Client;
+import peony.game.GameObject;
+import peony.game.ObjectAccessor;
+import peony.game.Player;
+import peony.game.Server;
+import peony.game.VMap;
+import peony.game.nation.Nation;
+import peony.game.nation.NationService;
+import peony.net.ClientSession;
+import peony.net.Packet;
+import peony.service.Service;
+import peony.service.ServiceEvent;
+import peony.service.ServiceEventListener;
+import peony.service.feast.FeastInstanceService;
+import peony.service.friend.PlayerRelation;
+import peony.service.tong.Tong;
+import peony.util.StringUtil;
+import ch.javasoft.util.intcoll.IntHashMap;
+
+public class ChatService implements Service, ServiceEventListener, Runnable {
+
+	private static final Logger log = Logger.getLogger(ChatService.class);
+
+	protected static final String CHAT_CHANNEL_WORLD = "chat_world";
+	protected static final String CHAT_CHANNEL_WEI = "chat_wei";
+	protected static final String CHAT_CHANNEL_SHU = "chat_shu";
+	protected static final String CHAT_CHANNEL_WU = "chat_wu";
+	protected static final String CHAT_CHANNEL_GUILD = "chat_guild";
+	protected static final String CHAT_CHANNEL_PARTY = "chat_party";
+	protected static final String CHAT_CHANNEL_AREA = "chat_area";
+	protected static final String CHAT_CHANNEL_SYSTEM = "chat_system";
+	protected static final String CHAT_CHANNEL_NATIVE = "chat_native";
+
+	protected Channel systemChannel;
+	protected Channel weiChannel;
+	protected Channel shuChannel;
+	protected Channel wuChannel;
+	protected Channel worldChannel;
+	protected BlockingQueue<ChatMessage> messages = new LinkedBlockingQueue<ChatMessage>();
+	protected IntHashMap<ChatForbid> forbids = new IntHashMap<ChatForbid>();
+
+	protected ChannelFilter filter = new BlackListChannelFilter();
+	protected ChannelFilter worldShoutFilter = new WorldShoutFilter();
+	
+	protected static Pattern urlPattern = Pattern.compile("(\\w+\\.)+[a-zA-Z]+");
+	protected static String sgurl = "sg.pipgame.cn";
+	
+	//中国二级区划
+	protected static final String[] NATIVES = { peony.Messages.STRING_01613, peony.Messages.STRING_00334, peony.Messages.STRING_01614, peony.Messages.STRING_01615, peony.Messages.STRING_01616,
+			peony.Messages.STRING_01617, peony.Messages.STRING_01618, peony.Messages.STRING_01619, peony.Messages.STRING_01620, peony.Messages.STRING_01621, peony.Messages.STRING_01622, peony.Messages.STRING_01623, peony.Messages.STRING_01624, peony.Messages.STRING_00336, peony.Messages.STRING_00337, peony.Messages.STRING_01625,
+			peony.Messages.STRING_01626, peony.Messages.STRING_00335, peony.Messages.STRING_01627, peony.Messages.STRING_01628, peony.Messages.STRING_00338, peony.Messages.STRING_01629, peony.Messages.STRING_01630, peony.Messages.STRING_01631, peony.Messages.STRING_01632, peony.Messages.STRING_01633, peony.Messages.STRING_01634,
+			peony.Messages.STRING_01635, peony.Messages.STRING_01636, peony.Messages.STRING_01637, peony.Messages.STRING_01638, peony.Messages.STRING_01639, peony.Messages.STRING_01640, peony.Messages.STRING_01641,
+
+	};
+	
+	//日本二级区划
+	protected static final String[] NATIVES_JP = { "北海道", "青森县", "岩手县", "宫城县", "秋田县",
+		"山形县", "福岛县", "东京都", "神奈川县", "琦玉县", "千叶县", "茨城县", "枥木县", "群马县",
+		"新泻县", "富山县", "石川县", "福井县", "山梨县", "长野县", "岐阜县", "静冈县", "爱知县",
+		"三重县", "滋贺县", "京都府", "大阪府", "兵库县", "奈良县", "和歌山县", "鸟取县", "岛根县", 
+		"冈山县", "广岛县", "山口县", "德岛县", "香川县", "爱媛县", "高知县", "福冈县", "佐贺县", 
+		"长崎县", "熊本县", "大分县", "宫崎县", "鹿儿岛县", "冲绳县",
+
+	};
+	
+	//韩国一级区划(因韩国二级区划有重名故以"一级区划-二级区划"作为频道关键字)
+	protected static final String[] NATIVES_KO = { "首尔特别市", "釜山广域市", "仁川广域市", "大邱广域市",
+		"蔚山广域市", "大田广域市", "光州广域市北区", "江原道", "京畿道", "庆尚南道", "庆尚北道", "忠清南道",
+		"忠清北道", "全罗南道", "全罗北道", "济州特别自治道",
+
+	};
+	
+	//韩国二级区划
+	protected static final String[][] NATIVES_KO2 = { 
+		{"江南区", "江东区", "江北区", "江西区", "冠岳区", "广津区", "九老区", "衿川区", "芦原区",
+		  "道峰区", "东大门", "铜雀区", "麻浦区", "西大门", "瑞草区", "城东区", "城北区", "松坡区",
+		  "阳川区", "永登浦区", "龙山区", "恩平区", "锺路区", "中区", "中浪区", },
+		  
+		{"江西区", "金井区", "机张郡", "南区", "东区", "东莱区", "釜山镇区", "北区", "沙上区",
+		  "沙下区", "西区", "水营区", "莲堤", "影岛区", "中区", "海云台区", },
+		  
+		{"江华郡", "桂阳区", "南区", "南东区", "东区", "富平区", "西区", "延寿区", "瓮津郡", "中区", },
+		
+		{"南区", "达西区", "达城郡", "东区", "北区", "西区", "寿城区", "中区", },
+		
+		{"南区", "东区", "北区", "蔚州郡", "中区", },
+		
+		{"大德区", "东区", "西区", "儒城区", "中区", },
+		
+		{"光山区", "南区洞", "北区", "西区", },
+		
+		{"江陵市", "高城郡", "东海市", "三陟市", "束草市", "杨口郡", "襄阳郡", "宁越郡", "原州市",
+		"麟蹄郡", "旌善郡", "铁原郡", "春川市", "太白市", "平昌郡", "洪川郡", "华川郡", "横城郡", },
+		
+		{"加平郡", "高阳市", "果川市", "光明市", "广州市", "九里市", "军浦市", "金浦市", "南杨州",
+		 "豆川市", "富川市", "城南市", "水原市", "始兴市", "安山市", "安城市", "安养市", "杨州市",
+		 "杨平郡", "骊州郡", "涟川郡", "乌山市", "龙仁市", "义王市", "议政府", "利川市", "坡州市",
+		 "平泽市", "抱川市", "河南市", "华城市", },
+		
+		 {"巨济市", "居昌郡", "高城郡", "金海市", "南海市", "马山市", "密阳市", "泗川市", "山清郡",
+		  "梁山市", "宜宁郡", "晋州市", "镇海区", "昌宁郡", "昌原市", "统营市", "河东郡", "咸安郡",
+		  "咸阳郡", "陕川郡", },
+		 
+		 {"庆山市", "庆州市", "高灵郡", "龟尾市", "军威郡", "金泉市", "闻庆市", "奉化郡", "尚州市",
+		  "星州郡", "安东市", "盈德郡", "英阳郡", "荣州市", "永川市", "醴泉郡", "郁陵郡", "蔚珍郡",
+		  "义城郡", "清道郡", "青松郡", "漆谷郡", "浦项市", },
+		 
+		 {"鸡龙市", "公州市", "锦山郡", "论山市", "唐津郡", "保宁市", "扶余郡", "瑞山市", "舒川郡",
+		  "牙山市", "燕岐郡", "礼山郡", "天安市", "青阳郡", "泰安郡", "洪城郡", },
+		 
+		 {"槐山郡", "丹阳郡", "报恩郡", "永同郡", "沃川郡", "阴城郡", "堤川市", "曾坪郡", "镇川郡",
+		  "清原郡", "清州市", "清州市", "忠州市", },
+		 
+		 {"康津郡", "高兴郡", "谷城郡", "光阳市", "求礼郡", "罗州市", "潭阳郡", "木浦市", "务安郡",
+		  "宝城郡", "顺天市", "新安郡", "丽水市", "灵光郡", "灵岩郡", "莞岛郡", "长城郡", "长兴郡",
+		  "珍岛郡", "咸平郡", "海南郡", "和顺郡", },
+		 
+		 {"高敞郡", "群山市", "金堤市", "南原市", "茂朱郡", "扶安郡", "淳昌郡", "完州郡", "益山市",
+		  "任实郡", "长水郡", "全州市", "井邑市", "镇安郡", },
+		 
+		 {"西归浦", "济州市", }
+	};
+	
+	protected BlockingQueue<ChatMessage> worldShoutQueue = new LinkedBlockingQueue<ChatMessage>();
+	
+	// 特殊地图channel
+	protected static int[] specialMap = new int[]{785, 737, 801, 1457,2160};
+
+	public ChatService() {
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		worldChannel = channelService.createChannel(CHAT_CHANNEL_WORLD, false);
+		weiChannel = channelService.createChannel(CHAT_CHANNEL_WEI, false);
+		shuChannel = channelService.createChannel(CHAT_CHANNEL_SHU, false);
+		wuChannel = channelService.createChannel(CHAT_CHANNEL_WU, false);
+		systemChannel = channelService
+				.createChannel(CHAT_CHANNEL_SYSTEM, false);
+		
+		if(Server.REVISION_TYPE_JAPAN.equals(Server.server.revision)){//日本区划
+			for (int i = 0; i < NATIVES_JP.length; i++) {
+				channelService.createChannel(CHAT_CHANNEL_NATIVE + NATIVES_JP[i],
+						false);
+			}
+		} else if(Server.REVISION_TYPE_KO.equals(Server.server.revision)){//韩国区划
+			for (int i = 0; i < NATIVES_KO.length; i++) {
+				for (int j = 0; j < NATIVES_KO2[i].length; j++) {
+					channelService.createChannel(CHAT_CHANNEL_NATIVE + NATIVES_KO[i] + "-" + NATIVES_KO2[i][j],
+							false);
+				}
+			}
+		} else {//中国区划
+			for (int i = 0; i < NATIVES.length; i++) {
+				channelService.createChannel(CHAT_CHANNEL_NATIVE + NATIVES[i],
+						false);
+			}
+		}
+	}
+
+	public void join(int channel, int targetId, String nativeString,
+			ClientSession session) {
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (channel == ChatOption.SYSTEM) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_SYSTEM, session);
+		} else if (channel == ChatOption.WORLD) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_WORLD, session);
+		} else if (channel == ChatOption.FACTION) {
+			if (targetId == 1) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_WEI, session);
+			} else if (targetId == 2) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_SHU, session);
+			} else if (targetId == 3) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_WU, session);
+			}
+		} else if (channel == ChatOption.GUILD) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_GUILD + targetId,
+					session);
+		} else if (channel == ChatOption.NATIVE) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_NATIVE
+					+ nativeString, session);
+		} else if (channel == ChatOption.AREA) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_AREA + targetId,
+					session);
+		}
+	}
+
+	public void startup() {
+		Server.server.getEventManager().registerListener(this);
+		new Thread(this, "ChatService").start();
+		new Thread(new CheckWorldShoutProcess()).start();
+	}
+
+	public void shutdown() {
+		Server.server.getEventManager().unregisterListener(this);
+	}
+
+	/**
+	 * 返回此监听者关心的事件类型数组。
+	 */
+	public int[] getEventTypes() {
+		return new int[] { ServiceEvent.EVENT_MAP_ADDED,
+				ServiceEvent.EVENT_MAP_REMOVED,
+				ServiceEvent.EVENT_MAP_PLAYER_ADDED,
+				ServiceEvent.EVENT_MAP_PLAYER_LOADED,
+				ServiceEvent.EVENT_MAP_PLAYER_REMOVED,
+				ServiceEvent.EVENT_PLAYER_CREATED,
+				ServiceEvent.EVENT_PLAYER_LOADED,
+				ServiceEvent.EVENT_PLAYER_LOGINED,
+				ServiceEvent.EVENT_PLAYER_LOGOUTED,
+				ServiceEvent.EVENT_PLAYER_FIRSTLOAD,
+				ServiceEvent.EVENT_TONG_LOADED,
+				ServiceEvent.EVENT_PLAYER_CHANGETONG,
+				ServiceEvent.EVENT_PLAYER_LEAVETONG,
+				ServiceEvent.EVENT_PLAYER_CHANGE_FACTION };
+	}
+
+	/**
+	 * 处理服务事件。
+	 * 
+	 * @param event
+	 */
+	public void handleEvent(ServiceEvent event) {
+		switch (event.type) {
+		case ServiceEvent.EVENT_MAP_ADDED:
+			mapAdded((VMap) event.param1);
+			break;
+		case ServiceEvent.EVENT_MAP_REMOVED:
+			mapRemoved((VMap) event.param1);
+			break;
+		case ServiceEvent.EVENT_MAP_PLAYER_ADDED:
+			mapPlayerAdded((VMap) event.param1, (Player) event.param2);
+			break;
+		case ServiceEvent.EVENT_MAP_PLAYER_LOADED:
+			mapPlayerLoadingFinish((VMap) event.param1, (Player) event.param2);
+			break;
+		case ServiceEvent.EVENT_MAP_PLAYER_REMOVED:
+			mapPlayerRemoved((VMap) event.param1, (Player) event.param2);
+			break;
+		case ServiceEvent.EVENT_PLAYER_CREATED:
+			playerCreated((Player) event.param1);
+			break;
+		case ServiceEvent.EVENT_PLAYER_LOADED:
+			playerLoaded((Player) event.param1);
+			break;
+		case ServiceEvent.EVENT_PLAYER_LOGINED:
+			playerLogined((Player) event.param1);
+			break;
+		case ServiceEvent.EVENT_PLAYER_LOGOUTED:
+			playerLogouted((Player) event.param1);
+			break;
+		case ServiceEvent.EVENT_PLAYER_FIRSTLOAD:
+			playerFirstLoad((Player) event.param1);
+			break;
+		case ServiceEvent.EVENT_TONG_LOADED:
+			tongLoaded((Tong) event.param1);
+			break;
+		case ServiceEvent.EVENT_PLAYER_CHANGETONG:
+			changeTong((Actor) event.param1, (Tong) event.param2);
+			break;
+		case ServiceEvent.EVENT_PLAYER_LEAVETONG:
+			leaveTong((Actor) event.param1, (Tong) event.param2);
+			break;
+		case ServiceEvent.EVENT_PLAYER_CHANGE_FACTION:
+			changeFaction((Player) event.param1, (Integer) event.param2);
+			break;
+		}
+	}
+
+	protected void changeFaction(Player p, Integer oldFaction) {
+		String oldChannelName = null;
+		if (oldFaction == GameObject.FACTION_WEI)
+			oldChannelName = CHAT_CHANNEL_WEI;
+		else if (oldFaction == GameObject.FACTION_SHU)
+			oldChannelName = CHAT_CHANNEL_SHU;
+		else if (oldFaction == GameObject.FACTION_WU)
+			oldChannelName = CHAT_CHANNEL_WU;
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		channelService.removeSessionFromChannel(oldChannelName, p.session);
+		String newChannelName = null;
+		if (p.faction == GameObject.FACTION_WEI)
+			newChannelName = CHAT_CHANNEL_WEI;
+		else if (p.faction == GameObject.FACTION_SHU)
+			newChannelName = CHAT_CHANNEL_SHU;
+		else if (p.faction == GameObject.FACTION_WU)
+			newChannelName = CHAT_CHANNEL_WU;
+		channelService.addSessionToChannel(newChannelName, p.session);
+	}
+
+	protected void changeTong(Actor actor, Tong t) {
+		Player p = ObjectAccessor.getPlayer(actor.id);
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (p != null && p.session != null
+				&& p.chatOptions.options[ChatOption.GUILD].inChannel) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_GUILD + t.id,
+					p.session);
+		}
+	}
+
+	public void leaveTong(Actor actor, Tong t) {
+		Player p = ObjectAccessor.getPlayer(actor.id);
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (p != null && p.session != null
+				&& p.chatOptions.options[ChatOption.GUILD].inChannel) {
+			channelService.removeSessionFromChannel(CHAT_CHANNEL_GUILD + t.id,
+					p.session);
+		}
+	}
+
+	public void tongLoaded(Tong tong) {
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		channelService.createChannel(CHAT_CHANNEL_GUILD + tong.id, false);
+	}
+
+	public void mapAdded(VMap map) {
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if(isSpecialMap(map.getId()) && map.instance!=null){
+			channelService.createChannel(CHAT_CHANNEL_AREA + map.getId() + map.instance.getId(), false);
+		}else{
+			channelService.createChannel(CHAT_CHANNEL_AREA + map.getId(), false);
+		}
+	}
+
+	public void mapRemoved(VMap map) {
+
+	}
+
+	public void playerCreated(Player player) {
+
+	}
+
+	public void playerFirstLoad(Player player) {
+		// log.debug("add to chatService:" + player.name);
+		ChatOptions options = player.chatOptions;
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		channelService.addSessionToChannel(CHAT_CHANNEL_SYSTEM, player.session);
+		if (options.options[ChatOption.WORLD].inChannel) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_WORLD,
+					player.session);
+		}
+		if (options.options[ChatOption.FACTION].inChannel) {
+			if (player.faction == GameObject.FACTION_WEI) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_WEI,
+						player.session);
+			} else if (player.faction == GameObject.FACTION_SHU) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_SHU,
+						player.session);
+			} else if (player.faction == GameObject.FACTION_WU) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_WU,
+						player.session);
+			}
+		}
+		if (options.options[ChatOption.NATIVE].inChannel
+				&& player.chatOptions.nativeName.length() > 0) {
+			channelService.addSessionToChannel(CHAT_CHANNEL_NATIVE
+					+ player.chatOptions.nativeName, player.session);
+		}
+		if (options.options[ChatOption.GUILD].inChannel) {
+			Tong tong = Server.server.getServiceRegistry().getTongService()
+					.getPlayerTong(player.id,false);
+			if (tong != null) {
+				channelService.addSessionToChannel(
+						CHAT_CHANNEL_GUILD + tong.id, player.session);
+			}
+		}
+	}
+
+	public void playerLoaded(Player player) {
+
+	}
+
+	public void playerLogined(Player player) {
+	}
+
+	public void playerLogouted(Player player) {
+		ChatOptions options = player.chatOptions;
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		channelService.removeSessionFromChannel(CHAT_CHANNEL_SYSTEM,
+				player.session);
+		if (options.options[ChatOption.WORLD].inChannel) {
+			channelService.removeSessionFromChannel(CHAT_CHANNEL_WORLD,
+					player.session);
+		}
+		if (options.options[ChatOption.FACTION].inChannel) {
+			if (player.faction == GameObject.FACTION_WEI) {
+				channelService.removeSessionFromChannel(CHAT_CHANNEL_WEI,
+						player.session);
+			} else if (player.faction == GameObject.FACTION_SHU) {
+				channelService.removeSessionFromChannel(CHAT_CHANNEL_SHU,
+						player.session);
+			} else if (player.faction == GameObject.FACTION_WU) {
+				channelService.removeSessionFromChannel(CHAT_CHANNEL_WU,
+						player.session);
+			}
+		}
+		if (options.options[ChatOption.NATIVE].inChannel) {
+			channelService.removeSessionFromChannel(CHAT_CHANNEL_NATIVE
+					+ player.chatOptions.nativeName, player.session);
+		}
+	}
+
+	public void mapPlayerAdded(VMap map, Player player) {
+
+	}
+
+	public void mapPlayerLoadingFinish(VMap map, Player player) {
+		if(Server.isStepServer)
+			return;
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (player.chatOptions.options[ChatOption.AREA].inChannel) {
+			if(isSpecialMap(map.getId()) && map.instance!=null){
+				channelService.addSessionToChannel(CHAT_CHANNEL_AREA + map.getId() + map.instance.getId(),
+						player.session);
+			}else{
+				channelService.addSessionToChannel(CHAT_CHANNEL_AREA + map.getId(),
+						player.session);
+			}
+		}
+	}
+
+	public void mapPlayerRemoved(VMap map, Player player) {
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (player.chatOptions.options[ChatOption.AREA].inChannel) {
+			if(isSpecialMap(map.getId()) && map.instance!=null){
+				channelService.removeSessionFromChannel(CHAT_CHANNEL_AREA
+						+ map.getId() + map.instance.getId(), player.session);
+			}else{
+				channelService.removeSessionFromChannel(CHAT_CHANNEL_AREA
+						+ map.getId(), player.session);
+			}
+		}
+	}
+
+	public void addChatMessage(ChatMessage cm) {
+		messages.add(cm);
+	}
+
+	public void run() {
+		while (true) {
+			try {
+				ChatMessage message = messages.take();
+				send(message);
+			} catch (Exception e) {
+				log.error(e, e);
+			}
+		}
+	}
+
+	protected void send(ChatMessage cm) {
+		if (!checkForbid(cm))
+			return;
+		if (cm.sourceId > 0) {
+			String s = StringUtil.filterBadWords(cm.getMessage());
+			cm.message = s.replaceAll("[\r\n]", "");
+//			cm.message = s.replace('\n', ' ');
+				if (Server.server.REVISION_TYPE_PIP.equals(Server.server.revision))
+			cm.message = replaceUrl(cm.message);
+		}
+		switch (cm.channel) {
+		case ChatOption.SYSTEM:
+			systemChannel.broadcast(cm.getPacket(), null);
+			break;
+		case ChatOption.WORLD:
+			worldChannel.broadcast(cm, filter);
+			break;
+		case ChatOption.AREA: {
+			ChannelService channelService = Server.server.getServiceRegistry()
+					.getChannelService();
+			Channel ch = channelService.getChannel(CHAT_CHANNEL_AREA
+					+ cm.destId);
+			if (ch != null)
+				ch.broadcast(cm, filter);
+		}
+			break;
+		case ChatOption.FACTION: {
+			Channel ch = null;
+			if (cm.destId == GameObject.FACTION_WEI) {
+				ch = weiChannel;
+			} else if (cm.destId == GameObject.FACTION_SHU) {
+				ch = shuChannel;
+			} else if (cm.destId == GameObject.FACTION_WU) {
+				ch = wuChannel;
+			}
+			if (ch != null)
+				ch.broadcast(cm, filter);
+		}
+			break;
+		case ChatOption.GUILD: {
+			Tong tong = Server.server.getServiceRegistry().getTongService()
+					.getTong(cm.destId);
+			if (tong != null) {
+				ChannelService channelService = Server.server
+						.getServiceRegistry().getChannelService();
+				Channel ch = channelService.getChannel(CHAT_CHANNEL_GUILD
+						+ tong.id);
+				if (ch != null)
+					ch.broadcast(cm, filter);
+			}
+		}
+			break;
+		case ChatOption.PRIVATE: {
+			if (cm.destId > 0) { // 如果是一般的玩家
+				Player p = ObjectAccessor.getPlayer(cm.destId);
+				if (p != null && p.session != null) {
+					if(p.isInStep&&cm.sourceId!=-1){
+						if (cm.sourceId > 0) {
+							Player source = ObjectAccessor.getPlayer(cm.sourceId);
+							if (source != null) {
+								source.send(new ChatMessage(ChatOption.PRIVATE, -1,
+										-1, peony.Messages.STRING_00004, "您私聊的对象正在跨服战场浴血奋战，暂时不能回复您，请稍候。", null).getPacket());
+							}
+						}
+					}else{
+						// Packet pt = getPacket(cm);
+						filter.filter(p.session, cm, null);
+						if (cm.sourceId > 0) {
+							Player source = ObjectAccessor.getPlayer(cm.sourceId);
+							if (source != null) {
+								source.send(cm.getPacket());
+							}
+							
+							// 发送聊天通知消息，更新临时关系表
+							Server.server.getEventManager().addEvent(
+									new ServiceEvent(ServiceEvent.EVENT_INTERACT, source,
+											p, PlayerRelation.INTERACT_CHAT));
+						}
+					}
+				} else {
+					if (cm.sourceId > 0) {
+						Player source = ObjectAccessor.getPlayer(cm.sourceId);
+						if (source != null) {
+							source.send(new ChatMessage(ChatOption.PRIVATE, -1,
+									-1, peony.Messages.STRING_00004, peony.Messages.STRING_00609, null).getPacket());
+						}
+					}
+				}
+			} else {
+				if (cm.destId != -1) {// 如果是Admin
+					Admin admin = Server.server.getServiceRegistry()
+							.getAdminService().getAdmin(-cm.destId);
+					if (admin != null) {
+						Packet pt = cm.getPacket();
+						pt.putString("private");
+						admin.send(pt);
+					}
+				}
+			}
+		}
+			break;
+		case ChatOption.NATIVE: {
+			ChannelService channelService = Server.server.getServiceRegistry()
+					.getChannelService();
+			if (cm.destName != null && cm.destName.length() > 0) {
+				Channel ch = channelService.getChannel(CHAT_CHANNEL_NATIVE
+						+ cm.destName);
+				if (ch != null)
+					ch.broadcast(cm, filter);
+			}
+		}
+			break;
+		case ChatOption.PARTY: {
+			if (cm.sessions != null && cm.sessions.length > 0) {
+				for (ClientSession session : cm.sessions) {
+					if (session != null)
+						filter.filter(session, cm, null);
+				}
+			}
+		}
+			break;
+		case ChatOption.FACTION_SHOUT: {
+			Channel ch = null;
+			if (cm.destId == GameObject.FACTION_WEI) {
+				ch = weiChannel;
+			} else if (cm.destId == GameObject.FACTION_SHU) {
+				ch = shuChannel;
+			} else if (cm.destId == GameObject.FACTION_WU) {
+				ch = wuChannel;
+			}
+			if (ch != null)
+				ch.broadcast(cm.getShoutPacket());
+		}
+			break;
+		case ChatOption.WORLD_SHOUT: {
+			Channel ch = worldChannel;
+			if (ch != null)
+				ch.broadcast(cm.getShoutPacket(), worldShoutFilter);
+		}
+		case ChatOption.PRIVATE_SHOUT:
+			if (cm.destId > 0) {
+				Player p = ObjectAccessor.getPlayer(cm.destId);
+				if (p != null && p.session != null) {
+					p.send(cm.getShoutPacket());
+				}
+			}
+		break;
+		}
+	}
+	
+	protected static String replaceUrl(String s){
+		return urlPattern.matcher(s).replaceAll(sgurl);
+	}
+
+	public void sendPrivateShout(int destId, int color, int duration, int faction, String message){
+		ChatMessage cm = new ChatMessage(ChatOption.PRIVATE_SHOUT, destId, faction, "", message, null);
+		cm.destId = destId;
+		cm.shoutColor = color;
+		cm.shoutDuration = duration;
+		addChatMessage(cm);
+	}
+	
+	public void sendSystemMessage(int ch, String name, String message) {
+		ChatMessage cm = new ChatMessage(ch, -1, -1, peony.Messages.STRING_00004, message, null);
+		addChatMessage(cm);
+	}
+	
+	public void sendPrivateMessage(int destId,String message){
+		ChatMessage cm = new ChatMessage(ChatOption.PRIVATE, -1, -1, peony.Messages.STRING_00004,
+				destId, message, null);
+		addChatMessage(cm);
+	}
+	
+	public void sendFactionSystemMessage(int faction, String message) {
+		ChatMessage cm = new ChatMessage(ChatOption.FACTION, -1, faction, peony.Messages.STRING_00004, message, null);
+		cm.destId = faction;
+		addChatMessage(cm);
+	}
+	
+	public void sendAreaSystemMessage(String message,int destId){
+		ChatMessage cm = new ChatMessage(ChatOption.AREA,-1,-1,peony.Messages.STRING_00004,message,null);
+		cm.destId = destId;
+		addChatMessage(cm);
+	}
+	
+	public void sendFactionShout(int faction,String message,int color,int duration){
+		ChatMessage cm = new ChatMessage(ChatOption.FACTION_SHOUT, -1, faction, peony.Messages.STRING_00004, message, null);
+		cm.destId = faction;
+		cm.shoutColor = color;
+		cm.shoutDuration = duration;
+		addChatMessage(cm);
+	}
+	
+	public void sendWorldShout(String name,int sourceId,int faction,String message,int color,int duration){
+		sendWorldShout(name, sourceId, faction, message, color, duration,0);
+	}
+	
+	public void sendWorldShout(String name,int sourceId,int faction,String message,int color,int duration,int viplevel){
+		ChatMessage cm = new ChatMessage(ChatOption.WORLD_SHOUT, sourceId, faction, "", message, null);
+		cm.sourceName = name;
+		cm.destId = faction;
+		cm.shoutColor = color;
+		cm.shoutDuration = duration;
+		cm.vipLevel = viplevel;
+		worldShoutQueue.add(cm);
+	}
+	
+	public void sendFactionSystemMessage(int faction, String name, String message){
+		ChatMessage cm = new ChatMessage(ChatOption.FACTION, -1, faction, name, message, null);
+		cm.destId = faction;
+		addChatMessage(cm);
+	}
+	
+	public void sendWorldMessage(String message) {
+		ChatMessage cm = new ChatMessage(ChatOption.WORLD,-1,-1,peony.Messages.STRING_00004,message,null);
+		addChatMessage(cm);
+	}
+	
+	public void sendGuildSystemMessage(String message, int destId){
+		ChatMessage cm = new ChatMessage(ChatOption.GUILD,-1,-1,peony.Messages.STRING_00004,message,null);
+		cm.destId = destId;
+		addChatMessage(cm);
+	}
+
+	public void changeOption(int ch, boolean oldInChannel,
+			boolean newInChannel, Player player) {
+		String channelName = null;
+		if (ch == ChatOption.WORLD) {
+			channelName = CHAT_CHANNEL_WORLD;
+		} else if (ch == ChatOption.FACTION) {
+			if (player.faction == GameObject.FACTION_WEI) {
+				channelName = CHAT_CHANNEL_WEI;
+			} else if (player.faction == GameObject.FACTION_SHU) {
+				channelName = CHAT_CHANNEL_SHU;
+			} else if (player.faction == GameObject.FACTION_WU) {
+				channelName = CHAT_CHANNEL_WU;
+			}
+		} else if (ch == ChatOption.AREA) {
+			if(player.map.map.instance!=null){
+				channelName = CHAT_CHANNEL_AREA + player.map.id + player.map.map.instance.getId();
+			}else{
+				channelName = CHAT_CHANNEL_AREA + player.map.id;
+			}
+		} else if (ch == ChatOption.NATIVE) {
+			if (player.chatOptions.nativeName.length() > 0) {
+				channelName = CHAT_CHANNEL_NATIVE
+						+ player.chatOptions.nativeName;
+			}
+		}
+		if (ch == ChatOption.GUILD) {
+			Tong tong = Server.server.getServiceRegistry().getTongService()
+					.getPlayerTong(player.id,false);
+
+			if (tong != null) {
+				channelName = CHAT_CHANNEL_GUILD+tong.id;
+			}
+		}
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (channelName != null) {
+			if (oldInChannel) {
+				channelService.removeSessionFromChannel(channelName,
+						player.session);
+			}
+			if (newInChannel) {
+				channelService.addSessionToChannel(channelName, player.session);
+			}
+		}
+	}
+
+	public void nativeChange(String oldNative, String newNative, Player player) {
+		ChannelService channelService = Server.server.getServiceRegistry()
+				.getChannelService();
+		if (player.chatOptions.options[ChatOption.NATIVE].inChannel) {
+			if (oldNative.length() > 0) {
+				channelService.removeSessionFromChannel(CHAT_CHANNEL_NATIVE
+						+ oldNative, player.session);
+			}
+			if (newNative.length() > 0) {
+				channelService.addSessionToChannel(CHAT_CHANNEL_NATIVE
+						+ newNative, player.session);
+			}
+		}
+	}
+
+	// protected Packet getPacket(ChatMessage msg) {
+	// Packet pt = new Packet(OpCode.CHAT_SERVER);
+	// pt.put(msg.channel);
+	// pt.putInt(msg.sourceId);
+	// pt.putString(msg.sourceName);
+	// pt.putString(msg.message);
+	// pt.put(msg.getBytes());
+	// return pt;
+	// }
+
+	public void forbid(int playerId, int channel, long time) {
+		if (time == 0 || time < System.currentTimeMillis()) {
+			forbids.remove(playerId);
+			return;
+		}
+		ChatForbid forbid = forbids.get(playerId);
+		if (forbid == null) {
+			forbid = new ChatForbid(playerId);
+			forbids.put(playerId, forbid);
+		}
+		forbid.flag |= channel;
+		forbid.time = time;
+	}
+	
+	public boolean checkForbid(ChatMessage cm) {
+		ChatForbid cf = forbids.get(cm.sourceId);
+		if (cf == null)
+			return true;
+		if (cf.time < System.currentTimeMillis())
+			return true;
+		switch (cm.channel) {
+		case ChatOption.WORLD:
+			return (cf.flag & ChatForbid.FORBID_WORLD) == 0;
+		case ChatOption.FACTION:
+			return (cf.flag & ChatForbid.FORBID_FACTION) == 0;
+		case ChatOption.AREA:
+			return (cf.flag & ChatForbid.FORBID_AREA) == 0;
+		case ChatOption.NATIVE:
+			return (cf.flag & ChatForbid.FORBID_NATIVE) == 0;
+		case ChatOption.PRIVATE:
+			return (cf.flag & ChatForbid.FORBID_PRIVATE) == 0;
+		}
+		return true;
+	}
+	
+	public static boolean isSpecialMap(int mapId){
+		for(int id : specialMap){
+			if(id==mapId)
+				return true;
+		}
+		return false;
+	}
+	
+	class CheckWorldShoutProcess implements Runnable{
+
+		public void run() {
+			while(true){
+				try {
+					ChatMessage cm = worldShoutQueue.take();
+					String mess = cm.message;
+					cm.message = MessageFormat.format("{0}:{1}", cm.sourceName,mess);
+					addChatMessage(cm);
+					ChatMessage cm1 = new ChatMessage(ChatOption.WORLD,cm.sourceId,cm.faction,cm.sourceName,mess,null);
+					cm1.vipLevel = cm.vipLevel;
+					cm1.playerLevel = cm.playerLevel;
+					addChatMessage(cm1);
+					Thread.sleep(2000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+	}
+	
+}
+
+class BlackListChannelFilter implements ChannelFilter {
+	public void filter(ClientSession session, Object object, Channel channel) {
+		ChatMessage cm = (ChatMessage) object;
+		Client client = session.getClient();
+		if (client != null) {
+			if (client instanceof Player) {
+				if (cm.sourceId < 0) {
+					session.send(cm.getPacket());
+					return;
+				}
+				Player p = (Player) client;
+				ChatOption option = p.chatOptions.options[cm.channel];
+				if (option.inChannel) {
+					if(((cm.channel == option.FACTION && !p.isAllowFactionChat()))||
+							(cm.channel == option.GUILD && !p.isAllowGuildChat())){
+						return;
+					}
+					
+					PlayerRelation r = Server.server.getServiceRegistry()
+							.getRelationService().get(p.id);
+					if (r != null) {
+						if (r.blackList.exists(cm.sourceId))
+							return;
+					}
+					if (cm.faction == -1 || p.faction == cm.faction || cm.channel==ChatOption.WORLD)//世界聊因为花钱了，所以都能看见
+						session.send(cm.getPacket());
+					else {
+						Player source = (Player)ObjectAccessor.getPlayer(cm.sourceId);
+						if(source!=null && source.getVMap().instance!=null && p.getVMap().instance!=null){
+							if(cm.channel==ChatOption.AREA&&p.faction!=cm.faction&&p.getVMap().getId() == FeastInstanceService.MAPID && source.getVMap().instance.getId() == p.getVMap().instance.getId()){
+								session.send(cm.getPacket());
+							}
+						}
+						if(cm.channel==ChatOption.PRIVATE&&p.faction!=cm.faction){
+							NationService nationService = Server.server.getServiceRegistry().getNationService();
+							Nation sourceNation = nationService.getNationByFaction(cm.faction);
+							if(sourceNation.getKingId()==cm.sourceId){ //如果是两个国王之间的私聊就可以发送
+								 Nation destNation = nationService.getNationByFaction(p.faction);
+								 if(destNation.getKingId()==p.id){
+									 session.send(cm.getPacket());
+								 }
+							}
+						}
+						if (cm.maskMessage != null
+								&& cm.maskMessage.length() > 0)
+							session.send(cm.getMaskPacket());
+					}
+				}
+			} else if (client instanceof Admin) {
+				Packet packet = cm.getPacket();
+				Packet p = new Packet(packet.getOpCode());
+				ByteBuffer buf = packet.getData();
+				int n = buf.position();
+				byte bbuf[] = new byte[n];
+				buf.position(0);
+				buf.get(bbuf);
+				buf.position(n);
+				p.getData().put(bbuf);
+				p.putString(channel.getName());
+				session.send(p);
+			}
+		}
+		// ByteBuffer buff = packet.getData();
+		// byte ch = buff.get(0);
+		// int sourceId = buff.getInt(1);
+		//
+		// Client client = session.getClient();
+		// if (client != null) {
+		// if (client instanceof Player) {
+		// if (sourceId < 0) {
+		// session.send(packet);
+		// return;
+		// }
+		// Player p = (Player) client;
+		// // if (p.id == sourceId)
+		// // return;
+		// ChatOption option = p.chatOptions.options[ch];
+		// if (option.inChannel) {
+		// PlayerRelation r = Server.server.getServiceRegistry()
+		// .getRelationService().get(p.id);
+		// if (r != null) {
+		// if (r.blackList.exists(sourceId))
+		// return;
+		// }
+		// session.send(packet);
+		// }
+		// } else if (client instanceof Admin) {
+		// Packet p = new Packet(packet.getOpCode());
+		// ByteBuffer buf = packet.getData();
+		// int n = buf.position();
+		// byte bbuf[] = new byte[n];
+		// buf.position(0);
+		// buf.get(bbuf);
+		// buf.position(n);
+		// p.getData().put(bbuf);
+		// p.putString(channel.getName());
+		// session.send(p);
+		// }
+		// }
+	}
+
+}
+
+class ChatForbid {
+	public int playerId;
+	public int flag;
+	public long time;
+
+	public static final int FORBID_WORLD = 1;
+	public static final int FORBID_FACTION = 1 << 1;
+	public static final int FORBID_AREA = 1 << 2;
+	public static final int FORBID_NATIVE = 1 << 3;
+	public static final int FORBID_PRIVATE = 1 << 4;
+
+	public ChatForbid(int playerId) {
+		this.playerId = playerId;
+	}
+}

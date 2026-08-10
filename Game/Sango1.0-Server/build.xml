@@ -1,0 +1,124 @@
+<project name="Sanguo1.0" default="dist" basedir=".">
+	<property name="eclipsehome" location="c:/eclipse3.4" />
+	<property name="db" location="../db/src" />
+	<property name="net" location="../net/src" />
+	<property name="editor" location="../Sanguo-Editor1.0/src" />
+	<property name="image" location="../ImageWorkshop1.0/src" />
+	<property name="world" location="src" />
+	<property name="build" location="build" />
+	<property name="dist" location="dist" />
+	<path id="libs">
+		<fileset dir="lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="${eclipsehome}/plugins">
+			<include name="**/org.eclipse*.jar" />
+		</fileset>
+		<fileset dir="../Sanguo-Editor1.0/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="../net/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="../db/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+	<target name="init">
+		<mkdir dir="${build}" />
+	</target>
+
+	<target name="compiledb" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${db}" />
+		</javac>
+	</target>
+
+	<target name="compilenet" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${net}" />
+		</javac>
+	</target>
+
+	<target name="compileeditor" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${editor}" />
+		</javac>
+	</target>
+
+	<target name="compileimage" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${image}" />
+		</javac>
+	</target>
+
+	<target name="compileworld" depends="compilenet,compiledb,compileeditor,compileimage">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${world}" />
+		</javac>
+	</target>
+
+	<target name="disteditor" depends="compileeditor">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/editor.jar">
+			<fileset dir="${build}" includes="**/com/pip/sanguo/**" />
+		</jar>
+	</target>
+
+	<target name="distdb" depends="compiledb">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/db.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+		</jar>
+	</target>
+
+	<target name="distnet" depends="compilenet">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/commonnet.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+		</jar>
+	</target>
+
+	<target name="distimage" depends="compileimage">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/workshop.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+			<fileset dir="${build}" includes="**/com/pipimage/**" />
+		</jar>
+	</target>
+
+	<target name="distworld" depends="compileworld">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/peony.jar">
+			<fileset dir="${build}" includes="**/peony/**" />
+		</jar>
+	</target>
+
+	<target name="dist" depends="clean,distdb,distnet,distimage,disteditor,distworld" />
+
+	<target name="clean" description="clean up">
+		<delete dir="${build}" />
+		<delete dir="${dist}" />
+	</target>
+
+</project>

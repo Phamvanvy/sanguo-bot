@@ -1,0 +1,306 @@
+<?xml version="1.0"?>
+<project name="sango" basedir="." default="">
+    <property file="custom.properties" />
+    <property name="cvsroot" value=":pserver:${cvsuser}:${cvspass}@192.168.0.3:/repository" />
+    <property name="server.dir" value="server" />
+    <property name="client.dir" value="client" />
+    <property name="editor.dir" value="editor" />
+    <property name="vm.dir" value="vm" />
+    <property name="db.dir" value="db" />
+    <property name="server.module.name" value="projects/iTimes1.0/iTimes1.0-Server" />
+    <property name="client.module.name" value="projects/iTimes1.0/iTimes1.1-Client" />
+    <property name="editor.module.name" value="projects/iTimes1.0/iTimes1.0-Editor" />
+    <property name="vm.module.name" value="projects/iTimes1.0/iTimes1.0-VM" />
+    <property name="db.module.name" value="projects/Account1.0/db" />
+    <property name="db" value="${basedir}/${db.dir}/src" />
+    <property name="editor" value="${basedir}/${editor.dir}/dev/src" />
+    <property name="vm" value="${basedir}/${vm.dir}/src" />
+    <property name="server.common" value="${basedir}/${server.dir}/common/src" />
+    <property name="server.world" value="${basedir}/${server.dir}/WorldServer/src" />
+    <property name="server.net" value="${basedir}/${server.dir}/net/src" />
+    <property name="server.dispatch" value="${basedir}/${server.dir}/DispatchServer/src" />
+    <property name="build" value="build" />
+    <property name="dist" value="dist" />
+
+    <path id="libs">
+        <fileset dir="${basedir}/${server.dir}/lib">
+            <include name="**/*.jar" />
+        </fileset>
+        <fileset dir="${eclipsehome}/plugins">
+            <include name="**/org.eclipse*.jar" />
+        </fileset>
+        <fileset dir="${basedir}/${editor.dir}/dev/lib">
+            <include name="**/*.jar" />
+        </fileset>
+        <fileset dir="${basedir}/${db.dir}/lib">
+            <include name="**/*.jar" />
+        </fileset>
+    </path>
+
+    <!--########## Compile ##########-->
+    <target name="init">
+        <mkdir dir="${build}" />
+    </target>
+
+    <target name="compilevm" depends="init">
+        <javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${vm}/etf" />
+            <src path="${vm}/gtvm" />
+            <src path="${vm}/debugger" />
+            <src path="${vm}/etf@server" />
+            <src path="${vm}/decompiler" />
+            <src path="${vm}/compiler" />
+        </javac>
+    </target>
+
+    <target name="compiledb" depends="init">
+        <javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${db}" />
+        </javac>
+    </target>
+
+    <target name="compileeditor" depends="init">
+        <javac nowarn="true" destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${editor}" />
+        </javac>
+        <copy todir="${build}">
+            <fileset dir="${editor}">
+                <include name="**/*.xml" />
+                <include name="**/*.properties" />
+            </fileset>
+        </copy>
+    </target>
+
+    <target name="compilenet" depends="init">
+        <javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${server.net}" />
+        </javac>
+    </target>
+
+    <target name="compilecommon" depends="compiledb">
+        <javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${server.common}" />
+        </javac>
+        <copy todir="${build}/com">
+            <fileset dir="${server.common}/com">
+                <include name="**/*.xml" />
+            </fileset>
+        </copy>
+    </target>
+
+    <target name="compiledispatch" depends="compilenet">
+        <javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${server.dispatch}" />
+        </javac>
+    </target>
+
+    <target name="compileserver" depends="compiledb, compileeditor, compilecommon, compilenet">
+        <javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+            <classpath>
+                <path refid="libs" />
+                <pathelement path="${build}" />
+            </classpath>
+            <src path="${server.world}" />
+        </javac>
+    </target>
+    <!--########## Compile End ##########-->
+
+    <!--########## Dist Code ##########-->
+    <target name="distvm" depends="compilevm">
+        <mkdir dir="${dist}/jar" />
+        <jar destfile="${dist}/jar/gtl.jar">
+            <fileset dir="${build}" includes="**/com/pip/gtl/**" />
+        </jar>
+    </target>
+
+    <target name="distdb" depends="compiledb">
+        <mkdir dir="${dist}/jar" />
+        <jar destfile="${dist}/jar/db.jar">
+            <fileset dir="${build}" includes="**/com/pip/db/**" />
+        </jar>
+    </target>
+
+    <target name="distnet" depends="compilenet">
+        <mkdir dir="${dist}/jar" />
+        <jar destfile="${dist}/jar/Net.jar">
+            <fileset dir="${build}">
+                <include name="**/com/pip/itimes/net/**" />
+            </fileset>
+        </jar>
+    </target>
+
+    <target name="distcommon" depends="compilecommon">
+        <mkdir dir="${dist}/jar" />
+        <jar destfile="${dist}/jar/Common.jar">
+            <fileset dir="${build}">
+                <include name="**/com/pip/itimes/server/*.class" />
+                <include name="**/com/pip/itimes/server/bean/**" />
+                <include name="**/com/pip/itimes/server/dao/**" />
+                <include name="**/com/pip/itimes/server/sms/**" />
+                <include name="**/com/pip/itimes/server/stage/**" />
+                <include name="**/com/pip/itimes/server/util/**" />
+                <include name="**/com/pip/itimes/server/suit/**" />
+                <include name="**/com/pip/itimes/server/gift/**" />
+                <include name="**/com/pip/itimes/server/camp/**" />
+                <include name="**/com/pip/security/**" />
+            </fileset>
+        </jar>
+    </target>
+
+    <target name="distdispatch" depends="compiledispatch">
+        <mkdir dir="${dist}/jar" />
+        <jar destfile="${dist}/jar/Dispatcher.jar">
+            <fileset dir="${build}">
+                <include name="**/com/pip/dispatch/**" />
+            </fileset>
+        </jar>
+    </target>
+
+    <target name="distserver" depends="compileserver">
+        <mkdir dir="${dist}/jar" />
+        <jar destfile="${dist}/jar/WorldServer.jar">
+            <fileset dir="${build}">
+                <include name="**/com/pip/itimes/server/world/**" />
+                <include name="**/com/pip/accountskeleton/**" />
+            </fileset>
+        </jar>
+    </target>
+    <!--########## Dist Code End ##########-->
+
+    <!--########## Dist Data ##########-->
+    <target name="distdata.pip" depends="compileeditor">
+        <delete dir="${dist}/data_pip" />
+        <mkdir dir="${dist}/data_pip" />
+        <taskdef name="distdata.pip" classname="com.pip.maped.pm.ExportAllSilent" classpath="${build}" classpathref="libs" />
+        <distdata.pip source="${basedir}/${editor.dir}/dev/data" target="${dist}/data_pip" version="PIP" />
+        <exec executable="${7z}">
+            <arg line="a -m0=BCJ2 -m1=LZMA:d23 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3 ${basedir}/${dist}/data_pip/data.7z ${basedir}/${dist}/data_pip/data" />
+        </exec>
+        <delete dir="${dist}/data_pip/data" />
+    </target>
+
+    <target name="distdata.cmcc" depends="compileeditor">
+        <delete dir="${dist}/data_cmcc" />
+        <mkdir dir="${dist}/data_cmcc" />
+        <taskdef name="distdata.cmcc" classname="com.pip.maped.pm.ExportAllSilent" classpath="${build}" classpathref="libs" />
+        <distdata.cmcc source="${basedir}/${editor.dir}/dev/data" target="${dist}/data_cmcc" version="CMCC" />
+        <exec executable="${7z}">
+            <arg line="a -m0=BCJ2 -m1=LZMA:d23 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3 ${basedir}/${dist}/data_cmcc/data.7z ${basedir}/${dist}/data_cmcc/data" />
+        </exec>
+        <delete dir="${dist}/data_cmcc/data" />
+    </target>
+
+    <target name="distdata.qq" depends="compileeditor">
+        <delete dir="${dist}/data_qq" />
+        <mkdir dir="${dist}/data_qq" />
+        <taskdef name="distdata.qq" classname="com.pip.maped.pm.ExportAllSilent" classpath="${build}" classpathref="libs" />
+        <distdata.qq source="${basedir}/${editor.dir}/dev/data" target="${dist}/data_qq" version="QQ" />
+        <exec executable="${7z}">
+            <arg line="a -m0=BCJ2 -m1=LZMA:d23 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3 ${basedir}/${dist}/data_qq/data.7z ${basedir}/${dist}/data_qq/data" />
+        </exec>
+        <delete dir="${dist}/data_qq/data" />
+    </target>
+
+    <!--########## Dist Data End ##########-->
+
+    <!--########## CVS ##########-->
+    <target name="checkout-server" depends="">
+        <delete dir="${basedir}/${server.dir}" />
+        <cvs cvsRoot="${cvsroot}" package="${server.module.name}" command="checkout -P -d ./${server.dir} -r ${server.tag}" />
+    </target>
+
+    <target name="checkout-client" depends="">
+        <delete dir="${basedir}/${client.dir}" />
+        <cvs cvsRoot="${cvsroot}" package="${client.module.name}" command="checkout -P -d ./${client.dir} -r ${client.tag}" />
+    </target>
+
+    <target name="checkout-editor" depends="">
+        <delete dir="${basedir}/${editor.dir}" />
+        <cvs cvsRoot="${cvsroot}" package="${editor.module.name}" command="checkout -P -d ./${editor.dir} -r ${editor.tag}" />
+    </target>
+
+    <target name="checkout-db" depends="">
+        <delete dir="${basedir}/${db.dir}" />
+        <cvs cvsRoot="${cvsroot}" package="${db.module.name}" command="checkout -P -d ./${db.dir} -r ${db.tag}" />
+    </target>
+
+    <target name="checkout-vm" depends="">
+        <delete dir="${basedir}/${vm.dir}" />
+        <cvs cvsRoot="${cvsroot}" package="${vm.module.name}" command="checkout -P -d ./${vm.dir} -r ${vm.tag}" />
+    </target>
+
+    <tstamp>
+        <format property="date.now" pattern="yyyyMMdd" locale="en" />
+    </tstamp>
+    <!--########## CVS End ##########-->
+
+    <target name="7z" depends="">
+        <mkdir dir="${basedir}/${dist}" />
+        <exec executable="${7z}">
+            <arg line="a -m0=BCJ2 -m1=LZMA:d23 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3 ${basedir}/${dist}/data.7z ${basedir}/${data.locale.dir}/data" />
+        </exec>
+    </target>
+
+    <target name="clean-code" description="clean code">
+        <delete dir="${basedir}/${server.dir}" />
+        <delete dir="${basedir}/${client.dir}" />
+        <delete dir="${basedir}/${editor.dir}" />
+        <delete dir="${basedir}/${vm.dir}" />
+        <delete dir="${basedir}/${db.dir}" />
+        <delete dir="${basedir}/${build}" />
+    </target>
+
+    <target name="clean-dist" description="clean dist">
+        <delete dir="${basedir}/${dist}" />
+    </target>
+
+    <target name="dist-code" depends="distvm, distdb, distdispatch, distnet, distcommon, distserver">
+        <copy file="${basedir}/${server.dir}/lib/commonnet.jar" todir="${basedir}/${dist}/jar" />
+    </target>
+
+    <target name="dist-data" depends="compileeditor">
+        <antcall target="distdata.pip" />
+        <antcall target="distdata.cmcc" />
+        <antcall target="distdata.qq" />
+    </target>
+
+    <target name="build-checkout">
+        <antcall target="clean-code" />
+        <antcall target="checkout-server" />
+        <antcall target="checkout-client" />
+        <antcall target="checkout-editor" />
+        <antcall target="checkout-db" />
+        <antcall target="checkout-vm" />
+    </target>
+
+    <target name="build">
+        <antcall target="build-checkout" />
+        <antcall target="clean-dist" />
+        <antcall target="dist-code" />
+        <antcall target="dist-data" />
+    </target>
+</project>

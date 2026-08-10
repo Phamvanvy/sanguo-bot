@@ -1,0 +1,1111 @@
+<?xml version="1.0" encoding="GBK"?>
+<cmccconfig>
+    <!-- 幻想整理后代码20100303 -->
+	<item consumecode="120121972228" name="初级鉴定宝钻" price="100"/>
+	<item consumecode="120121972229" name="高级鉴定宝钻" price="500"/>
+	<item consumecode="120121972230" name="飞灵卷轴" price="10"/>
+	<item consumecode="120121972231" name="个人试炼场卷轴" price="10"/>
+	<item consumecode="120121972232" name="公会试炼场卷轴" price="10"/>
+	<item consumecode="120121972233" name="海滨浴场卷轴" price="10"/>
+	<item consumecode="120121972234" name="黑威城卷轴" price="10"/>
+	<item consumecode="120121972235" name="回家卷轴" price="10"/>
+	<item consumecode="120121972236" name="家园密友邀请函(折)" price="10"/>
+	<item consumecode="120121972237" name="巨效急救魔法药水(折)" price="10"/>
+	<item consumecode="120121972238" name="巨效急救生命药水(折)" price="10"/>
+	<item consumecode="120121972239" name="梦幻村卷轴(折)" price="10"/>
+	<item consumecode="120121972240" name="随身答题果(折)" price="10"/>
+	<item consumecode="120121972241" name="万圣迷魂糖" price="10"/>
+	<item consumecode="120121972242" name="形象广场卷轴" price="10"/>
+	<item consumecode="120121972243" name="幸运时魔球" price="10"/>
+	<item consumecode="120121972244" name="寻缘镜(折)" price="10"/>
+	<item consumecode="120121972245" name="指路宝典" price="10"/>
+	<item consumecode="120121972246" name="智多星" price="10"/>
+	<item consumecode="120121972247" name="中级仇人录" price="10"/>
+	<item consumecode="120121972248" name="中秋节兔面男装" price="10"/>
+	<item consumecode="120121972249" name="中秋节兔面女装" price="10"/>
+	<item consumecode="120121972250" name="12点增力药剂(折)" price="20"/>
+	<item consumecode="120121972251" name="12点增敏药剂(折)" price="20"/>
+	<item consumecode="120121972252" name="12点增体药剂(折)" price="20"/>
+	<item consumecode="120121972253" name="12点增智药剂(折)" price="20"/>
+	<item consumecode="120121972254" name="爱之门" price="20"/>
+	<item consumecode="120121972255" name="答题机会果(折)" price="20"/>
+	<item consumecode="120121972256" name="德恩村卷轴" price="20"/>
+	<item consumecode="120121972257" name="队伍集合水晶" price="20"/>
+	<item consumecode="120121972258" name="高级仇人录" price="20"/>
+	<item consumecode="120121972259" name="后黑威城卷轴" price="20"/>
+	<item consumecode="120121972260" name="精晶碎片(折)" price="20"/>
+	<item consumecode="120121972261" name="巨效急救恢复药水(折)" price="20"/>
+	<item consumecode="120121972262" name="麦格雷斯教堂卷轴" price="20"/>
+	<item consumecode="120121972263" name="麦格雷斯卷轴(折)" price="20"/>
+	<item consumecode="120121972264" name="荣誉大厅卷轴" price="20"/>
+	<item consumecode="120121972265" name="神效急救魔法药水" price="20"/>
+	<item consumecode="120121972266" name="神效急救生命药水" price="20"/>
+	<item consumecode="120121972267" name="瓦伊特卷轴" price="20"/>
+	<item consumecode="120121972268" name="宠物忠诚馅饼(折)" price="30"/>
+	<item consumecode="120121972269" name="神效急救恢复药水" price="30"/>
+	<item consumecode="120121972270" name="圣诞老人男装" price="30"/>
+	<item consumecode="120121972271" name="圣诞老人女装" price="30"/>
+	<item consumecode="120121972272" name="世界地图卷轴(折)" price="30"/>
+	<item consumecode="120121972273" name="新年雪人男装" price="30"/>
+	<item consumecode="120121972274" name="新年雪人女装" price="30"/>
+	<item consumecode="120121972275" name="传送门(折)" price="40"/>
+	<item consumecode="120121972276" name="嘉宾海滨浴场幸运券" price="40"/>
+	<item consumecode="120121972277" name="漂流瓶(折)" price="40"/>
+	<item consumecode="120121972278" name="宠物经验翻倍果(折)" price="50"/>
+	<item consumecode="120121972279" name="蓝色妖姬" price="50"/>
+	<item consumecode="120121972280" name="男勇士男装" price="50"/>
+	<item consumecode="120121972281" name="女勇士女装" price="50"/>
+	<item consumecode="120121972282" name="全效急救魔法药水" price="50"/>
+	<item consumecode="120121972283" name="10神秘之盾" price="60"/>
+	<item consumecode="120121972284" name="宝箱钥匙" price="60"/>
+	<item consumecode="120121972285" name="烹饪铁锅 " price="70"/>
+	<item consumecode="120121972286" name="神秘经验包" price="70"/>
+	<item consumecode="120121972287" name="神秘荣誉包" price="80"/>
+	<item consumecode="120121972288" name="神秘宝箱3合1套装" price="90"/>
+	<item consumecode="120121972289" name="40经验计次加成果" price="100"/>
+	<item consumecode="120121972290" name="40经验计时加成果" price="100"/>
+	<item consumecode="120121972291" name="60经验计次加成果(折)" price="100"/>
+	<item consumecode="120121972292" name="60经验计时加成果(折)" price="100"/>
+	<item consumecode="120121972293" name="宠物经验翻倍果" price="100"/>
+	<item consumecode="120121972294" name="宠物训练师女装" price="100"/>
+	<item consumecode="120121972295" name="宠物营养元素" price="100"/>
+	<item consumecode="120121972296" name="传送师男装" price="100"/>
+	<item consumecode="120121972297" name="高级浴场传送卷轴" price="100"/>
+	<item consumecode="120121972298" name="公告员女装" price="100"/>
+	<item consumecode="120121972299" name="海盗男装" price="100"/>
+	<item consumecode="120121972300" name="卖场员女装" price="100"/>
+	<item consumecode="120121972301" name="情侣男装" price="100"/>
+	<item consumecode="120121972302" name="情侣女装" price="100"/>
+	<item consumecode="120121972303" name="天使之音3合1套装" price="100"/>
+	<item consumecode="120121972304" name="新手指导师女装" price="100"/>
+	<item consumecode="120121972305" name="治疗师男装" price="100"/>
+	<item consumecode="120121972306" name="装备修理师男装" price="100"/>
+	<item consumecode="120121972307" name="超值礼包" price="200"/>
+	<item consumecode="120121972308" name="家园地区邀请函" price="200"/>
+	<item consumecode="120121972309" name="狂战训练师男装" price="200"/>
+	<item consumecode="120121972310" name="魔战训练师女装" price="200"/>
+	<item consumecode="120121972311" name="师徒自由药水" price="200"/>
+	<item consumecode="120121972312" name="宠物退化石" price="300"/>
+	<item consumecode="120121972313" name="钥匙串" price="300"/>
+	<item consumecode="120121972314" name="10张嘉宾浴场套券" price="400"/>
+	<item consumecode="120121972315" name="28格扩展背包" price="400"/>
+	<item consumecode="120121972316" name="8级宠物召唤符" price="500"/>
+	<item consumecode="120121972317" name="10枚宝箱钥匙套装" price="600"/>
+	<item consumecode="120121972318" name="7级宠物召唤符" price="700"/>
+	<item consumecode="120121972319" name="34格扩展背包" price="800"/>
+	<item consumecode="120121972320" name="婚姻自由药水" price="800"/>
+	<item consumecode="120121972321" name="家族城堡管家" price="800"/>
+	<item consumecode="120121972322" name="新春牛气大礼包" price="800"/>
+	<item consumecode="120121972323" name="44格扩展背包" price="833"/>
+	<item consumecode="120121972324" name="春季大礼包" price="833"/>
+	<item consumecode="120121972325" name="冬季大礼包" price="833"/>
+	<item consumecode="120121972326" name="秋季大礼包" price="833"/>
+	<item consumecode="120121972327" name="夏季大礼包" price="833"/>
+	<item consumecode="120121972328" name="30格扩展背包" price="1000"/>
+	<item consumecode="120121972329" name="30张嘉宾浴场套券" price="1000"/>
+	<item consumecode="120121972330" name="庆双节精炼石优惠礼包" price="1000"/>
+	<item consumecode="120121972331" name="移星水晶" price="1000"/>
+	<item consumecode="120121972332" name="30颗精华金蛋礼包" price="1500"/>
+	<item consumecode="120121972333" name="40格扩展背包" price="1500"/>
+	<item consumecode="120121972334" name="世界地图卷轴" price="1500"/>
+	<item consumecode="120121972335" name="30颗魔法精华金蛋礼包" price="1653"/>
+	<item consumecode="120121972336" name="30颗物理精华金蛋礼包" price="1653"/>
+	<item consumecode="120121972337" name="50格扩展背包" price="1666"/>
+	<item consumecode="120121972338" name="49张嘉宾浴场套券" price="1800"/>
+	<item consumecode="120121972339" name="精炼石" price="2000"/>
+	<item consumecode="120121972340" name="10串钥匙串套装" price="2800"/>
+	<item consumecode="120121972341" name="20颗精炼石超值礼包" price="3000"/>
+	<item consumecode="120121972342" name="60格扩展背包" price="3333"/>
+	<item consumecode="120121972343" name="20颗精炼石礼包" price="3500"/>
+	<item consumecode="120121972344" name="广东宝盒金钥匙" price="100"/>
+	<item consumecode="120121972345" name="烹饪铁锅" price="70"/>
+	<item consumecode="120121972346" name="广东宝盒金钥匙" price="100"/>
+	<item consumecode="120121972347" name="顶级体力精华" price="50"/>
+	<item consumecode="120121972348" name="顶级智力精华" price="50"/>
+	<item consumecode="120121972349" name="顶级力量精华" price="50"/>
+	<item consumecode="120121972350" name="顶级敏捷精华" price="50"/>
+	<item consumecode="120121972351" name="顶级物攻精华" price="50"/>
+	<item consumecode="120121972352" name="顶级物防精华" price="50"/>
+	<item consumecode="120121972353" name="顶级魔攻精华" price="50"/>
+	<item consumecode="120121972354" name="顶级魔防精华" price="50"/>
+	<item consumecode="120121972355" name="顶级物暴精华" price="50"/>
+	<item consumecode="120121972356" name="顶级魔暴精华" price="50"/>
+	<item consumecode="120121972357" name="顶级命中精华" price="50"/>
+	<item consumecode="120121972358" name="顶级闪避精华" price="50"/>
+	<item consumecode="120121972359" name="3级黄晶" price="250"/>
+	<item consumecode="120121972360" name="3级白晶" price="250"/>
+	<item consumecode="120121972361" name="3级茶晶" price="250"/>
+	<item consumecode="120121972362" name="3级紫晶" price="250"/>
+	<item consumecode="120121972363" name="3级钛石" price="250"/>
+	<item consumecode="120121972364" name="3级萤石" price="250"/>
+	<item consumecode="120121972365" name="3级琥珀" price="250"/>
+	<item consumecode="120121972366" name="3级玛瑙" price="250"/>
+	<item consumecode="120121972367" name="3级橄榄石" price="250"/>
+	<item consumecode="120121972368" name="3级红纹石" price="250"/>
+	<item consumecode="120121972369" name="3级金沙石" price="250"/>
+	<item consumecode="120121972370" name="初级打孔符" price="10"/>
+	<item consumecode="120121972371" name="高级打孔符" price="150"/>
+	<item consumecode="120121972372" name="初级合成符" price="10"/>
+	<item consumecode="120121972373" name="高级合成符" price="60"/>
+	<item consumecode="120121972374" name="3级摘除符" price="10"/>
+	<item consumecode="120121972375" name="4级摘除符" price="50"/>
+	<item consumecode="120121972376" name="5级摘除符" price="250"/>
+	<item consumecode="120121972377" name="6级摘除符" price="1250"/>
+	<item consumecode="120121972378" name="7级摘除符" price="3000"/>
+	<item consumecode="120121972379" name="3级金刚钻" price="250"/>
+	<item consumecode="120121972380" name="3级翡翠石" price="250"/>
+	<item consumecode="120121972381" name="幸运礼券" price="100"/>
+	<item consumecode="120121972382" name="4级黄晶" price="1250" />
+	<item consumecode="120121972383" name="4级白晶" price="1250" />
+	<item consumecode="120121972384" name="4级茶晶" price="1250" />
+	<item consumecode="120121972385" name="4级紫晶" price="1250" />
+	<item consumecode="120121972386" name="4级钛石" price="1250" />
+	<item consumecode="120121972387" name="4级萤石" price="1250" />
+	<item consumecode="120121972388" name="4级琥珀" price="1250" />
+	<item consumecode="120121972389" name="4级玛瑙" price="1250" />
+	<item consumecode="120121972390" name="4级橄榄石" price="1250" />
+	<item consumecode="120121972391" name="4级红纹石" price="1250" />
+	<item consumecode="120121972392" name="4级金沙石" price="1250" />
+	<item consumecode="120121972393" name="4级金刚钻" price="1250" />
+	<item consumecode="120121972394" name="4级翡翠石" price="1250" />
+	<item consumecode="120121972395" name="50格扩展背包" price="416" />
+	<item consumecode="120121972396" name="60格扩展背包" price="833" />
+	<item consumecode="120121972397" name="44格扩展背包" price="200" />
+	<item consumecode="120121972398" name="40格扩展背包" price="100" />
+	<item consumecode="120121972399" name="七夕宝石精炼豪华组" price="400" />
+	<item consumecode="120121972400" name="30颗物理精华金蛋礼包" price="1110" />
+	<item consumecode="120121972401" name="30颗魔法精华金蛋礼包" price="1110" />
+	<item consumecode="120121972402" name="精炼狂欢礼包" price="3000" />
+	<item consumecode="120121972403" name="10钥匙送10宝箱感恩礼包" price="530" />
+	<item consumecode="120121972404" name="高级鉴定宝钻" price="500" />
+	<item consumecode="120121972405" name="水晶之恋漂流瓶" price="40" />
+	<item consumecode="120121972406" name="移星水晶" price="1000" />
+	<item consumecode="120121972407" name="新春宠物金蛋" price="300" />
+	<item consumecode="120121972408" name="虎年春季大礼包" price="830" />
+	<item consumecode="120121972409" name="大力神金靴" price="3200" />
+	<item consumecode="120121972410" name="大力神金杯" price="3900" />
+	<item consumecode="120121972411" name="劳模十字绣" price="770" />
+	<item consumecode="120121972412" name="劳模锤" price="377" />
+	<item consumecode="120121972413" name="圣诞千层糕" price="89" />
+	<item consumecode="120121972414" name="小金勺" price="30" />
+	<item consumecode="120121972415" name="端午节金钥匙" price="150" />
+	<item consumecode="120121972416" name="臭鸡蛋" price="20" />
+	<item consumecode="120121972417" name="虎年藏宝礼包" price="100" />
+	<item consumecode="120121972418" name="亚运火炬" price="100" />
+	<item consumecode="120121972419" name="举国同庆寻宝礼包" price="100" />
+	<item consumecode="120121972420" name="5朵蓝色妖姬礼包" price="235" />
+	<item consumecode="120121972421" name="10元i币卡" price="1000" />
+	<item consumecode="120121972422" name="神圣藏宝图随机包" price="120" />
+	<item consumecode="120121972423" name="夫妻感恩魔盒" price="20" />
+	<item consumecode="120121972424" name="夫妻感恩挖宝铲" price="50" />
+	<item consumecode="120121972425" name="悟性水晶" price="100" />
+	<item consumecode="120121972426" name="悟性水晶簇" price="9000" />
+	<item consumecode="120121972427" name="灵魂精华" price="100" />
+	<item consumecode="120121972428" name="复生宝典" price="100" />
+	<item consumecode="120121972429" name="小锁头" price="1000" />
+	<item consumecode="120121972430" name="祝福礼包" price="100" />
+	<item consumecode="120121972431" name="威哥" price="50" />
+	<item consumecode="120121972432" name="幸运锤子" price="50" />
+	<item consumecode="120121972433" name="修正石" price="88" />
+	<item consumecode="120121972434" name="属性鉴定符" price="100" />
+	<item consumecode="120121972435" name="角色属性改变符（石头）" price="300" />
+	<item consumecode="120121972436" name="角色属性改变符（剪子）" price="300" />
+	<item consumecode="120121972437" name="角色属性改变符（布）" price="300" />
+	<item consumecode="120121972438" name="双倍经验果" price="100" />
+	<item consumecode="120121972439" name="限时形象续费" price="833" />
+	<item consumecode="120121972440" name="统御魔能" price="200" />
+	<item consumecode="120121972444" name="留声唱片" price="500" />
+	<item consumecode="120121972445" name="CD唱片" price="1800" />
+	<item consumecode="120121972446" name="五角代金券" price="50" imoney="5"/>
+    <item consumecode="120121972447" name="一元代金券" price="100" imoney="10"/>
+    <item consumecode="120121972448" name="五元代金券" price="500" imoney="50"/>
+    <item consumecode="120121972449" name="十元代金券" price="1000" imoney="100"/>
+	
+
+	<!-- 20100411 武林新代码整理 -->
+	<item consumecode="120121811007" name="神秘宝箱3合1套装" price="80" />
+	<item consumecode="120121811008" name="修复魔石" price="10" />
+	<item consumecode="120121811009" name="元气" price="30" />
+	<item consumecode="120121811010" name="神秘商人" price="30" />
+	<item consumecode="120121811011" name="云游修理师" price="30" />
+	<item consumecode="120121811160" name="茶馆传送符" price="10"/>
+	<item consumecode="120121811161" name="低级宝石合成符" price="10"/>
+	<item consumecode="120121811162" name="低级镶嵌符" price="10"/>
+	<item consumecode="120121811163" name="3级宝石摘除符" price="10"/>
+	<item consumecode="120121811164" name="初级打孔符" price="10"/>
+	<item consumecode="120121811165" name="临安传送符" price="15"/>
+	<item consumecode="120121811166" name="京南传送符" price="15"/>
+	<item consumecode="120121811167" name="京城传送符" price="15"/>
+	<item consumecode="120121811168" name="长安传送符" price="15"/>
+	<item consumecode="120121811169" name="玉门传送符" price="15"/>
+	<item consumecode="120121811170" name="汉中传送符" price="15"/>
+	<item consumecode="120121811171" name="灯会作弊卡" price="20"/>
+	<item consumecode="120121811172" name="灯会门票" price="20"/>
+	<item consumecode="120121811173" name="高级打造符纹" price="30"/>
+	<item consumecode="120121811174" name="灯谜召唤符" price="30"/>
+	<item consumecode="120121811175" name="元气丹" price="30"/>
+	<item consumecode="120121811176" name="传送符" price="30"/>
+	<item consumecode="120121811177" name="祝福烟花" price="30"/>
+	<item consumecode="120121811178" name="树苗" price="30"/>
+	<item consumecode="120121811179" name="高级打造符纹" price="30"/>
+	<item consumecode="120121811180" name="水囊" price="40"/>
+	<item consumecode="120121811181" name="神秘仓库" price="45"/>
+	<item consumecode="120121811182" name="灯会套票" price="50"/>
+	<item consumecode="120121811183" name="天山雪莲" price="50"/>
+	<item consumecode="120121811184" name="千里传音" price="50"/>
+	<item consumecode="120121811185" name="法宝力量精华" price="50"/>
+	<item consumecode="120121811186" name="法宝敏捷精华" price="50"/>
+	<item consumecode="120121811187" name="法宝耐力精华" price="50"/>
+	<item consumecode="120121811188" name="法宝智力精华" price="50"/>
+	<item consumecode="120121811189" name="法宝精神精华" price="50"/>
+	<item consumecode="120121811190" name="10级神秘之剑" price="50"/>
+	<item consumecode="120121811191" name="10级神秘头巾" price="50"/>
+	<item consumecode="120121811192" name="10级神秘短靴" price="50"/>
+	<item consumecode="120121811193" name="高级镶嵌符" price="50"/>
+	<item consumecode="120121811194" name="4级宝石摘除符" price="50"/>
+	<item consumecode="120121811195" name="宝箱钥匙" price="60"/>
+	<item consumecode="120121811196" name="品茶券" price="60"/>
+	<item consumecode="120121811197" name="优质法宝力量精华" price="60"/>
+	<item consumecode="120121811198" name="优质法宝耐力精华" price="60"/>
+	<item consumecode="120121811199" name="优质法宝敏捷精华" price="60"/>
+	<item consumecode="120121811200" name="优质法宝智力精华" price="60"/>
+	<item consumecode="120121811201" name="优质法宝精神精华" price="60"/>
+	<item consumecode="120121811202" name="高级宝石合成符" price="60"/>
+	<item consumecode="120121811203" name="黑玉断续膏3合1" price="70"/>
+	<item consumecode="120121811204" name="九花玉露丸3合1" price="70"/>
+	<item consumecode="120121811205" name="宝箱钥匙(1)" price="70"/>
+	<item consumecode="120121811206" name="火种" price="100"/>
+	<item consumecode="120121811207" name="木炭" price="100"/>
+	<item consumecode="120121811208" name="劳动节活动物品" price="100"/>
+	<item consumecode="120121811209" name="仓库包格20格" price="100"/>
+	<item consumecode="120121811210" name="门派募捐令" price="100"/>
+	<item consumecode="120121811211" name="投票推广员" price="100"/>
+	<item consumecode="120121811212" name="20级神秘之剑" price="100"/>
+	<item consumecode="120121811213" name="20级神秘头巾" price="100"/>
+	<item consumecode="120121811214" name="20级神秘短靴" price="100"/>
+	<item consumecode="120121811215" name="夜明珠" price="100"/>
+	<item consumecode="120121811216" name="低级资质鉴定符" price="110"/>
+	<item consumecode="120121811217" name="顶级打孔符" price="180"/>
+	<item consumecode="120121811218" name="仇人录" price="195"/>
+	<item consumecode="120121811219" name="劳动节高级活动物品" price="200"/>
+	<item consumecode="120121811220" name="掌门召集令" price="200"/>
+	<item consumecode="120121811221" name="禁言令" price="200"/>
+	<item consumecode="120121811222" name="狮子吼" price="200"/>
+	<item consumecode="120121811223" name="双倍经验丹" price="250"/>
+	<item consumecode="120121811224" name="随意烟花" price="250"/>
+	<item consumecode="120121811225" name="清理门户" price="250"/>
+	<item consumecode="120121811226" name="5级宝石摘除符" price="250"/>
+	<item consumecode="120121811227" name="3级天罡石" price="250"/>
+	<item consumecode="120121811228" name="3级北斗石" price="250"/>
+	<item consumecode="120121811229" name="3级游龙石" price="250"/>
+	<item consumecode="120121811230" name="3级金刚石" price="250"/>
+	<item consumecode="120121811231" name="3级伏魔石" price="250"/>
+	<item consumecode="120121811232" name="3级太极石" price="250"/>
+	<item consumecode="120121811233" name="3级乾坤石" price="250"/>
+	<item consumecode="120121811234" name="3级八卦石" price="250"/>
+	<item consumecode="120121811235" name="3级万象石" price="250"/>
+	<item consumecode="120121811236" name="3级无相石" price="250"/>
+	<item consumecode="120121811237" name="3级阴阳石" price="250"/>
+	<item consumecode="120121811238" name="3级轩辕石" price="250"/>
+	<item consumecode="120121811239" name="3级回旋石" price="250"/>
+	<item consumecode="120121811240" name="3级赤焰石" price="250"/>
+	<item consumecode="120121811241" name="3级天机石" price="250"/>
+	<item consumecode="120121811242" name="3级龙息石" price="250"/>
+	<item consumecode="120121811243" name="3级玄冥石" price="250"/>
+	<item consumecode="120121811244" name="3级麒麟石" price="250"/>
+	<item consumecode="120121811245" name="元气丹（10）" price="300"/>
+	<item consumecode="120121811246" name="极品装备包裹" price="400"/>
+	<item consumecode="120121811247" name="重立门户" price="450"/>
+	<item consumecode="120121811248" name="扩展背包20格" price="470"/>
+	<item consumecode="120121811249" name="仓库包格40格" price="500"/>
+	<item consumecode="120121811250" name="高级资质鉴定符" price="500"/>
+	<item consumecode="120121811251" name="钥匙盒" price="600"/>
+	<item consumecode="120121811252" name="钥匙串" price="650"/>
+	<item consumecode="120121811253" name="婚姻自由药水" price="650"/>
+	<item consumecode="120121811254" name="钥匙包" price="650"/>
+	<item consumecode="120121811255" name="投票推广员(赠元气)" price="650"/>
+	<item consumecode="120121811256" name="极品武器包裹" price="800"/>
+	<item consumecode="120121811257" name="镖车召唤符" price="1000"/>
+	<item consumecode="120121811258" name="星级转移宝典" price="1000"/>
+	<item consumecode="120121811259" name="投票推广员(赠茶券)" price="1150"/>
+	<item consumecode="120121811260" name="6级宝石摘除符" price="1250"/>
+	<item consumecode="120121811261" name="刻印符纹包" price="1500"/>
+	<item consumecode="120121811262" name="超级门派镖车符" price="2000"/>
+	<item consumecode="120121811263" name="品茶券(49)" price="2500"/>
+	<item consumecode="120121811264" name="7级宝石摘除符" price="3000"/>
+	<item consumecode="120121811265" name="敏捷刻印符文包" price="2990"/>
+	<item consumecode="120121811266" name="力量刻印符文包" price="2990"/>
+	<item consumecode="120121811267" name="智力刻印符文包" price="2990"/>
+	<item consumecode="120121811268" name="精神刻印符文包" price="2990"/>
+	<item consumecode="120121811269" name="耐力刻印符文包" price="2990"/>
+	<item consumecode="120121811270" name="优质法宝敏捷精华包" price="4900"/>
+	<item consumecode="120121811271" name="优质法宝力量精华包" price="4900"/>
+	<item consumecode="120121811272" name="优质法宝智力精华包" price="4900"/>
+	<item consumecode="120121811273" name="优质法宝耐力精华包" price="4900"/>
+	<item consumecode="120121811274" name="优质法宝精神精华包" price="4900"/>
+	<item consumecode="120121811275" name="心意卡" price="100"/>
+    
+    <!-- 幻想TS版本 -->
+	<item consumecode="120121973001" name="指路宝典" price="10" />
+	<item consumecode="120121973002" name="宝箱钥匙" price="60" />
+	<item consumecode="120121973003" name="10枚宝箱钥匙套装" price="600" />
+	<item consumecode="120121973004" name="随身答题果" price="20" />
+	<item consumecode="120121973005" name="答题机会果" price="30" />
+	<item consumecode="120121973006" name="智多星" price="10" />
+	<item consumecode="120121973007" name="家园地区邀请函" price="200" />
+	<item consumecode="120121973008" name="神秘宝箱3合1套装" price="90" />
+	<item consumecode="120121973009" name="漂流瓶" price="60" />
+	<item consumecode="120121973010" name="寻缘镜" price="100" />
+	<item consumecode="120121973011" name="嘉宾海滨浴场幸运券" price="40" />
+	<item consumecode="120121973012" name="10张嘉宾浴场套券" price="400" />
+	<item consumecode="120121973013" name="30张嘉宾浴场套券" price="1000" />
+	<item consumecode="120121973014" name="30张大众浴场套券" price="600" />
+	<item consumecode="120121973015" name="49张大众浴场套券" price="1000" />
+	<item consumecode="120121973016" name="德恩村卷轴" price="20" />
+	<item consumecode="120121973017" name="麦格雷斯卷轴" price="10" />
+	<item consumecode="120121973018" name="荣誉大厅卷轴" price="20" />
+	<item consumecode="120121973019" name="海滨浴场卷轴" price="10" />
+	<item consumecode="120121973020" name="麦格雷斯教堂卷轴" price="20" />
+	<item consumecode="120121973021" name="飞灵卷轴" price="10" />
+	<item consumecode="120121973022" name="个人试炼场卷轴" price="10" />
+	<item consumecode="120121973023" name="公会试炼场卷轴" price="10" />
+	<item consumecode="120121973024" name="宠物忠诚馅饼" price="50" />
+	<item consumecode="120121973025" name="天使之音3合1套装" price="100" />
+	<item consumecode="120121973026" name="传送门" price="50" />
+	<item consumecode="120121973027" name="宠物经验翻倍果" price="100" />
+	<item consumecode="120121973028" name="60经验计次加成果" price="200" />
+	<item consumecode="120121973029" name="60经验计时加成果" price="200" />
+	<item consumecode="120121973030" name="40经验计次加成果" price="100" />
+	<item consumecode="120121973031" name="40经验计时加成果" price="100" />
+	<item consumecode="120121973032" name="师徒自由药水" price="200" />
+	<item consumecode="120121973033" name="婚姻自由药水" price="800" />
+	<item consumecode="120121973034" name="心情称号" price="20" />
+	<item consumecode="120121973035" name="12增力药剂" price="30" />
+	<item consumecode="120121973036" name="12增智药剂" price="30" />
+	<item consumecode="120121973037" name="12增体药剂" price="30" />
+	<item consumecode="120121973038" name="12增敏药剂" price="30" />
+	<item consumecode="120121973039" name="30格扩展背包" price="1000" />
+	<item consumecode="120121973040" name="神秘经验包" price="70" />
+	<item consumecode="120121973041" name="神秘荣誉包" price="80" />
+	<item consumecode="120121973042" name="钥匙串" price="300" />
+	<item consumecode="120121973043" name="8级宠物召唤符" price="500" />
+	<item consumecode="120121973044" name="7级宠物召唤符" price="700" />
+	<item consumecode="120121973045" name="保护盾" price="900" />
+	<item consumecode="120121973046" name="装备精炼守护石" price="1200" />
+	<item consumecode="120121973047" name="世界地图卷轴" price="1500" />
+	<item consumecode="120121973048" name="10串钥匙串" price="1800" />
+	<item consumecode="120121973049" name="精炼石" price="2000" />
+    
+    <!-- 乐园消费代码 -->
+	<item consumecode="120121987001" name="小生命药剂" price="50" />
+	<item consumecode="120121987002" name="小手雷" price="50" />
+	<item consumecode="120121987003" name="小无敌药剂" price="50" />
+	<item consumecode="120121987004" name="时间停止" price="50" />
+	<item consumecode="120121987005" name="威力之石" price="50" />
+	<item consumecode="120121987006" name="加速（宝石龙）" price="20" />
+	<item consumecode="120121987007" name="辨别敌我" price="50" />
+	<item consumecode="120121987008" name="伪装" price="50" />
+	<item consumecode="120121987009" name="加速（地道战）" price="20" />
+	<item consumecode="120121987010" name="减速（地道战）" price="20" />
+	<item consumecode="120121987011" name="十字雷" price="30" />
+	<item consumecode="120121987012" name="禁手（对对碰）" price="50" />
+	<item consumecode="120121987013" name="洗牌（对对碰）" price="30" />
+	<item consumecode="120121987014" name="钻石" price="50" />
+	<item consumecode="120121987015" name="雷神（连连看）" price="50" />
+	<item consumecode="120121987016" name="障碍（连连看）" price="40" />
+	<item consumecode="120121987017" name="禁手（连连看）" price="50" />
+	<item consumecode="120121987018" name="洗牌（连连看）" price="20" />
+	<item consumecode="120121987019" name="炸弹（俄罗斯）" price="30" />
+	<item consumecode="120121987020" name="障碍（俄罗斯）" price="50" />
+	<item consumecode="120121987021" name="消除" price="50" />
+	<item consumecode="120121987022" name="加速（俄罗斯）" price="20" />
+	<item consumecode="120121987023" name="消除两行" price="20" />
+	<item consumecode="120121987024" name="增加两行" price="20" />
+	<item consumecode="120121987025" name="负分清零" price="300" />
+	<item consumecode="120121987026" name="双倍积分" price="20" />
+	<item consumecode="120121987027" name="绿野仙踪" price="100" />
+	<item consumecode="120121987028" name="[男]普通男士头发" price="100" />
+	<item consumecode="120121987029" name="[男]潇洒男士发型" price="200" />
+	<item consumecode="120121987030" name="[女]头巾发式" price="100" />
+	<item consumecode="120121987031" name="[女]温柔女士发型" price="200" />
+	<item consumecode="120121987032" name="[男]休闲鞋" price="100" />
+	<item consumecode="120121987033" name="[男]帆布鞋" price="100" />
+	<item consumecode="120121987034" name="[女]时尚靴子" price="100" />
+	<item consumecode="120121987035" name="[女]时尚皮鞋" price="100" />
+	<item consumecode="120121987036" name="[男]篮球衣" price="100" />
+	<item consumecode="120121987037" name="[男]假西服" price="100" />
+	<item consumecode="120121987038" name="[女]女孩上衣" price="100" />
+	<item consumecode="120121987039" name="[女]厚女孩上衣" price="100" />
+	<item consumecode="120121987040" name="[男]皱西裤" price="100" />
+	<item consumecode="120121987041" name="[男]休闲短裤" price="100" />
+	<item consumecode="120121987042" name="[女]女孩短裤" price="100" />
+	<item consumecode="120121987043" name="[女]七分裤" price="100" />
+	<item consumecode="120121987044" name="威力之石（折）" price="40" />
+	<item consumecode="120121987045" name="时间停止（折）" price="40" />
+	<item consumecode="120121987046" name="钻石（折）" price="40" />
+	<item consumecode="120121987047" name="雷神（连连看）（折）" price="40" />
+	<item consumecode="120121987048" name="增加两行（折）" price="10" />
+    
+    <!-- WAP武林消费代码 -->
+	<item consumecode="220121892001" name="仓库包格（小）" price="450" />
+	<item consumecode="220121892002" name="千里传音盒（小）" price="130" />
+	<item consumecode="220121892003" name="五神练气丹（小）" price="70" />
+	<item consumecode="220121892004" name="五神练气丹（中）" price="150" />
+	<item consumecode="220121892005" name="五神真气散（小）" price="70" />
+	<item consumecode="220121892006" name="宝箱钥匙" price="60" />
+	<item consumecode="220121892007" name="神秘宝箱3合1套装" price="80" />
+	<item consumecode="220121892008" name="修复魔石" price="10" />
+	<item consumecode="220121892009" name="元气" price="30" />
+	<item consumecode="220121892010" name="神秘商人" price="30" />
+	<item consumecode="220121892011" name="云游修理师" price="30" />
+	<item consumecode="220121892012" name="掌中世界卷轴" price="30" />
+	<item consumecode="220121892013" name="龙盘修炼100次" price="30" />
+	<item consumecode="220121892014" name="龙盘修炼360次" price="100" />
+	<item consumecode="220121892015" name="秘宝店传单" price="0" />
+	<item consumecode="220121892016" name="天下第一擂请帖" price="0" />
+	<item consumecode="220121892017" name="新手大礼包" price="0" />
+	<item consumecode="220121892018" name="仙剑" price="0" />
+	<item consumecode="220121892019" name="变形：透明人（优惠包）" price="100" />
+	<item consumecode="220121892020" name="变形：红眼人（优惠包）" price="100" />
+	<item consumecode="220121892021" name="变形：兽人-v-（优惠包）" price="100" />
+	<item consumecode="220121892022" name="变形：花瓜-_-（优惠包）" price="100" />
+	<item consumecode="220121892023" name="变形：鬼啊！！（优惠包）" price="100" />
+	<item consumecode="220121892024" name="变形：菲佣出现！（优惠包）" price="100" />
+	<item consumecode="220121892025" name="变形：红脸（优惠包）" price="100" />
+	<item consumecode="220121892026" name="变形：猪头（优惠包）" price="100" />
+	<item consumecode="220121892027" name="还我真身（优惠包）" price="100" />
+	<item consumecode="220121892028" name="愚人节百变符（优惠包）" price="100" />
+	<item consumecode="220121892029" name="钥匙盒" price="600" />
+	<item consumecode="220121892030" name="灯谜召唤符" price="30" />
+	<item consumecode="220121892031" name="灯会作弊卡" price="20" />
+	<item consumecode="220121892032" name="灯会套票" price="50" />
+	<item consumecode="220121892033" name="灯会门票" price="20" />
+	<item consumecode="220121892034" name="元气丹" price="30" />
+	<item consumecode="220121892035" name="黑玉断续膏3合1" price="70" />
+	<item consumecode="220121892036" name="九花玉露丸3合1" price="70" />
+	<item consumecode="220121892037" name="天山雪莲" price="50" />
+	<item consumecode="220121892038" name="传送符" price="30" />
+	<item consumecode="220121892039" name="双倍经验丹" price="250" />
+	<item consumecode="220121892040" name="千里传音" price="50" />
+	<item consumecode="220121892041" name="祝福烟花" price="30" />
+	<item consumecode="220121892042" name="随意烟花" price="250" />
+	<item consumecode="220121892043" name="宝箱钥匙(1)" price="70" />
+	<item consumecode="220121892044" name="钥匙串" price="650" />
+	<item consumecode="220121892045" name="品茶券" price="60" />
+	<item consumecode="220121892046" name="品茶券(49)" price="2500" />
+	<item consumecode="220121892047" name="婚姻自由药水" price="650" />
+	<item consumecode="220121892048" name="清理门户" price="250" />
+	<item consumecode="220121892049" name="重立门户" price="450" />
+	<item consumecode="220121892050" name="20格仓库包格" price="150" />
+	<item consumecode="220121892051" name="12格扩展背包" price="550" />
+	<item consumecode="220121892052" name="茶馆传送符" price="10" />
+	<item consumecode="220121892053" name="临安传送符" price="15" />
+	<item consumecode="220121892054" name="京南传送符" price="15" />
+	<item consumecode="220121892055" name="京城传送符" price="15" />
+	<item consumecode="220121892056" name="长安传送符" price="15" />
+	<item consumecode="220121892057" name="玉门传送符" price="15" />
+	<item consumecode="220121892058" name="汉中传送符" price="15" />
+	<item consumecode="220121892059" name="树苗" price="30" />
+	<item consumecode="220121892060" name="水囊" price="40" />
+	<item consumecode="220121892061" name="神秘仓库" price="45" />
+	<item consumecode="220121892062" name="元气丹（10）" price="300" />
+	<item consumecode="220121892063" name="火种" price="100" />
+	<item consumecode="220121892064" name="木炭" price="100" />
+	<item consumecode="220121892065" name="劳动节活动物品" price="100" />
+	<item consumecode="220121892066" name="劳动节高级活动物品" price="200" />
+
+	<!-- 乐园新消费代码 -->
+	<item consumecode="120122021001" name="绿野仙踪" price="20" />
+	<item consumecode="120122021002" name="乡郊消夏" price="50" />
+	<item consumecode="120122021003" name="清爽气候" price="20" />
+	<item consumecode="120122021004" name="心星舞台" price="50" />
+	<item consumecode="120122021005" name="美景如画" price="30" />
+	<item consumecode="120122021006" name="繁华夜景" price="30" />
+	<item consumecode="120122021007" name="[男]金质帅哥" price="10" />
+	<item consumecode="120122021008" name="[男]帅气逼真" price="20" />
+	<item consumecode="120122021009" name="[女]靓丽短发" price="20" />
+	<item consumecode="120122021010" name="[女]时尚运动" price="10" />
+	<item consumecode="120122021011" name="[男]优雅小帅" price="10" />
+	<item consumecode="120122021012" name="[男]运动男生" price="10" />
+	<item consumecode="120122021013" name="[女]魅力四射" price="30" />
+	<item consumecode="120122021014" name="[女]清新感觉" price="10" />
+	<item consumecode="120122021015" name="[男]白色皮鞋" price="10" />
+	<item consumecode="120122021016" name="[男]红绿搭配" price="10" />
+	<item consumecode="120122021017" name="[女]冰蓝色彩" price="10" />
+	<item consumecode="120122021018" name="[女]运动风" price="10" />
+	<item consumecode="120122021019" name="[男]黑色风采" price="10" />
+	<item consumecode="120122021020" name="[男]时尚皮鞋" price="10" />
+	<item consumecode="120122021021" name="[女]高贵黑色" price="10" />
+	<item consumecode="120122021022" name="[女]夏天感觉" price="10" />
+	<item consumecode="120122021023" name="[男]红色休闲" price="20" />
+	<item consumecode="120122021024" name="[男]黄绿搭配" price="20" />
+	<item consumecode="120122021025" name="[女]活力运动" price="20" />
+	<item consumecode="120122021026" name="[女]时尚精灵" price="30" />
+	<item consumecode="120122021027" name="[男]清凉天气" price="20" />
+	<item consumecode="120122021028" name="[男]休闲马甲" price="20" />
+	<item consumecode="120122021029" name="[女]夏日街头" price="30" />
+	<item consumecode="120122021030" name="[女]爱心MM" price="30" />
+	<item consumecode="120122021031" name="[男]翻边牛仔" price="20" />
+	<item consumecode="120122021032" name="[男]蓝绿仔裤" price="20" />
+	<item consumecode="120122021033" name="[女]牛仔短裤" price="20" />
+	<item consumecode="120122021034" name="[女]酷牛仔" price="20" />
+	<item consumecode="120122021035" name="[男]黄与蓝" price="30" />
+	<item consumecode="120122021036" name="[男]深蓝休闲" price="20" />
+	<item consumecode="120122021037" name="[女]绚丽色彩" price="30" />
+	<item consumecode="120122021038" name="[女]魅力女生" price="30" />
+	<item consumecode="120122021039" name="小生命药剂" price="50" />
+	<item consumecode="120122021040" name="小手雷" price="50" />
+	<item consumecode="120122021041" name="小无敌药剂" price="50" />
+	<item consumecode="120122021042" name="时间停止" price="50" />
+	<item consumecode="120122021043" name="威力之石" price="50" />
+	<item consumecode="120122021044" name="加速（宝石龙）" price="20" />
+	<item consumecode="120122021045" name="辨别敌我" price="50" />
+	<item consumecode="120122021046" name="伪装" price="50" />
+	<item consumecode="120122021047" name="加速（地道战）" price="20" />
+	<item consumecode="120122021048" name="减速（地道战）" price="20" />
+	<item consumecode="120122021049" name="十字雷" price="30" />
+	<item consumecode="120122021050" name="禁手（对对碰）" price="50" />
+	<item consumecode="120122021051" name="洗牌（对对碰）" price="30" />
+	<item consumecode="120122021052" name="钻石" price="50" />
+	<item consumecode="120122021053" name="雷神（连连看）" price="50" />
+	<item consumecode="120122021054" name="障碍（连连看）" price="40" />
+	<item consumecode="120122021055" name="禁手（连连看）" price="50" />
+	<item consumecode="120122021056" name="洗牌（连连看）" price="20" />
+	<item consumecode="120122021057" name="炸弹（俄罗斯）" price="30" />
+	<item consumecode="120122021058" name="障碍（俄罗斯）" price="50" />
+	<item consumecode="120122021059" name="消除" price="50" />
+	<item consumecode="120122021060" name="加速（俄罗斯）" price="20" />
+	<item consumecode="120122021061" name="消除两行" price="20" />
+	<item consumecode="120122021062" name="增加两行" price="20" />
+	<item consumecode="120122021063" name="负分清零" price="300" />
+	<item consumecode="120122021064" name="双倍积分" price="20" />
+	<item consumecode="120122021065" name="绿野仙踪" price="100" />
+	<item consumecode="120122021066" name="[男]普通男士头发" price="100" />
+	<item consumecode="120122021067" name="[男]潇洒男士发型" price="200" />
+	<item consumecode="120122021068" name="[女]头巾发式" price="100" />
+	<item consumecode="120122021069" name="[女]温柔女士发型" price="200" />
+	<item consumecode="120122021070" name="[男]休闲鞋" price="100" />
+	<item consumecode="120122021071" name="[男]帆布鞋" price="100" />
+	<item consumecode="120122021072" name="[女]时尚靴子" price="100" />
+	<item consumecode="120122021073" name="[女]时尚皮鞋" price="100" />
+	<item consumecode="120122021074" name="[男]篮球衣" price="100" />
+	<item consumecode="120122021075" name="[男]假西服" price="100" />
+	<item consumecode="120122021076" name="[女]女孩上衣" price="100" />
+	<item consumecode="120122021077" name="[女]厚女孩上衣" price="100" />
+	<item consumecode="120122021078" name="[男]皱西裤" price="100" />
+	<item consumecode="120122021079" name="[男]休闲短裤" price="100" />
+	<item consumecode="120122021080" name="[女]女孩短裤" price="100" />
+	<item consumecode="120122021081" name="[女]七分裤" price="100" />
+	<item consumecode="120122021082" name="威力之石（折）" price="40" />
+	<item consumecode="120122021083" name="时间停止（折）" price="40" />
+	<item consumecode="120122021084" name="钻石（折）" price="40" />
+	<item consumecode="120122021085" name="雷神（连连看）（折）" price="40" />
+	<item consumecode="120122021086" name="增加两行（折）" price="10" />
+
+	<item consumecode="120122022001" name="小生命药剂" price="50" />
+	<item consumecode="120122022002" name="小手雷" price="50" />
+	<item consumecode="120122022003" name="小无敌药剂" price="50" />
+	<item consumecode="120122022004" name="时间停止" price="50" />
+	<item consumecode="120122022005" name="威力之石" price="50" />
+	<item consumecode="120122022006" name="加速（宝石龙）" price="20" />
+	<item consumecode="120122022007" name="辨别敌我" price="50" />
+	<item consumecode="120122022008" name="伪装" price="50" />
+	<item consumecode="120122022009" name="加速（地道战）" price="20" />
+	<item consumecode="120122022010" name="减速（地道战）" price="20" />
+	<item consumecode="120122022011" name="十字雷" price="30" />
+	<item consumecode="120122022012" name="禁手（对对碰）" price="50" />
+	<item consumecode="120122022013" name="洗牌（对对碰）" price="30" />
+	<item consumecode="120122022014" name="钻石" price="50" />
+	<item consumecode="120122022015" name="雷神（连连看）" price="50" />
+	<item consumecode="120122022016" name="障碍（连连看）" price="40" />
+	<item consumecode="120122022017" name="禁手（连连看）" price="50" />
+	<item consumecode="120122022018" name="洗牌（连连看）" price="20" />
+	<item consumecode="120122022019" name="炸弹（俄罗斯）" price="30" />
+	<item consumecode="120122022020" name="障碍（俄罗斯）" price="50" />
+	<item consumecode="120122022021" name="消除" price="50" />
+	<item consumecode="120122022022" name="加速（俄罗斯）" price="20" />
+	<item consumecode="120122022023" name="消除两行" price="20" />
+	<item consumecode="120122022024" name="增加两行" price="20" />
+	<item consumecode="120122022025" name="负分清零" price="300" />
+	<item consumecode="120122022026" name="双倍积分" price="20" />
+	<item consumecode="120122022027" name="绿野仙踪" price="100" />
+	<item consumecode="120122022028" name="[男]普通男士头发" price="100" />
+	<item consumecode="120122022029" name="[男]潇洒男士发型" price="200" />
+	<item consumecode="120122022030" name="[女]头巾发式" price="100" />
+	<item consumecode="120122022031" name="[女]温柔女士发型" price="200" />
+	<item consumecode="120122022032" name="[男]休闲鞋" price="100" />
+	<item consumecode="120122022033" name="[男]帆布鞋" price="100" />
+	<item consumecode="120122022034" name="[女]时尚靴子" price="100" />
+	<item consumecode="120122022035" name="[女]时尚皮鞋" price="100" />
+	<item consumecode="120122022036" name="[男]篮球衣" price="100" />
+	<item consumecode="120122022037" name="[男]假西服" price="100" />
+	<item consumecode="120122022038" name="[女]女孩上衣" price="100" />
+	<item consumecode="120122022039" name="[女]厚女孩上衣" price="100" />
+	<item consumecode="120122022040" name="[男]皱西裤" price="100" />
+	<item consumecode="120122022041" name="[男]休闲短裤" price="100" />
+	<item consumecode="120122022042" name="[女]女孩短裤" price="100" />
+	<item consumecode="120122022043" name="[女]七分裤" price="100" />
+	<item consumecode="120122022044" name="威力之石（折）" price="40" />
+	<item consumecode="120122022045" name="时间停止（折）" price="40" />
+	<item consumecode="120122022046" name="钻石（折）" price="40" />
+	<item consumecode="120122022047" name="雷神（连连看）（折）" price="40" />
+	<item consumecode="120122022048" name="增加两行（折）" price="10" />
+	
+	<!-- 三国消费代码 -->
+	<item consumecode="120122041001" name="玄冰白虎(武将)" price="8800"/>
+	<item consumecode="120122041002" name="玄冰白虎(刺客)" price="8800"/>
+	<item consumecode="120122041003" name="玄冰白虎(谋士)" price="8800"/>
+	<item consumecode="120122041004" name="玄冰白虎(方士)" price="8800"/>
+	<item consumecode="120122041005" name="雪岩白虎(武将)" price="1200"/>
+	<item consumecode="120122041006" name="雪岩白虎(刺客)" price="1200"/>
+	<item consumecode="120122041007" name="雪岩白虎(谋士)" price="1200"/>
+	<item consumecode="120122041008" name="雪岩白虎(方士)" price="1200"/>
+	<item consumecode="120122041009" name="爪黄飞电(武将)" price="1200"/>
+	<item consumecode="120122041010" name="爪黄飞电(刺客)" price="1200"/>
+	<item consumecode="120122041011" name="爪黄飞电(谋士)" price="1200"/>
+	<item consumecode="120122041012" name="爪黄飞电(方士)" price="1200"/>
+	<item consumecode="120122041013" name="麋鹿(武将)" price="1200"/>
+	<item consumecode="120122041014" name="麋鹿(刺客)" price="1200"/>
+	<item consumecode="120122041015" name="麋鹿(谋士)" price="1200"/>
+	<item consumecode="120122041016" name="麋鹿(方士)" price="1200"/>
+	<item consumecode="120122041017" name="一往情深" price="2800"/>
+	<item consumecode="120122041018" name="两情相悦" price="6600"/>
+	<item consumecode="120122041019" name="百年好合" price="9900"/>
+	<item consumecode="120122041020" name="高级坐骑口粮" price="30"/>
+	<item consumecode="120122041021" name="双倍经验符" price="120"/>
+	<item consumecode="120122041022" name="坐骑经验双倍卡" price="120"/>
+	<item consumecode="120122041023" name="还魂香包" price="50"/>
+	<item consumecode="120122041024" name="坐骑技能锁定符" price="350"/>
+	<item consumecode="120122041025" name="一合酥" price="40"/>
+	<item consumecode="120122041026" name="特级饲料" price="40"/>
+	<item consumecode="120122041027" name="装备修理符" price="10"/>
+	<item consumecode="120122041028" name="都城传送符" price="20"/>
+	<item consumecode="120122041029" name="传送符" price="20"/>
+	<item consumecode="120122041030" name="休书" price="1000"/>
+	<item consumecode="120122041031" name="夫妻团圆符" price="20"/>
+	<item consumecode="120122041032" name="10背包扩展符" price="150"/>
+	<item consumecode="120122041033" name="15背包扩展符" price="300"/>
+	<item consumecode="120122041034" name="20背包扩展符" price="600"/>
+	<item consumecode="120122041035" name="25背包扩展符" price="1200"/>
+	<item consumecode="120122041036" name="30背包扩展符" price="2400"/>
+	<item consumecode="120122041037" name="国家喊话符" price="30"/>
+	<item consumecode="120122041038" name="世界喊话符" price="200"/>
+	<item consumecode="120122041039" name="10仓库扩展符" price="75"/>
+	<item consumecode="120122041040" name="20仓库扩展符" price="300"/>
+	<item consumecode="120122041041" name="国家任务令" price="350"/>
+	<item consumecode="120122041042" name="装备打造符" price="10"/>
+	<item consumecode="120122041043" name="低级宝石合成符" price="10"/>
+	<item consumecode="120122041044" name="高级宝石合成符" price="60"/>
+	<item consumecode="120122041045" name="初级打孔符" price="10"/>
+	<item consumecode="120122041046" name="中级打孔符" price="10"/>
+	<item consumecode="120122041047" name="高级打孔符" price="40"/>
+	<item consumecode="120122041048" name="顶级打孔符" price="180"/>
+	<item consumecode="120122041049" name="低级镶嵌符" price="10"/>
+	<item consumecode="120122041050" name="高级镶嵌符" price="50"/>
+	<item consumecode="120122041051" name="3级宝石摘除符" price="10"/>
+	<item consumecode="120122041052" name="4级宝石摘除符" price="50"/>
+	<item consumecode="120122041053" name="4级宝石摘除符" price="50"/>
+	<item consumecode="120122041054" name="5级宝石摘除符" price="250"/>
+	<item consumecode="120122041055" name="6级宝石摘除符" price="1250"/>
+	<item consumecode="120122041056" name="7级宝石摘除符" price="3000"/>
+	<item consumecode="120122041057" name="低级星级鉴定符" price="100"/>
+	<item consumecode="120122041058" name="高级星级鉴定符" price="500"/>
+	<item consumecode="120122041059" name="3级黄宝石" price="250"/>
+	<item consumecode="120122041060" name="3级蓝宝石" price="250"/>
+	<item consumecode="120122041061" name="3级绿宝石" price="250"/>
+	<item consumecode="120122041062" name="3级琥珀" price="250"/>
+	<item consumecode="120122041063" name="3级玛瑙" price="250"/>
+	<item consumecode="120122041064" name="3级孔雀石" price="250"/>
+	<item consumecode="120122041065" name="3级猫眼石" price="250"/>
+	<item consumecode="120122041066" name="3级月光石 " price="250"/>
+	<item consumecode="120122041067" name="3级红宝石" price="250"/>
+	<item consumecode="120122041068" name="3级日光石" price="250"/>
+	<item consumecode="120122041069" name="3级寿山石" price="250"/>
+	<item consumecode="120122041070" name="3级紫鸦石" price="250"/>
+	<item consumecode="120122041071" name="3级翡翠" price="250"/>
+	<item consumecode="120122041072" name="3级碧玉" price="250"/>
+	<item consumecode="120122041073" name="3级金刚石" price="250"/>
+	<item consumecode="120122041074" name="3级水晶石" price="250"/>
+	<item consumecode="120122041075" name="3级青金石" price="250"/>
+	<item consumecode="120122041076" name="超级小还丹" price="10"/>
+	<item consumecode="120122041077" name="超级益气散" price="10"/>
+	<item consumecode="120122041078" name="超级大还丹" price="15"/>
+	<item consumecode="120122041079" name="超级大补散" price="15"/>
+	<item consumecode="120122041080" name="超级九转还魂丹" price="20"/>
+	<item consumecode="120122041081" name="超级首乌还神散" price="20"/>
+	<item consumecode="120122041082" name="超级行军丹" price="25"/>
+	<item consumecode="120122041083" name="超级清心露" price="25"/>
+	<item consumecode="120122041084" name="超级金创药" price="30"/>
+	<item consumecode="120122041085" name="超级忘忧露" price="30"/>
+	<item consumecode="120122041086" name="温州金钥匙" price="50"/>
+	<item consumecode="120122041087" name="坐骑技能遗忘书" price="50"/>
+	<item consumecode="120122041088" name="亚运火炬" price="100"/>
+	<item consumecode="120122041089" name="祝福礼包" price="100"/>
+	
+	<!-- 三国Android版本代码 -->
+	<item consumecode="160121244004" name="双倍经验符" price="120"/>
+	<item consumecode="160121244005" name="还魂香包" price="50"/>
+	<item consumecode="160121244006" name="一合酥" price="40"/>
+	<item consumecode="160121244007" name="装备修理符" price="10"/>
+	<item consumecode="160121244008" name="坐骑经验双倍卡" price="120"/>
+	<item consumecode="160121244009" name="高级坐骑口粮" price="30"/>
+	<item consumecode="160121244010" name="特级饲料" price="40"/>
+	<item consumecode="160121244011" name="坐骑技能锁定符" price="350"/>
+	<item consumecode="160121244012" name="坐骑技能遗忘书" price="50"/>
+	<item consumecode="160121244014" name="都城传送符" price="20"/>
+	<item consumecode="160121244015" name="传送符" price="20"/>
+	<item consumecode="160121244017" name="夫妻团圆符" price="20"/>
+	<item consumecode="160121244021" name="国家喊话符" price="30"/>
+	<item consumecode="160121244022" name="世界喊话符" price="200"/>
+	<item consumecode="160121244023" name="10仓库扩展符" price="75"/>
+	<item consumecode="160121244024" name="20仓库扩展符" price="300"/>
+	<item consumecode="160121244025" name="国家任务令" price="350"/>
+	<item consumecode="160121244026" name="装备打造符" price="10"/>
+	<item consumecode="160121244027" name="低级宝石合成符" price="10"/>
+	<item consumecode="160121244028" name="高级宝石合成符" price="60"/>
+	<item consumecode="160121244029" name="初级打孔符" price="10"/>
+	<item consumecode="160121244030" name="中级打孔符" price="10"/>
+	<item consumecode="160121244031" name="高级打孔符" price="40"/>
+	<item consumecode="160121244032" name="顶级打孔符" price="180"/>
+	<item consumecode="160121244033" name="低级镶嵌符" price="10"/>
+	<item consumecode="160121244034" name="高级镶嵌符" price="50"/>
+	<item consumecode="160121244035" name="3级宝石摘除符" price="10"/>
+	<item consumecode="160121244036" name="4级宝石摘除符" price="50"/>
+	<item consumecode="160121244037" name="5级宝石摘除符" price="250"/>
+	<item consumecode="160121244040" name="低级星级鉴定符" price="100"/>
+	<item consumecode="160121244042" name="3级力量宝石" price="250"/>
+	<item consumecode="160121244043" name="3级智力宝石" price="250"/>
+	<item consumecode="160121244044" name="3级敏捷宝石" price="250"/>
+	<item consumecode="160121244045" name="3级物攻宝石" price="250"/>
+	<item consumecode="160121244046" name="3级法攻宝石" price="250"/>
+	<item consumecode="160121244047" name="3级命中宝石" price="250"/>
+	<item consumecode="160121244048" name="3级暴击宝石" price="250"/>
+	<item consumecode="160121244049" name="3级回气宝石 " price="250"/>
+	<item consumecode="160121244050" name="3级体力宝石" price="250"/>
+	<item consumecode="160121244051" name="3级回血宝石" price="250"/>
+	<item consumecode="160121244052" name="3级生命宝石" price="250"/>
+	<item consumecode="160121244053" name="3级免暴宝石" price="250"/>
+	<item consumecode="160121244054" name="3级物闪宝石" price="250"/>
+	<item consumecode="160121244055" name="3级法闪宝石" price="250"/>
+	<item consumecode="160121244056" name="3级护甲宝石" price="250"/>
+	<item consumecode="160121244057" name="3级法防宝石" price="250"/>
+	<item consumecode="160121244058" name="3级速度宝石" price="250"/>
+	<item consumecode="160121244059" name="超级小还丹" price="10"/>
+	<item consumecode="160121244060" name="超级益气散" price="10"/>
+	<item consumecode="160121244061" name="超级大还丹" price="15"/>
+	<item consumecode="160121244062" name="超级大补散" price="15"/>
+	<item consumecode="160121244063" name="超级九转还魂丹" price="20"/>
+	<item consumecode="160121244064" name="超级首乌还神散" price="20"/>
+	<item consumecode="160121244065" name="超级行军丹" price="25"/>
+	<item consumecode="160121244066" name="超级清心露" price="25"/>
+	<item consumecode="160121244067" name="超级金创药" price="30"/>
+	<item consumecode="160121244068" name="超级忘忧露" price="30"/>
+	
+	<!-- 幻想整理前后代码对应 -->
+	<map source="120121972034" target="120121972230"/>
+	<map source="120121972035" target="120121972231"/>
+	<map source="120121972036" target="120121972232"/>
+	<map source="120121972032" target="120121972233"/>
+	<map source="120121972025" target="120121972234"/>
+	<map source="120121972023" target="120121972235"/>
+	<map source="120121972111" target="120121972236"/>
+	<map source="120121972121" target="120121972237"/>
+	<map source="120121972122" target="120121972238"/>
+	<map source="120121972114" target="120121972239"/>
+	<map source="120121972112" target="120121972240"/>
+	<map source="120121972227" target="120121972241"/>
+	<map source="120121972024" target="120121972242"/>
+	<map source="120121972064" target="120121972243"/>
+	<map source="120121972109" target="120121972244"/>
+	<map source="120121972001" target="120121972245"/>
+	<map source="120121972006" target="120121972246"/>
+	<map source="120121972010" target="120121972247"/>
+	<map source="120121972138" target="120121972248"/>
+	<map source="120121972139" target="120121972249"/>
+	<map source="120121972096" target="120121972250"/>
+	<map source="120121972097" target="120121972251"/>
+	<map source="120121972098" target="120121972252"/>
+	<map source="120121972099" target="120121972253"/>
+	<map source="120121972063" target="120121972254"/>
+	<map source="120121972110" target="120121972255"/>
+	<map source="120121972029" target="120121972256"/>
+	<map source="120121972065" target="120121972257"/>
+	<map source="120121972011" target="120121972258"/>
+	<map source="120121972026" target="120121972259"/>
+	<map source="120121972095" target="120121972260"/>
+	<map source="120121972120" target="120121972261"/>
+	<map source="120121972033" target="120121972262"/>
+	<map source="120121972113" target="120121972263"/>
+	<map source="120121972031" target="120121972264"/>
+	<map source="120121972125" target="120121972265"/>
+	<map source="120121972126" target="120121972266"/>
+	<map source="120121972028" target="120121972267"/>
+	<map source="120121972103" target="120121972268"/>
+	<map source="120121972124" target="120121972269"/>
+	<map source="120121972148" target="120121972270"/>
+	<map source="120121972149" target="120121972271"/>
+	<map source="120121972115" target="120121972272"/>
+	<map source="120121972150" target="120121972273"/>
+	<map source="120121972151" target="120121972274"/>
+	<map source="120121972104" target="120121972275"/>
+	<map source="120121972016" target="120121972276"/>
+	<map source="120121972108" target="120121972277"/>
+	<map source="120121972102" target="120121972278"/>
+	<map source="120121972088" target="120121972279"/>
+	<map source="120121972130" target="120121972280"/>
+	<map source="120121972131" target="120121972281"/>
+	<map source="120121972123" target="120121972282"/>
+	<map source="120121972082" target="120121972283"/>
+	<map source="120121972002" target="120121972284"/>
+	<map source="120121972226" target="120121972285"/>
+	<map source="120121972070" target="120121972286"/>
+	<map source="120121972071" target="120121972287"/>
+	<map source="120121972012" target="120121972288"/>
+	<map source="120121972043" target="120121972289"/>
+	<map source="120121972044" target="120121972290"/>
+	<map source="120121972090" target="120121972291"/>
+	<map source="120121972091" target="120121972292"/>
+	<map source="120121972040" target="120121972293"/>
+	<map source="120121972137" target="120121972294"/>
+	<map source="120121972087" target="120121972295"/>
+	<map source="120121972140" target="120121972296"/>
+	<map source="120121972015" target="120121972297"/>
+	<map source="120121972141" target="120121972298"/>
+	<map source="120121972136" target="120121972299"/>
+	<map source="120121972143" target="120121972300"/>
+	<map source="120121972132" target="120121972301"/>
+	<map source="120121972133" target="120121972302"/>
+	<map source="120121972038" target="120121972303"/>
+	<map source="120121972145" target="120121972304"/>
+	<map source="120121972142" target="120121972305"/>
+	<map source="120121972144" target="120121972306"/>
+	<map source="120121972092" target="120121972307"/>
+	<map source="120121972007" target="120121972308"/>
+	<map source="120121972134" target="120121972309"/>
+	<map source="120121972135" target="120121972310"/>
+	<map source="120121972045" target="120121972311"/>
+	<map source="120121972086" target="120121972312"/>
+	<map source="120121972072" target="120121972313"/>
+	<map source="120121972017" target="120121972314"/>
+	<map source="120121972129" target="120121972315"/>
+	<map source="120121972074" target="120121972316"/>
+	<map source="120121972003" target="120121972317"/>
+	<map source="120121972075" target="120121972318"/>
+	<map source="120121972100" target="120121972319"/>
+	<map source="120121972046" target="120121972320"/>
+	<map source="120121972206" target="120121972321"/>
+	<map source="120121972081" target="120121972322"/>
+	<map source="120121972207" target="120121972323"/>
+	<map source="120121972210" target="120121972324"/>
+	<map source="120121972213" target="120121972325"/>
+	<map source="120121972212" target="120121972326"/>
+	<map source="120121972211" target="120121972327"/>
+	<map source="120121972069" target="120121972328"/>
+	<map source="120121972018" target="120121972329"/>
+	<map source="120121972223" target="120121972330"/>
+	<map source="120121972222" target="120121972331"/>
+	<map source="120121972085" target="120121972332"/>
+	<map source="120121972101" target="120121972333"/>
+	<map source="120121972078" target="120121972334"/>
+	<map source="120121972214" target="120121972335"/>
+	<map source="120121972215" target="120121972336"/>
+	<map source="120121972208" target="120121972337"/>
+	<map source="120121972107" target="120121972338"/>
+	<map source="120121972080" target="120121972339"/>
+	<map source="120121972106" target="120121972340"/>
+	<map source="120121972083" target="120121972341"/>
+	<map source="120121972209" target="120121972342"/>
+	<map source="120121972084" target="120121972343"/>
+	<map source="120121972344" target="120121972346"/>
+
+	<!-- 武林整理前后代码对应 -->
+	<map source="120121811006" target="120121811195"/>
+	<map source="120121811039" target="120121811251"/>
+	<map source="120121811040" target="120121811174"/>
+	<map source="120121811041" target="120121811171"/>
+	<map source="120121811042" target="120121811182"/>
+	<map source="120121811043" target="120121811172"/>
+	<map source="120121811044" target="120121811175"/>
+	<map source="120121811045" target="120121811203"/>
+	<map source="120121811046" target="120121811204"/>
+	<map source="120121811047" target="120121811183"/>
+	<map source="120121811048" target="120121811176"/>
+	<map source="120121811049" target="120121811223"/>
+	<map source="120121811050" target="120121811184"/>
+	<map source="120121811051" target="120121811177"/>
+	<map source="120121811052" target="120121811224"/>
+	<map source="120121811053" target="120121811205"/>
+	<map source="120121811054" target="120121811252"/>
+	<map source="120121811055" target="120121811196"/>
+	<map source="120121811056" target="120121811263"/>
+	<map source="120121811057" target="120121811253"/>
+	<map source="120121811058" target="120121811225"/>
+	<map source="120121811059" target="120121811247"/>
+	<map source="120121811062" target="120121811160"/>
+	<map source="120121811063" target="120121811165"/>
+	<map source="120121811064" target="120121811166"/>
+	<map source="120121811065" target="120121811167"/>
+	<map source="120121811066" target="120121811168"/>
+	<map source="120121811067" target="120121811169"/>
+	<map source="120121811068" target="120121811170"/>
+	<map source="120121811069" target="120121811178"/>
+	<map source="120121811070" target="120121811180"/>
+	<map source="120121811071" target="120121811181"/>
+	<map source="120121811072" target="120121811245"/>
+	<map source="120121811073" target="120121811206"/>
+	<map source="120121811074" target="120121811207"/>
+	<map source="120121811075" target="120121811208"/>
+	<map source="120121811076" target="120121811219"/>
+	<map source="120121811077" target="120121811254"/>
+	<map source="120121811080" target="120121811209"/>
+	<map source="120121811081" target="120121811185"/>
+	<map source="120121811082" target="120121811186"/>
+	<map source="120121811083" target="120121811187"/>
+	<map source="120121811084" target="120121811188"/>
+	<map source="120121811085" target="120121811189"/>
+	<map source="120121811086" target="120121811246"/>
+	<map source="120121811087" target="120121811256"/>
+	<map source="120121811088" target="120121811197"/>
+	<map source="120121811089" target="120121811198"/>
+	<map source="120121811090" target="120121811199"/>
+	<map source="120121811091" target="120121811200"/>
+	<map source="120121811092" target="120121811201"/>
+	<map source="120121811093" target="120121811261"/>
+	<map source="120121811094" target="120121811218"/>
+	<map source="120121811095" target="120121811220"/>
+	<map source="120121811096" target="120121811210"/>
+	<map source="120121811097" target="120121811221"/>
+	<map source="120121811098" target="120121811257"/>
+	<map source="120121811099" target="120121811262"/>
+	<map source="120121811100" target="120121811248"/>
+	<map source="120121811101" target="120121811211"/>
+	<map source="120121811102" target="120121811259"/>
+	<map source="120121811103" target="120121811255"/>
+	<map source="120121811104" target="120121811190"/>
+	<map source="120121811105" target="120121811191"/>
+	<map source="120121811106" target="120121811192"/>
+	<map source="120121811107" target="120121811212"/>
+	<map source="120121811108" target="120121811213"/>
+	<map source="120121811109" target="120121811214"/>
+	<map source="120121811110" target="120121811249"/>
+	<map source="120121811111" target="120121811222"/>
+	<map source="120121811112" target="120121811215"/>
+	<map source="120121811113" target="120121811161"/>
+	<map source="120121811114" target="120121811202"/>
+	<map source="120121811115" target="120121811164"/>
+	<map source="120121811118" target="120121811217"/>
+	<map source="120121811119" target="120121811162"/>
+	<map source="120121811120" target="120121811193"/>
+	<map source="120121811121" target="120121811163"/>
+	<map source="120121811122" target="120121811194"/>
+	<map source="120121811123" target="120121811226"/>
+	<map source="120121811124" target="120121811260"/>
+	<map source="120121811125" target="120121811264"/>
+	<map source="120121811126" target="120121811227"/>
+	<map source="120121811127" target="120121811228"/>
+	<map source="120121811128" target="120121811229"/>
+	<map source="120121811129" target="120121811230"/>
+	<map source="120121811130" target="120121811231"/>
+	<map source="120121811131" target="120121811232"/>
+	<map source="120121811132" target="120121811233"/>
+	<map source="120121811133" target="120121811234"/>
+	<map source="120121811134" target="120121811235"/>
+	<map source="120121811135" target="120121811236"/>
+	<map source="120121811136" target="120121811237"/>
+	<map source="120121811137" target="120121811238"/>
+	<map source="120121811138" target="120121811239"/>
+	<map source="120121811139" target="120121811240"/>
+	<map source="120121811140" target="120121811241"/>
+	<map source="120121811141" target="120121811242"/>
+	<map source="120121811142" target="120121811243"/>
+	<map source="120121811143" target="120121811244"/>
+	<map source="120121811144" target="120121811173"/>
+	<map source="120121811145" target="120121811179"/>
+	<map source="120121811146" target="120121811270"/>
+	<map source="120121811147" target="120121811271"/>
+	<map source="120121811148" target="120121811272"/>
+	<map source="120121811149" target="120121811273"/>
+	<map source="120121811150" target="120121811274"/>
+	<map source="120121811151" target="120121811265"/>
+	<map source="120121811152" target="120121811266"/>
+	<map source="120121811153" target="120121811267"/>
+	<map source="120121811154" target="120121811268"/>
+	<map source="120121811155" target="120121811269"/>
+	<map source="120121811156" target="120121811250"/>
+	<map source="120121811157" target="120121811216"/>
+	<map source="120121811158" target="120121811258"/>
+	
+	<!-- 三国Java计费代码转换为Android计费代码  -->
+	<map source="120122041001" target="160121244013"/>
+	<map source="120122041002" target="160121244013"/>
+	<map source="120122041003" target="160121244013"/>
+	<map source="120122041004" target="160121244013"/>
+	<map source="120122041017" target="160121244001"/>
+	<map source="120122041018" target="160121244002"/>
+	<map source="120122041019" target="160121244003"/>
+	<map source="120122041020" target="160121244009"/>
+	<map source="120122041021" target="160121244004"/>
+	<map source="120122041022" target="160121244008"/>
+	<map source="120122041023" target="160121244005"/>
+	<map source="120122041024" target="160121244011"/>
+	<map source="120122041025" target="160121244006"/>
+	<map source="120122041026" target="160121244010"/>
+	<map source="120122041027" target="160121244007"/>
+	<map source="120122041028" target="160121244014"/>
+	<map source="120122041029" target="160121244015"/>
+	<map source="120122041030" target="160121244016"/>
+	<map source="120122041031" target="160121244017"/>
+	<map source="120122041034" target="160121244018"/>
+	<map source="120122041035" target="160121244019"/>
+	<map source="120122041036" target="160121244020"/>
+	<map source="120122041037" target="160121244021"/>
+	<map source="120122041038" target="160121244022"/>
+	<map source="120122041039" target="160121244023"/>
+	<map source="120122041040" target="160121244024"/>
+	<map source="120122041041" target="160121244025"/>
+	<map source="120122041042" target="160121244026"/>
+	<map source="120122041043" target="160121244027"/>
+	<map source="120122041044" target="160121244028"/>
+	<map source="120122041045" target="160121244029"/>
+	<map source="120122041046" target="160121244030"/>
+	<map source="120122041047" target="160121244031"/>
+	<map source="120122041048" target="160121244032"/>
+	<map source="120122041049" target="160121244033"/>
+	<map source="120122041050" target="160121244034"/>
+	<map source="120122041051" target="160121244035"/>
+	<map source="120122041052" target="160121244036"/>
+	<map source="120122041053" target="160121244036"/>
+	<map source="120122041054" target="160121244037"/>
+	<map source="120122041055" target="160121244038"/>
+	<map source="120122041056" target="160121244039"/>
+	<map source="120122041057" target="160121244040"/>
+	<map source="120122041058" target="160121244041"/>
+	<map source="120122041059" target="160121244042"/>
+	<map source="120122041060" target="160121244043"/>
+	<map source="120122041061" target="160121244044"/>
+	<map source="120122041062" target="160121244045"/>
+	<map source="120122041063" target="160121244046"/>
+	<map source="120122041064" target="160121244047"/>
+	<map source="120122041065" target="160121244048"/>
+	<map source="120122041066" target="160121244049"/>
+	<map source="120122041067" target="160121244050"/>
+	<map source="120122041068" target="160121244051"/>
+	<map source="120122041069" target="160121244052"/>
+	<map source="120122041070" target="160121244053"/>
+	<map source="120122041071" target="160121244054"/>
+	<map source="120122041072" target="160121244055"/>
+	<map source="120122041073" target="160121244056"/>
+	<map source="120122041074" target="160121244057"/>
+	<map source="120122041075" target="160121244058"/>
+	<map source="120122041076" target="160121244059"/>
+	<map source="120122041077" target="160121244060"/>
+	<map source="120122041078" target="160121244061"/>
+	<map source="120122041079" target="160121244062"/>
+	<map source="120122041080" target="160121244063"/>
+	<map source="120122041081" target="160121244064"/>
+	<map source="120122041082" target="160121244065"/>
+	<map source="120122041083" target="160121244066"/>
+	<map source="120122041084" target="160121244067"/>
+	<map source="120122041085" target="160121244068"/>
+	<map source="120122041087" target="160121244012"/>
+</cmccconfig>

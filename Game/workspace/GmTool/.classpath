@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="res_zh.sanguo"/>
+	<classpathentry kind="src" path="res_zh"/>
+	<classpathentry kind="src" path="src.sanguo"/>
+	<classpathentry kind="src" path="src.502"/>
+	<classpathentry kind="src" path="src.fit"/>
+	<classpathentry kind="src" path="src.message"/>
+	<classpathentry kind="src" path="src.util"/>
+	<classpathentry kind="src" path="src.uwap"/>
+	<classpathentry kind="src" path="resources"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="lib/mina-core-1.1.5.jar"/>
+	<classpathentry kind="lib" path="lib/slf4j-jdk14.jar"/>
+	<classpathentry kind="lib" path="lib/jdom.jar"/>
+	<classpathentry kind="lib" path="lib/F1J8.jar"/>
+	<classpathentry kind="lib" path="lib/mysql-connector-java-3.1.10-bin.jar"/>
+	<classpathentry kind="lib" path="lib/sortUtil.jar"/>
+	<classpathentry kind="lib" path="lib/dom4j-1.6.1.jar"/>
+	<classpathentry kind="lib" path="lib/xercesImpl.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

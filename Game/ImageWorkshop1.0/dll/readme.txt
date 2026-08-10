@@ -1,0 +1,1 @@
+正常情况下用MangoJNI.dll就可以。某些特殊机器使用VBO会崩溃，可把MangoJNI_NO_VBO.dll改名为MangoJNI.dll使用。

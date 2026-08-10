@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="GBK"?>
+<feeplans>
+  <feeplan id="normal" fee="300" max="576000" beginlevel="101">
+    每付费1元可购买360个i币，享受6小时游戏时间，每月封顶16元。
+  </feeplan>
+  <feeplan id="normale2" fee="300" max="576000" beginlevel="101">
+    每付费1元可购买360个i币，享受6小时游戏时间，每月封顶16元。
+  </feeplan>
+</feeplans>

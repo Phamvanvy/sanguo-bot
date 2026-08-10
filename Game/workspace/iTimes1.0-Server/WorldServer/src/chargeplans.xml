@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="GBK"?>
+<chargeplans>
+	<chargeplan id="wap" serviceno="http://wap.monternet.com/reversesubscribe?SPID=900603&amp;ServiceID=31032031&amp;SPURL=http://wap.8002.cn/lr/mot/zzlxy/sfee.jspg.jsp?s=110000&amp;r=110000&amp;url=http://218.206.80.185:8102/Fee?FeeID=" content="渠道1(每次2元)"/>
+</chargeplans>

@@ -1,0 +1,55 @@
+package com.pip.itimes.server.world;
+
+import com.pip.itimes.server.stage.Pet;
+import com.pip.itimes.server.world.game.GameMap;
+
+public interface PositionSprite {
+	public int getId();
+	public void setId(int id);
+	public Team getTeam();
+	public void setTeam(Team team);
+	public byte getLightLevel();
+	public void setLightLevel(byte lightLevel);
+	public boolean isNeedRefreshPosition();
+	public void addPositionDest(int id);
+	public void removePositionDest(int id);
+	public String getPlayerName();
+	public void setPlayerName(String playerName);
+	public short getFace();
+	public Client getClient();
+	public byte getSex();
+	public void setSex(byte sex);
+	public int getLevel();
+	public String getTongName();
+	public void setTongName(String tongName);
+	public byte getReturnTimes();
+	public void setReturnTimes(byte returnTimes);
+	public Pet getPet();
+	public String getTitle();
+	public void setTitle(String title);
+	public String getCreditName();
+	public boolean isInBattle();
+	public boolean hasBattle();
+	public boolean hasBuf(int pro);
+	public void setNeedRefreshPosition(boolean needRefreshPosition);
+	public void setPositionTime(long time);
+	public boolean containsPosition(int id);
+	public byte getCamp();
+	public void setCamp(byte camp);
+	public short getX();
+	public void setX(short x);
+	public short getY();
+	public void setY(short y);
+	public byte getPhizTitleType();
+	public short getPhizTitleIndex();
+	public void setTeamState(int state);
+	public int getTeamState();
+	public void setMap(GameMap map);
+	public GameMap getMap();
+	public boolean inPkMap();
+	public void setHolyGemLightLevel(byte level);
+	public byte getHolyGemLightLevel();
+	public void setFantasyGemLightLevel(byte level);
+	public byte getFantasyGemLightLevel();
+	public int getVipNewLevel();
+}

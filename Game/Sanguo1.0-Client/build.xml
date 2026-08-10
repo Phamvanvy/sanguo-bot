@@ -1,0 +1,1487 @@
+<?xml version="1.0" encoding="GBK"?>
+<project name="明珠三国" default="create-All">
+
+	<!-- 环境目录 -->
+	<property name="wtk.home" value="C:\WTK22" />
+	<property name="polish.home" value="C:\Program Files\J2ME-Polish2-build" />
+	<property name="nokia.home" value="C:\Emulator\Nokia_S40_DP20_SDK_1_1" />
+	<property name="motorola.home" value="C:\Program Files\Motorola\SDK v5.1.2 for J2ME" />
+
+<property name="MEDIA-PRICE" value="." />
+<property name="MIDP-VERSION" value="MIDP-2.0"/>
+<property name="CLDC-VERSION" value="CLDC-1.0"/>
+<property name="MIDlet-Class" value="com.pip.sanguo.SanguoMIDlet"/>
+<property name="MIDlet-Info-URL" value="http://3g.pipgame.cn/"/>
+<property name="Version" value="4.2"/>
+<property name="Version2" value="4_2"/>
+<property name="ChannelCode" value="CCCCACCD"/>
+<property name="Revision" value="PiP"/>
+<property name="RestrictIP" value="0"/>
+<property name="mainmenu_config" value=""/>	
+		<property name="use360sdk" value="false" /><!--使用360sdk-->
+	<taskdef name="j2mepolish"
+		classname="de.enough.polish.ant.PolishTask"
+		classpath="${polish.home}/lib/enough-j2mepolish-build.jar:${polish.home}/lib/jdom.jar:${polish.home}/lib/proguard.jar:${polish.home}/lib/retroguard.jar:{polish.home}/lib/yguard-lib.jar"/>
+	<taskdef name="updatejad"
+		classname="com.pip.tools.UpdateJADTask"
+		classpath="stringreplacement.jar"/>
+<target name="create-All">
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Midp2General-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia7610-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia6681-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia3250-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia5310XM-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-NokiaN73-PiP" />
+	<!--<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia7370-PiP" />-->
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia5800-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia5800-Portrait-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia5800II-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-NokiaE62-PiP" />
+	<!--<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SEK750-PiP" />-->
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SEK790-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-MotoE2-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Midp2Touch-PiP" />
+
+</target>
+
+<target name="create-DIANXIN">
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-HUAWEIC7500-PiP" />
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-DOPODS500-PiP" />
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-HUAWEIC5600-PiP" />
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-HUAWEIC7600-PiP" />
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-TYD788-PiP" />
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-ZTED90-PiP" />
+		<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SCHW239-PiP" />
+	</target>
+	
+
+<target name="create-Midp2General-PiP" depends="set-Midp2General-PiP,make-package" />
+<target name="create-Nokia7610-PiP" depends="set-Nokia7610-PiP,make-package" />
+<target name="create-Nokia6681-PiP" depends="set-Nokia6681-PiP,make-package" />
+<target name="create-Nokia3250-PiP" depends="set-Nokia3250-PiP,make-package" />
+<target name="create-NokiaN73-PiP" depends="set-NokiaN73-PiP,make-package" />
+<target name="create-Nokia5310XM-PiP" depends="set-Nokia5310XM-PiP,make-package" />
+<target name="create-Nokia7370-PiP" depends="set-Nokia7370-PiP,make-package" />
+<target name="create-NokiaE62-PiP" depends="set-NokiaE62-PiP,make-package" />
+<target name="create-Nokia5800-PiP" depends="set-Nokia5800-PiP,make-package" />
+<target name="create-Nokia5800-Portrait-PiP" depends="set-Nokia5800-Portrait-PiP,make-package" />
+<target name="create-Nokia5800-NewUI-PiP" depends="set-Nokia5800-NewUI-PiP,make-package" />
+<target name="create-Nokia5800II-PiP" depends="set-Nokia5800II-PiP,make-package" />
+<target name="create-SEK750-PiP" depends="set-SEK750-PiP,make-package" />
+<target name="create-SEK790-PiP" depends="set-SEK790-PiP,make-package" />
+<target name="create-MotoE2-PiP" depends="set-MotoE2-PiP,make-package" />
+<target name="create-Midp2Touch-PiP" depends="set-Midp2Touch-PiP,make-package-touch" />
+<target name="create-Lenovo-PiP" depends="set-Lenovo-PiP" />
+<target name="create-AndroidAuto-WH-PiP" depends="set-AndroidAuto-WH-PiP" />
+<target name="create-AndroidAuto-Xperia-PiP" depends="set-AndroidAuto-Xperia-PiP" />
+<target name="create-Android-Pad-PiP" depends="set-Android-Pad-PiP" />
+<target name="create-Android-PiP" depends="set-Android-PiP" />
+<target name="create-AndroidSmall-PiP" depends="set-AndroidSmall-PiP" />
+<target name="create-AndroidLarge-PiP" depends="set-AndroidLarge-PiP" />
+<target name="create-AndroidAuto-PiP" depends="set-AndroidAuto-PiP" />
+<target name="create-LenovoU1-PiP" depends="set-LenovoU1-PiP" />	
+	
+	<!--DIANXIN-->
+	<target name="create-HUAWEIC7500-PiP" depends="set-HUAWEIC7500-PiP,make-package" />
+	<target name="create-DOPODS500-PiP" depends="set-DOPODS500-PiP,make-package" />
+	<target name="create-HUAWEIC5600-PiP" depends="set-HUAWEIC5600-PiP,make-package" />
+	<target name="create-HUAWEIC7600-PiP" depends="set-HUAWEIC7600-PiP,make-package" />
+	<target name="create-TYD788-PiP" depends="set-TYD788-PiP,make-package" />
+	<target name="create-ZTED90-PiP" depends="set-ZTED90-PiP,make-package" />
+	<target name="create-SCHW239-PiP" depends="set-SCHW239-PiP,make-package" />
+
+
+<target name="set-Midp2General-PiP">
+	<!-- 机型设置 -->
+	<!-- PolishDevice参数指定这个机型对应的Polish机型 -->
+	<property name="PolishDevice" value="Motorola/V3" />
+	<!-- ModelID参数指定这个机型的JAR包里的机型名称 -->
+	<property name="ModelID" value="GenericMidp2" />
+	<!-- Series参数指定这个机型对应的服务器机型ID -->
+	<property name="Series" value="GenericMidp2" />
+	<!-- UIModel参数指定这个机型用哪个系列的UI脚本 -->
+	<property name="UIModel" value="Midp2Big" />
+	
+	<!-- 资源设置 -->
+	<!-- ResDirectory参数指定包含资源目录下的哪个子目录 -->
+	<property name="ResDirectory" value="Midp2Big" />
+	<!-- IconDirectory参数指定使用哪个子目录下的图标文件 -->
+	<property name="IconDirectory" value="icon-72 gy" />
+	
+	<!-- 绘图设置 -->
+	<!-- CanvasType参数指定程序使用哪一个Canvas类，可能的取值包括：GameCanvas/FullCanvas/Canvas -->
+	<property name="CanvasType" value="GameCanvas"/>
+	<!-- PipImageMode参数指定PipImage类的模式，可能的取值包括：realtime(不缓存图片)/halfbuffer(缓存最近使用
+	的图片)/fullbuffer(一次性全部创建) -->
+	<property name="PipImageMode" value="fullbuffer"/>
+	<!-- PipImageBufferSize参数指定每个PipImage缓存的帧数量，只适用于halfbuffer模式 -->
+	<property name="PipImageBufferSize" value="1"/>
+	<!-- DrawMethod参数指定对图片进行翻转的方法，可能的取值包括：NokiaUI(使用DirectGraphics.drawImage来翻转
+	，适用于60s1, 60s2，在60s3上会导致内存泄漏)/DrawRegion(适用于MIDP2机型，但在60s2上会导致内存泄漏) -->
+    <property name="TransitMethod" value="DrawRegion" />
+	
+	<!-- 字体设置 -->
+	<!-- Draw3DString参数指定绘制立体文字时使用的方法，可能的取值包括：best(画8遍背景)/medium(画4遍背景)/
+	simple(画1遍背景)/none(不画背景) -->
+	<property name="Draw3DString" value="best"/>
+	<!-- FontSize参数指定字体大小，可能的取值包括：small/medium/large -->
+	<property name="FontSize" value="small" />
+	<!-- UseImageFont参数指定是否使用自带的图片字体 -->
+	<property name="UseImageFont" value="false"/>
+	
+	<!-- 键盘设置 -->
+	<!-- KeyCodeType指定键盘布局，可能的取值包括：General/Motorola/MotorolaE2 -->
+	<property name="KeyCodeType" value="General" />
+	
+	<!-- 网络设置 -->
+	<!-- protocol参数指定使用的网络协议类型，可能的取值包括：tcp/http -->
+	<property name="protocol" value="tcp" />
+	<!-- Connection参数指定TCP环境下使用的线程模式，可能的取值包括：single(单线程模式，用于NGage/V300等无法在读取的同时
+	写数据的机型)/dual(双线程模式，读写分为2个线程) -->
+	<property name="ConnectionThread" value="dual"/>
+	<!-- StreamMode参数指定读取和写入数据时的模式，可能的取值包括：free(可使用API提供的DataInputSream和DataOutputStream，
+	适用于大部分的机型)/strict(自己创建Stream来读写，用于V300，这个机型自带的API提供的Stream有BUG) -->
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgb"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:MIDP2General版本." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<!--是否双倍地图-->
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<!--横屏还是竖屏-->
+	<property name="Orientation" value="portrait" />
+	<!--是否支持支付宝-->
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-Nokia7610-PiP">
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+	<property name="ModelID" value="Nokia7610" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Small" />
+	<property name="ResDirectory" value="Midp2Small" />
+	<property name="IconDirectory" value="icon-29 gy" />
+	<property name="CanvasType" value="FullCanvas"/>
+	<property name="ScreenWidth" value="176"/>
+	<property name="ScreenHeight" value="208"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="10"/>
+    <property name="TransitMethod" value="DrawRegion" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Nokia7610系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-Nokia6681-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="Nokia6681" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Small" />
+    <property name="ResDirectory" value="Midp2Small" />
+    <property name="IconDirectory" value="icon-29 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="176"/>
+    <property name="ScreenHeight" value="208"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="10"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Nokia6681系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-Nokia3250-PiP">
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+	<property name="ModelID" value="Nokia3250" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Small" />
+	<property name="ResDirectory" value="Midp2Small" />
+	<property name="IconDirectory" value="icon-29 gy" />
+	<property name="CanvasType" value="FullCanvas"/>
+	<property name="ScreenWidth" value="176"/>
+	<property name="ScreenHeight" value="208"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="10"/>
+    <property name="TransitMethod" value="DrawRegion" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国${Version2}" />
+	<property name="Midlet-Description" value="支持:Nokia3250系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-NokiaN73-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="NokiaN73" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:NokiaN73系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-Nokia5310XM-PiP">
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+	<property name="ModelID" value="Nokia5310XM" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+	<property name="IconDirectory" value="icon-58 gy" />
+	<property name="CanvasType" value="FullCanvas"/>
+	<property name="ScreenWidth" value="240"/>
+	<property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="halfbuffer"/>
+    <property name="PipImageBufferSize" value="20000"/>
+	<property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="simple"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="nokiaui"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="3"/>
+	<property name="Resource-Database-Size" value="300"/>
+	<property name="Midlet-Name" value="明珠三国${Version2}" />
+	<property name="Midlet-Description" value="支持:Nokia5310XM系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="small" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-Nokia7370-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="Nokia7370" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Nokia7370" />
+    <property name="ResDirectory" value="Nokia7370" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="halfbuffer"/>
+    <property name="PipImageBufferSize" value="40000"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="simple"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="nokiaui"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="2"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国${Version2}" />
+	<property name="Midlet-Description" value="支持:Nokia7370系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="small" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-NokiaE62-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="NokiaE62" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="NokiaE62" />
+    <property name="ResDirectory" value="NokiaE62" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="320"/>
+    <property name="ScreenHeight" value="240"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:NokiaE62系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-Nokia5800-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="Nokia5800" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Nokia5800" />
+    <property name="ResDirectory" value="Nokia5800" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="360"/>
+    <property name="ScreenHeight" value="640"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="5"/>
+	<property name="Resource-Database-Size" value="2000"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Nokia5800系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-Nokia5800II-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="Nokia5800II" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Nokia5800II" />
+    <property name="ResDirectory" value="Nokia5800II" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="360"/>
+    <property name="ScreenHeight" value="640"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Nokia5800系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-Nokia5800-Portrait-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="Nokia5800Portrait" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Nokia5800" />
+    <property name="ResDirectory" value="Nokia5800" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="360"/>
+    <property name="ScreenHeight" value="640"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="5"/>
+	<property name="Resource-Database-Size" value="2000"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Nokia5800竖屏." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<!-- 5800新界面 -->
+<target name="set-Nokia5800-NewUI-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="Nokia5800New" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Nokia5800New" />
+    <property name="ResDirectory" value="Nokia5800New" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="640"/>
+    <property name="ScreenHeight" value="360"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="5"/>
+	<property name="Resource-Database-Size" value="2000"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Nokia5800新界面系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-SEK750-PiP">
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+	<property name="ModelID" value="SEK750" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="SEK750" />
+	<property name="ResDirectory" value="SEK750" />
+	<property name="IconDirectory" value="icon-29 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="176"/>
+	<property name="ScreenHeight" value="220"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="50"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="simple"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgb"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="2"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:索爱K750系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="true" />
+	<property name="SupportWeather" value="false" />
+	<property name="SupportChase" value="player" />
+	<property name="MemoryMode" value="small" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-SEK790-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="SEK790" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-29 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="240"/>
+	<property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="50"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgb"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:索爱K790系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-MotoE2-PiP">
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="ModelID" value="MotoE2" />
+    <property name="Series" value="GenericMidp2" />
+    <property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-29 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="240"/>
+	<property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="MotorolaE2" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+    <property name="Midlet-Name" value="明珠三国" />
+    <property name="Midlet-Description" value="支持:Moto E2系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-Midp2Touch-PiP">
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="ModelID" value="Midp2Touch" />
+    <property name="Series" value="GenericMidp2" />
+    <property name="UIModel" value="Midp2Touch" />
+    <property name="ResDirectory" value="Midp2Touch" />
+    <property name="IconDirectory" value="icon-29 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+    <property name="Midlet-Name" value="明珠三国" />
+    <property name="Midlet-Description" value="支持:MIDP2Touch系列." />
+    <property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-Lenovo-PiP">
+	<property name="AndroidManifest" value="AndroidManifest_lenovo.xml"/>
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="ModelID" value="Lenovo" />
+    <property name="Series" value="GenericMidp2" />
+    <property name="UIModel" value="Lenovo" />
+    <property name="ResDirectory" value="Lenovo" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+    <property name="ScreenWidth" value="480"/>
+    <property name="ScreenHeight" value="800"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+    <property name="Midlet-Name" value="明珠三国" />
+    <property name="Midlet-Description" value="支持:Lenovo MIDP2Touch系列." />
+    <property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-Android-PiP">
+	<property name="AndroidManifest" value="AndroidManifest_normal.xml"/>
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="ModelID" value="Android" />
+    <property name="Series" value="GenericMidp2" />
+    <property name="UIModel" value="Android" />
+    <property name="ResDirectory" value="Android" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+    <property name="ScreenWidth" value="480"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+    <property name="Midlet-Name" value="明珠三国" />
+    <property name="Midlet-Description" value="支持:Android MIDP2Touch系列." />
+    <property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="SupportZhifubao" value="true" />
+	<property name="Orientation" value="landscape" />
+</target>
+
+<target name="set-AndroidSmall-PiP">
+	<property name="AndroidManifest" value="AndroidManifest_small.xml"/>
+	<property name="PolishDevice" value="Motorola/V3" />
+	<property name="ModelID" value="AndroidSmall" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="AndroidSmall" />
+	<property name="ResDirectory" value="AndroidSmall" />
+	<property name="IconDirectory" value="icon-29 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="240"/>
+	<property name="ScreenHeight" value="320"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="1"/>
+	<property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Android MIDP2Touch系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="true" />
+</target>
+
+<target name="set-AndroidLarge-PiP">
+	<property name="AndroidManifest" value="AndroidManifest_large.xml"/>
+	<property name="PolishDevice" value="Motorola/V3" />
+	<property name="ModelID" value="AndroidLarge" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="AndroidLarge" />
+	<property name="ResDirectory" value="AndroidLarge" />
+	<property name="IconDirectory" value="icon-72 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="480"/>
+	<property name="ScreenHeight" value="800"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="1"/>
+	<property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Lenovo MIDP2Touch系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="true" />
+</target>
+	
+	
+<target name="set-AndroidAuto-PiP">
+	<property name="AndroidManifest" value="AndroidManifest_Auto.xml"/>
+    <property name="PolishDevice" value="Motorola/V3" />
+	<property name="ModelID" value="AndroidAuto" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="AndroidAuto" />
+	<property name="ResDirectory" value="AndroidAuto" />
+	<property name="IconDirectory" value="icon-72 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="1"/>
+	<property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Android MIDP2Touch系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="true" />
+</target>
+	
+<target name="common-set-newui">
+	<property name="AndroidManifest" value="AndroidManifest_Auto.xml"/>
+    <property name="PolishDevice" value="Motorola/V3" />
+	<property name="ModelID" value="AndroidAuto" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="AndroidAuto" />
+	<property name="ResDirectory" value="AndroidAuto" />
+	<property name="IconDirectory" value="icon-72 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="1"/>
+	<property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Android MIDP2Touch系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="true" />
+</target>
+	
+<target name="set-Android-NewUI-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="General" />
+	<property name="NewUI" value="true" />
+</target>
+	
+<target name="set-Android-OldUI-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="General" />
+</target>
+	
+<!-- 文和时代手机按键适配 -->
+<target name="set-AndroidAuto-WH-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="PSP" />
+</target>
+	
+<!-- 索爱Xperia Play -->
+<target name="set-AndroidAuto-Xperia-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="XperiaPlay" />
+</target>
+	
+<!-- 瑞高 -->
+<target name="set-AndroidAuto-Ruigao-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="XperiaPlay" />
+	<property name="isRuigao" value="true" />
+</target>
+	
+
+<!-- 安卓pad新界面 -->
+<target name="set-Android-Pad-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="General" />
+	<property name="UseMapPatch" value="true" />
+	<property name="NewUI" value="true" />
+	<property name="isPad" value="true" />
+</target>
+	
+<!-- 安卓pad -->
+<target name="set-Android-Pad-OldUI-PiP" depends="common-set-newui">
+	<property name="KeyCodeType" value="General" />
+	<property name="UseMapPatch" value="true" />
+	<property name="isPad" value="true" />
+</target>
+	
+<target name="set-LenovoU1-PiP">
+	<property name="AndroidManifest" value="AndroidManifest_LenovoU1.xml"/>
+	<property name="PolishDevice" value="Motorola/V3" />
+	<property name="ModelID" value="LenovoU1" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="LenovoU1" />
+	<property name="ResDirectory" value="LenovoU1" />
+	<property name="IconDirectory" value="icon-72 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="480"/>
+	<property name="ScreenHeight" value="800"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="1"/>
+	<property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="best"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgbimage"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:Lenovo MIDP2Touch系列." />
+	<property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="true" />
+	<property name="DoubleScreen" value="true" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="true" />
+	<property name="Orientation" value="landscape" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+	
+<target name="set-DOPODS500-PiP">
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="ModelID" value="DOPODS500" />
+    <property name="Series" value="GenericMidp2" />
+    <property name="UIModel" value="Midp2Touch" />
+    <property name="ResDirectory" value="Midp2Touch" />
+    <property name="IconDirectory" value="icon-29 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+    <property name="Midlet-Name" value="明珠三国" />
+    <property name="Midlet-Description" value="支持:DOPODS500系列." />
+    <property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-HUAWEIC7500-PiP">
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="ModelID" value="HUAWEIC7500" />
+    <property name="Series" value="GenericMidp2" />
+    <property name="UIModel" value="Midp2Touch" />
+    <property name="ResDirectory" value="Midp2Touch" />
+    <property name="IconDirectory" value="icon-29 gy" />
+    <property name="CanvasType" value="GameCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+    <property name="Resource-Database-Count" value="16"/>
+    <property name="Resource-Database-Size" value="200"/>
+    <property name="Midlet-Name" value="明珠三国" />
+    <property name="Midlet-Description" value="支持:HUAWEIC7500系列." />
+    <property name="TouchScreen" value="true" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-HUAWEIC5600-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="HUAWEIC5600" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:HUAWEIC5600系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-HUAWEIC7600-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="HUAWEIC7600" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:HUAWEIC7600系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-SCHW239-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="SCHW239" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:SCHW239系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-TYD788-PiP">
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="ModelID" value="TYD788" />
+    <property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="Midp2Big" />
+    <property name="ResDirectory" value="Midp2Big" />
+    <property name="IconDirectory" value="icon-72 gy" />
+    <property name="CanvasType" value="FullCanvas"/>
+    <property name="ScreenWidth" value="240"/>
+    <property name="ScreenHeight" value="320"/>
+    <property name="PipImageMode" value="fullbuffer"/>
+    <property name="PipImageBufferSize" value="1"/>
+    <property name="TransitMethod" value="DrawRegion" />
+    <property name="Draw3DString" value="best"/>
+    <property name="FontSize" value="small" />
+    <property name="UseImageFont" value="false"/>
+    <property name="KeyCodeType" value="General" />
+    <property name="protocol" value="tcp" />
+    <property name="ConnectionThread" value="dual"/>
+    <property name="StreamMode" value="free"/>
+    <property name="AlphaMethod" value="rgbimage"/>
+    <property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="16"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:TYD788系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="false" />
+	<property name="SupportWeather" value="true" />
+	<property name="SupportChase" value="all" />
+	<property name="MemoryMode" value="unlimited" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+<target name="set-ZTED90-PiP">
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+	<property name="ModelID" value="ZTED90" />
+	<property name="Series" value="GenericMidp2" />
+	<property name="UIModel" value="SEK750" />
+	<property name="ResDirectory" value="SEK750" />
+	<property name="IconDirectory" value="icon-29 gy" />
+	<property name="CanvasType" value="GameCanvas"/>
+	<property name="ScreenWidth" value="176"/>
+	<property name="ScreenHeight" value="220"/>
+	<property name="PipImageMode" value="fullbuffer"/>
+	<property name="PipImageBufferSize" value="50"/>
+    <property name="TransitMethod" value="CreateImageWithBuffer" />
+	<property name="Draw3DString" value="simple"/>
+	<property name="FontSize" value="small" />
+	<property name="UseImageFont" value="false"/>
+	<property name="KeyCodeType" value="General" />
+	<property name="protocol" value="tcp" />
+	<property name="ConnectionThread" value="dual"/>
+	<property name="StreamMode" value="free"/>
+	<property name="AlphaMethod" value="rgb"/>
+	<property name="Launch-Obfuscator" value="true"/>
+	<property name="Resource-Database-Count" value="2"/>
+	<property name="Resource-Database-Size" value="200"/>
+	<property name="Midlet-Name" value="明珠三国" />
+	<property name="Midlet-Description" value="支持:ZTED90系列." />
+	<property name="TouchScreen" value="false" />
+	<property name="OptimizeMapDataBuffer" value="true" />
+	<property name="SupportWeather" value="false" />
+	<property name="SupportChase" value="player" />
+	<property name="MemoryMode" value="small" />
+	<property name="ScreenCanReset" value="false" />
+	<property name="DoubleScreen" value="false" />
+	<property name="SupportSMS" value="true" />
+	<property name="SupportSound" value="false" />
+	<property name="Orientation" value="portrait" />
+	<property name="SupportZhifubao" value="false" />
+</target>
+
+
+
+<property name="EnableReg" value="true" />
+
+<target name="make-package">
+	<property name="deploy-url" value="" />
+	<delete dir="temp" />
+	<j2mepolish>
+	    <!-- general settings -->
+		<info
+			license="GPL"
+			name="${Midlet-Name}"
+			version="${Version}"
+			description="${Midlet-Description}"
+			vendorName="PiP"
+			icon="icon.png"
+			jarName="Sanguo_${ModelID}_${ChannelCode}.jar"
+			jarUrl="${deploy-url}${polish.jarName}"
+		/>
+		<!-- selection of supported devices -->
+		<deviceRequirements>
+			<requirement name="Identifier" value="${PolishDevice}" />
+		</deviceRequirements>
+	    <!-- build settings  -->
+		<build
+			sourceDir="src"
+			workDir="temp"
+			destDir="dist"
+			usePolishGui="false"
+			fullscreen="yes"
+		>
+			<!-- midlets definition -->
+			<midlet class="${MIDlet-Class}" name="${Midlet-Name}" />
+			<!-- resources definition-->
+
+			<resources excludes="CVS,.cvsignore">
+				<fileset dir="../Sanguo1.0-Data/data/client_pkg/${ResDirectory}" includes="*.png,*.pip,*.ctn,*.pkg,*gz,*.data"/>
+
+				<fileset dir="../Sanguo1.0-Data/data/client_pkg/${IconDirectory}" includes="*.png"/>
+				<fileset dir="serverlist" includes="server_list_pip.txt"/>
+			</resources>
+			<!-- obfuscator settings -->
+			<obfuscator if="Launch-Obfuscator" enable="true" name="ProGuard" >
+				<parameter name="optimize" value="true" />
+			</obfuscator>
+			<variables includeAntProperties="true" />
+			<debug if="Test" showLogOnError="true" verbose="false">
+				<filter pattern=".*" level="debug" />
+			</debug>
+			<jad>
+				<attribute name="MIDlet-1" value="${Midlet-Name}, /icon.png, ${MIDlet-Class}"/>
+				<attribute name="MIDlet-Description" value="${Midlet-Description}"/>
+                <attribute name="MIDlet-Icon" value="/icon.png" />
+                <attribute name="MIDlet-Info-URL" value="${MIDlet-Info-URL}"/>
+				<attribute name="MicroEdition-Configuration" value="${CLDC-VERSION}"/>
+        		<attribute name="MicroEdition-Profile" value="${MIDP-VERSION}" />
+        		<attribute name="Media-Price" value="${MEDIA-PRICE}" />
+				<attribute name="Nokia-MIDlet-On-Screen-Keypad" value="no"/>
+				<attribute name="Nokia-MIDlet-App-Orientation" value="${Orientation}"/>
+			</jad>
+			<!-- 
+			<variables>
+				<variable name="buildtest" value="true" />
+			</variables>
+			-->				
+		</build>
+	</j2mepolish>
+    <!-- 
+    <delete dir="temp/${PolishDevice}/source/de" />
+    <mkdir dir="../Sanguo-${ModelID}/src" />
+    <copydir src="temp/${PolishDevice}/source" dest="../Sanguo-${ModelID}/src" forceoverwrite="yes" />
+	<copydir src="src" includes="*.etf" dest="../Sanguo-${ModelID}/src" forceoverwrite="yes" />
+	<copydir src="res/${ResDirectory}" includes="*.pkg*,*.png,*.s,*.p,*.m,*.ctf,*.ctn" dest="../Sanguo-${ModelID}/src" forceoverwrite="yes" />
+	<copydir src="res/${IconDirectory}" includes="*.png" dest="../Sanguo-${ModelID}/src" forceoverwrite="yes" />
+	<copydir src="script/Mipd2Big" includes="*.etf.gz,*.etd" dest="../Sanguo-${ModelID}/src" forceoverwrite="yes" />
+	-->
+	<!--<signjar jar="dist/Sanguo_${ModelID}_${ChannelCode}.jar" alias="pip" storepass="pip123" keystore="./keystore" keypass="pip123" signedjar=".\signed\Sanguo_${ModelID}_${ChannelCode}.jar"/>
+	<copy overwrite="true" file="dist/Sanguo_${ModelID}_${ChannelCode}.jad" tofile="signed/Sanguo_${ModelID}_${ChannelCode}.jad"/>
+	<updatejad jar="signed/Sanguo_${ModelID}_${ChannelCode}.jar" jad="signed/Sanguo_${ModelID}_${ChannelCode}.jad"/>-->
+</target>
+	
+<target name="make-package-touch">
+	<property name="deploy-url" value="" />
+	<delete dir="temp" />
+	<j2mepolish>
+	    <!-- general settings -->
+		<info
+			license="GPL"
+			name="${Midlet-Name}"
+			version="${Version}"
+			description="${Midlet-Description}"
+			vendorName="PiP"
+			icon="icon.png"
+			jarName="Sanguo_${ModelID}_${ChannelCode}.jar"
+			jarUrl="${deploy-url}${polish.jarName}"
+		/>
+		<!-- selection of supported devices -->
+		<deviceRequirements>
+			<requirement name="Identifier" value="${PolishDevice}" />
+		</deviceRequirements>
+	    <!-- build settings  -->
+		<build
+			sourceDir="src"
+			workDir="temp"
+			destDir="dist"
+			usePolishGui="false"
+			fullscreen="yes"
+		>
+			<!-- midlets definition -->
+			<midlet class="${MIDlet-Class}" name="${Midlet-Name}" />
+			<!-- resources definition-->
+			<resources excludes="CVS,.cvsignore">
+				<fileset dir="../Sanguo1.0-Data/data/client_pkg/${ResDirectory}" includes="*.png,*.pip,*.ctn,*.pkg,*gz,*.data"/>
+				<fileset dir="../Sanguo1.0-Data/data/client_pkg/${IconDirectory}" includes="*.png"/>
+				<fileset dir="serverlist" includes="server_list_pip.txt"/>
+			</resources>
+			<!-- obfuscator settings -->
+			<obfuscator if="Launch-Obfuscator" enable="true" name="ProGuard" >
+				<parameter name="optimize" value="true" />
+			</obfuscator>
+			<variables includeAntProperties="true" />
+			<debug if="Test" showLogOnError="true" verbose="false">
+				<filter pattern=".*" level="debug" />
+			</debug>
+			<jad>
+				<attribute name="MIDlet-1" value="${Midlet-Name}, /icon.png, ${MIDlet-Class}"/>
+				<attribute name="MIDlet-Description" value="${Midlet-Description}"/>
+                <attribute name="MIDlet-Icon" value="/icon.png" />
+                <attribute name="MIDlet-Info-URL" value="${MIDlet-Info-URL}"/>
+				<attribute name="MicroEdition-Configuration" value="${CLDC-VERSION}"/>
+        		<attribute name="MicroEdition-Profile" value="${MIDP-VERSION}" />
+        		<attribute name="Media-Price" value="${MEDIA-PRICE}" />
+				<attribute name="Nokia-MIDlet-On-Screen-Keypad" value="no"/>
+				<attribute name="MIDlet-Touch-Support" value="True"/>
+			</jad>
+			
+		</build>
+		
+	</j2mepolish>
+	<!--<signjar jar="dist\Sanguo_${ModelID}_${ChannelCode}.jar" alias="pip" storepass="pip123" keystore="./keystore" keypass="pip123" signedjar=".\signed\Sanguo_${ModelID}_${ChannelCode}.jar"/>
+	<copy overwrite="true" file="dist/Sanguo_${ModelID}_${ChannelCode}.jad" tofile="signed/Sanguo_${ModelID}_${ChannelCode}.jad"/>
+	<updatejad jar="signed/Sanguo_${ModelID}_${ChannelCode}.jar" jad="signed/Sanguo_${ModelID}_${ChannelCode}.jad"/>-->
+</target>
+
+</project>

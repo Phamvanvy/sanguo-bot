@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="GBK"?>
+<discounts 
+	discount="100" 
+	mdiscount="95" 
+	tongdiscount = "100" 
+	famouscount = "90" 
+	limit="9999" 
+	level1="4" level2="2" level3="1"
+	
+	percent="100"
+	/>

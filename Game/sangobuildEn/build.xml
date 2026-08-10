@@ -1,0 +1,309 @@
+<?xml version="1.0"?>   
+<project name="sango" basedir="." default="build">
+		<property file="custom.properties"/>
+    <property name="cvsroot" value=":pserver:${cvsuser}:${cvspass}@192.168.0.3:/repository"/>   
+    <property name="server.dir" value="${basedir}/server"/>
+    <property name="client.dir" value="${basedir}/client"/>  
+    <property name="editor.dir" value="${basedir}/editor"/>
+    <property name="db.dir" value="${basedir}/db"/>
+    <property name="net.dir" value="${basedir}/net"/>
+    <property name="data.dir" value="${basedir}/data"/>
+    <property name="workshop.dir" value="${basedir}/workshop"/>
+    <property name="server.module.name" value="projects/sanguo1.0/Sango1.0-Server"/>
+    <property name="client.module.name" value="projects/sanguo1.0/Sanguo1.0-Client"/>
+    <property name="editor.module.name" value="projects/sanguo1.0/Sanguo-Editor1.0"/>
+    <property name="db.module.name" value="projects/sanguo1.0/db"/>
+    <property name="net.module.name" value="projects/Account1.0/net"/>
+    <property name="workshop.module.name" value="library/ImageWorkshop1.0"/>
+    <property name="data.module.name" value="projects/sanguo1.0/Sanguo1.0-Data"/>
+    <property name="db" location="${db.dir}/src" />
+		<property name="net" location="${net.dir}/src" />
+		<property name="editor" location="${editor.dir}/src" />
+		<property name="datatw" location="${data.dir}/data_zh_TW" />
+		<property name="workshop" location="${workshop.dir}/src" />
+		<property name="server" location="${server.dir}/src" />
+		<property name="build" location="build" />
+		<property name="dist" location="dist" />
+		
+		<path id="libs">
+			<fileset dir="${server.dir}/lib">
+				<include name="**/*.jar" />
+			</fileset>
+			<fileset dir="${eclipsehome}/plugins">
+				<include name="**/org.eclipse*.jar" />
+			</fileset>
+			<fileset dir="${editor.dir}/lib">
+				<include name="**/*.jar" />
+			</fileset>
+			<fileset dir="${net.dir}/lib">
+				<include name="**/*.jar" />
+			</fileset>
+			<fileset dir="${db.dir}/lib">
+				<include name="**/*.jar" />
+			</fileset>
+		</path>
+		<target name="init">
+			<mkdir dir="${build}" />
+		</target>
+
+	<target name="compiledb" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${db}" />
+		</javac>
+	</target>
+
+	<target name="compilenet" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${net}" />
+		</javac>
+	</target>
+
+	<target name="compileeditor" depends="init">
+		<javac nowarn="true" destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${editor}" />
+		</javac>
+		<copydir src="${editor}" dest="build" includes="**/*.data"/>
+
+	</target>
+	
+
+
+	<target name="compileworkshop" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${workshop}" />
+		</javac>
+	</target>
+
+	<target name="compileserver" depends="compilenet,compiledb,compileeditor,compileworkshop,dealsevercode,generatecomplexskillandbuff">
+		
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="utf8">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${server}" />
+		</javac>
+	</target>
+
+	<target name="disteditor" depends="compileeditor">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/editor.jar">
+			<fileset dir="${build}" includes="**/com/pip/sanguo/**" />
+		</jar>
+	</target>
+	<target name="buildcomplexfileversion" depends="">
+		<buildcomplexfileversion source="${editor.dir}/data_zh_TW/data" />
+	</target>
+	<!--
+	<target name="datecatalog" depends="">
+		<datecatalog source="${data.dir}/data" />
+	</target>
+	-->
+	<target name="dealsevercode" depends="compileeditor">
+		<taskdef name="dealsevercode" classname="com.pip.sanguo.data.ant.DealSeverCode" classpath="${build}" classpathref="libs" />
+		<dealsevercode source="${data.dir}/data" target="${server}"/>
+	</target>
+	<target name="generatecomplexskillandbuff" depends="compileeditor">
+		<taskdef name="generatecomplexskillandbuff" classname="com.pip.sanguo.data.ant.GenerateComplexSkillAndBuff" classpath="${build}" classpathref="libs" />
+		<generatecomplexskillandbuff source="${data.dir}/data_zh_TW/data" target="${server}"/>
+	</target>
+	<target name="distdb" depends="compiledb">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/db.jar">
+			<fileset dir="${build}" includes="**/com/pip/db/**" />
+		</jar>
+	</target>
+
+	<target name="distnet" depends="compilenet">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/commonnet.jar">
+			<fileset dir="${build}" includes="**/com/pip/net/**" />
+		</jar>
+	</target>
+
+	<target name="distworkshop" depends="compileworkshop">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/workshop.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+			<fileset dir="${build}" includes="**/com/pipimage/**" />
+			<fileset dir="${build}" includes="**/com/jcraft/**" />
+		</jar>
+	</target>
+
+	<target name="distskills" depends="compileserver">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/skill.jar">
+			<fileset dir="${build}">
+				<include name="**/peony/game/skill/AutoGenerated*" />
+				<include name="**/peony/game/buff/AutoGenerated*" />
+			</fileset>
+		</jar>
+	</target>
+
+	<target name="distserver" depends="compileserver">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/peony.jar">
+			<fileset dir="${build}">
+				<include name="**/peony/**" />
+				<exclude name="**/peony/game/skill/AutoGenerated*" />
+				<exclude name="**/peony/game/buff/AutoGenerated*" />
+			</fileset>
+		</jar>
+	</target>
+
+    
+    <target name="server-check-out" depends="">   
+        <delete dir="${server.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${server.module.name}" command="checkout -d ${server.dir}"/> 
+    </target>
+    <target name="client-check-out" depends="">   
+        <delete dir="${client.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${client.module.name}" command="checkout -d ${client.dir}"/>   
+    </target>
+    <target name="editor-check-out" depends="">   
+        <delete dir="${editor.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${editor.module.name}" command="checkout -d ${editor.dir}"/>   
+    </target>
+    <target name="db-check-out" depends="">   
+        <delete dir="${db.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${db.module.name}" command="checkout -d ${db.dir}"/>   
+    </target>
+    <target name="net-check-out" depends="">   
+        <delete dir="${net.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${net.module.name}" command="checkout -d ${net.dir}"/>   
+    </target>  
+    <target name="workshop-check-out" depends="">   
+        <delete dir="${workshop.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${workshop.module.name}" command="checkout -d ${workshop.dir}"/>   
+    </target> 
+    <target name="data-check-out" depends="">   
+        <delete dir="${server.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${data.module.name}" command="checkout -d ${data.dir}"/> 
+    </target>
+    
+   	<target name="7z" depends="">
+	    	<exec executable="${7z}" >
+    			<arg line="a data.7z ${data.dir}/data_zh_TW/data"/>
+ 				 </exec>
+  	</target>      
+
+		<target name="clean" description="clean up">
+			<delete dir="${server.dir}" />
+			<delete dir="${client.dir}" />
+			<delete dir="${editor.dir}" />
+			<delete dir="${workshop.dir}" />
+			<delete dir="${db.dir}" />
+			<delete dir="${net.dir}" />
+			<delete dir="${build}" />
+			<delete dir="${dist}" />
+			<delete dir="${data.dir}" />
+		</target>
+
+		<target name="cleandist" description="clean up">
+			<delete file="editor.jar" />
+			<delete file="workshop.jar" />
+			<delete file="peony.jar" />
+			<delete file="data.7z" />
+			<delete file="skill.jar" />
+		</target>
+
+		<target name="deploy51">
+ 			<scp todir="lighthu@221.179.216.51:/home/lighthu/sango/server1/lib" password="game@pip!2008" trust="true" verbose="true">
+    		<fileset dir=".">
+      		<include name="editor.jar"/>
+      		<include name="workshop.jar"/>
+      		<include name="peony.jar"/>
+    		</fileset>
+  		</scp>
+  		<scp todir="lighthu@221.179.216.51:/home/lighthu/sango/server1" password="game@pip!2008" trust="true" verbose="true">
+    		<fileset dir=".">
+      		<include name="data.7z"/>
+    		</fileset>
+  		</scp>
+		</target>
+		
+		<target name="deploy57">
+ 			<scp todir="lighthu@221.179.216.57:/home/lighthu/sango/servertest_tw/lib" password="no&amp;2009@jive" trust="true" verbose="true">
+	    		<fileset dir="${dist}">
+	      		<include name="editor.jar"/>
+	      		<include name="workshop.jar"/>
+	      		<include name="peony.jar"/>
+	    		</fileset>
+	  		</scp>
+	  		<scp todir="lighthu@221.179.216.57:/home/lighthu/sango/servertest_tw" password="no&amp;2009@jive" trust="true" verbose="true">
+	    		<fileset dir="${dist}">
+	      		<include name="skill.jar"/>
+	    		</fileset>
+	  		</scp>
+	  		<!--
+	  		<scp todir="lighthu@221.179.216.57:/home/lighthu/sango/servertest_tw" password="no&amp;2009@jive" trust="true" verbose="true">
+	    		<fileset dir=".">
+	      		<include name="data.7z"/>
+	    		</fileset>
+	  		</scp>
+	  		-->
+		</target>
+		
+		<target name="restart57">
+ 			<sshexec host="221.179.216.57" username="lighthu" password="no&amp;2009@jive" trust="true" command="/home/lighthu/sango/servertest_tw/udata"/>
+ 			<sshexec host="221.179.216.57" username="lighthu" password="no&amp;2009@jive" trust="true" command="/home/lighthu/sango/servertest_tw/kserver"/>
+ 			<sshexec host="221.179.216.57" username="lighthu" password="no&amp;2009@jive" trust="true" command="/home/lighthu/sango/servertest_tw/startup_silent.sh"/>
+		</target>
+  	 
+		<target name="deploy_symbian">
+				<scp todir="lighthu@221.179.216.57:/home/lighthu/sango/serversymbiantest/lib" password="no&amp;2009@jive" trust="true" verbose="true">
+	    		<fileset dir=".">
+	      		<include name="editor.jar"/>
+	      		<include name="workshop.jar"/>
+	      		<include name="peony.jar"/>
+	    		</fileset>
+	  		</scp>
+	  		<scp todir="lighthu@221.179.216.57:/home/lighthu/sango/serversymbiantest" password="no&amp;2009@jive" trust="true" verbose="true">
+	    		<fileset dir=".">
+	      		<include name="skill.jar"/>
+	    		</fileset>
+	  		</scp>
+	  		<scp todir="lighthu@221.179.216.57:/home/lighthu/sango/serversymbiantest" password="no&amp;2009@jive" trust="true" verbose="true">
+	    		<fileset dir=".">
+	      		<include name="data.7z"/>
+	    		</fileset>
+	  		</scp>
+		</target>
+		
+		<target name="restart_symbian">
+			<sshexec host="221.179.216.57" username="lighthu" password="no&amp;2009@jive" trust="true" command="/home/lighthu/sango/serversymbiantest/udata"/>
+			<sshexec host="221.179.216.57" username="lighthu" password="no&amp;2009@jive" trust="true" command="/home/lighthu/sango/serversymbiantest/kserver"/>
+			<sshexec host="221.179.216.57" username="lighthu" password="no&amp;2009@jive" trust="true" command="/home/lighthu/sango/serversymbiantest/startup_silent.sh"/>
+		</target>
+
+	<target name="dist" depends="distdb,distnet,distworkshop,disteditor,distserver,distskills" />
+
+	<target name="build">
+    	<antcall target="cleandist" />
+    	<antcall target="clean" />
+        <antcall target="server-check-out" />
+        <antcall target="client-check-out" />  
+        <antcall target="editor-check-out" />  
+        <antcall target="data-check-out" />
+        <antcall target="db-check-out" />  
+        <antcall target="net-check-out" />  
+        <antcall target="workshop-check-out" />
+        <antcall target="dist" /> 
+    </target>  
+</project>   

@@ -1,0 +1,112 @@
+package com.pip.sanguo.editor.clientevent.trigger;
+
+import org.eclipse.swt.SWT;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Text;
+
+import com.pip.sanguo.data.clientEvent.ClientEvent;
+
+/**
+ * 表达式模板：未完成某个引导事件。
+ * @author ZHANGBAIQUAN
+ */
+public class G_NoFinisnClientEvent extends AbstractExprEvent {
+    private Text  textParams;    //条件参数
+    
+    public String[][] params = {
+        {  String.valueOf(VARIABLE_INT)  },    //参数类型
+        {  ""  }                               //参数数值
+    };
+    
+    /**
+     * 构造指定全局变量的模板。
+     * @param name 全局变量名称
+     */
+    public G_NoFinisnClientEvent(ClientEvent event) {
+        clientEvent = event;
+    }
+    
+    /**
+     * 判断这个模板是一个条件还是一个动作。
+     */
+    public boolean isCondition() {
+        return true;
+    }
+    
+    /**
+     * 用模板创建新的表达式片段。
+     */
+    public IExprEvent createNew(ClientEvent event) {
+        return new G_NoFinisnClientEvent(event);
+    }
+    
+    /**
+     * 取得模板名称。
+     */
+    public String getName() {
+        return "未完成某个引导事件...";
+    }
+
+    /**
+     * 取得生成的表达式。
+     */
+    public String getExpression() {
+        return "g_noFinisnClientEvent";
+    }
+
+    /**
+     * 取得模板参数基本类型。
+     */
+    public String getParamsType() {
+        return TempManagerEvent.getParameterStr(params[PARAM_TYPE]);
+    }
+    
+    /**
+     * 取得模板参数值。
+     */
+    public String getParamsValue() {
+        return TempManagerEvent.getParameterStr(params[PARAM_VALUE]);
+    }
+    
+    /**
+     * 取得模板的所有参数的值(String)。
+     */
+    public void initParamsValue(String str){
+        params[PARAM_VALUE][0] = str;
+    }
+    
+    /**
+     * 设置模板参数值。
+     */
+    public void setParamsValue(){
+       params[PARAM_VALUE][0] = textParams.getText();
+    }
+    
+    /**
+     * 取得改模板的界面
+     */
+    public Composite getProperty(Composite _con) {
+        final Composite composite = new Composite(_con, SWT.NONE);
+        composite.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true, 6, 1));
+        final GridLayout gridLayout = new GridLayout();
+        gridLayout.numColumns = 6;
+        composite.setLayout(gridLayout);
+        
+        Label labelParams = new Label(composite, SWT.NONE);
+        labelParams.setText("未完成的引导事件ID：");
+        textParams = new Text(composite, SWT.BORDER);
+        textParams.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 5, 1));
+        return composite;
+    }
+    
+    /**
+     * 设置属性当前值。
+     */
+    public void setPropertyValue(String str) {
+        textParams.setText(str);
+    }
+
+}

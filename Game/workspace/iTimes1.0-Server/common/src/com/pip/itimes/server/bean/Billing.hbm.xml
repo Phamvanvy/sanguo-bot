@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<!-- Generated 2006-6-20 15:39:49 by Hibernate Tools 3.1.0.beta5 -->
+<hibernate-mapping>
+    <class name="com.pip.itimes.server.bean.Billing" table="tbl_billing">
+        <comment></comment>
+        <id name="id" type="int">
+            <column name="id" />
+            <generator class="identity" />
+        </id>
+        <property name="msisdn" type="string">
+            <column name="msisdn" length="40">
+                <comment></comment>
+            </column>
+        </property>
+        <property name="balance" type="int">
+            <column name="balance">
+                <comment></comment>
+            </column>
+        </property>
+        <property name="feeplan" type="int">
+            <column name="feeplan">
+                <comment></comment>
+            </column>
+        </property>
+        <property name="createtime" type="timestamp">
+            <column name="createtime" length="19" not-null="true">
+                <comment></comment>
+            </column>
+        </property>
+        <property name="lastbillingtime" type="timestamp">
+            <column name="lastbillingtime" length="19" not-null="true">
+                <comment></comment>
+            </column>
+        </property>
+        <property name="credit" type="int">
+            <column name="credit">
+                <comment></comment>
+            </column>
+        </property>
+    </class>
+</hibernate-mapping>

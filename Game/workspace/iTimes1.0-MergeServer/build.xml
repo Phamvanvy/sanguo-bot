@@ -1,0 +1,117 @@
+<project name="iTimes1.0" default="dist" basedir=".">
+	<property name="eclipsehome" location="d:/tools/eclipse" />
+	<property name="merge" location="src" />
+	<property name="net" location="../net/src" />
+	<property name="world" location="../iTimes1.0-Server/WorldServer/src" />
+	<property name="vm" location="../iTimes1.0-VM/src" />
+	<property name="common" location="../iTimes1.0-Server/common/src" />
+	<property name="net1" location="../iTimes1.0-Server/net/src" />
+	<property name="build" location="build" />
+	<property name="dist" location="dist" />
+	<path id="libs">
+		<fileset dir="lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="../iTimes1.0-Server/lib">
+			<include name="**/*.jar" />
+		</fileset>
+		<fileset dir="../net/lib">
+			<include name="**/*.jar" />
+		</fileset>
+	</path>
+	<target name="init">
+		<mkdir dir="${build}" />
+	</target>
+
+	<target name="compilenet" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${net}" />
+		</javac>
+	</target>
+	
+	<target name="compilenet1" depends="init">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${net1}" />
+		</javac>
+	</target>
+	
+	<target name="compilecommon" depends="compilenet1">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${common}" />
+		</javac>
+	</target>
+	
+	<target name="compileworld" depends="compilenet,compilenet1,compilecommon">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${world}" />
+		</javac>
+	</target>
+	
+	<target name="compilemerge" depends="compilenet,compileworld">
+		<javac destdir="${build}" debug="true" source="1.5" target="1.5" encoding="GBK">
+			<classpath>
+				<path refid="libs" />
+				<pathelement path="${build}" />
+			</classpath>
+			<src path="${merge}" />
+		</javac>
+	</target>
+
+	<target name="distnet" depends="compilenet">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/commonnet.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+		</jar>
+	</target>
+
+	<target name="distcommon" depends="compilecommon">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/Common.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+		</jar>
+	</target>
+	
+	<target name="distnet1" depends="compilenet1">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/Net.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+		</jar>
+	</target>
+	
+	<target name="distworld" depends="compileworld">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/World.jar">
+			<fileset dir="${build}" includes="**/com/pip/**" />
+		</jar>
+	</target>
+	
+	<target name="distmerge" depends="compilemerge">
+		<mkdir dir="${dist}" />
+		<jar destfile="${dist}/merge.jar">
+			<fileset dir="${build}" includes="**/com/pip/**"/>
+		</jar>
+	</target>
+
+	<target name="dist" depends="clean,distnet,distnet1,distcommon,distworld, distmerge" />
+
+	<target name="clean" description="clean up">
+		<delete dir="${build}" />
+		<delete dir="${dist}" />
+	</target>
+</project>

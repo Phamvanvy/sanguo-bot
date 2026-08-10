@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+    <class name="com.pip.itimes.server.bean.LeaveMessage" table="tbl_leavemessage">
+        <id name="id" type="int">
+            <column name="id" />
+            <generator class="identity"></generator>
+        </id>
+        <property name="sourceId" type="int">
+            <column name="sourceid" not-null="true" />
+        </property>
+        <property name="sourceName" type="string">
+            <column name="sourcename" not-null="true" />
+        </property>
+        <property name="title" type="string">
+            <column name="title" not-null="true" />
+        </property>
+        <property name="ownerId" type="int">
+            <column name="ownerid" not-null="true" />
+        </property>
+        <property name="content" type="string">
+            <column name="content" length="65535" />
+        </property>
+        <property name="createTime" type="timestamp">
+            <column name="createtime" length="19" not-null="true" />
+        </property>
+    </class>
+</hibernate-mapping>

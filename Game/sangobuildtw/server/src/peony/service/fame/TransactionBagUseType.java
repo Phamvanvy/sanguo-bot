@@ -1,0 +1,82 @@
+package peony.service.fame;
+
+import java.io.Serializable;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+import org.hibernate.Hibernate;
+import org.hibernate.HibernateException;
+import org.hibernate.usertype.UserType;
+
+import peony.game.ItemUtil;
+import peony.game.Player;
+import peony.game.TransactionBag;
+
+public class TransactionBagUseType implements UserType {
+
+	private static final int[] SQL_TYPES = { Hibernate.BINARY.sqlType() };
+
+	public Object assemble(Serializable cached, Object owner)
+			throws HibernateException {
+		return cached;
+	}
+
+	public Object deepCopy(Object value) throws HibernateException {
+		return ((TransactionBag) value).clone();
+	}
+
+	public Serializable disassemble(Object value) throws HibernateException {
+		return (Serializable) value;
+	}
+
+	public boolean equals(Object x, Object y) throws HibernateException {
+		if (x == y)
+			return true;
+		if (x == null || y == null)
+			return false;
+		return x.equals(y);
+	}
+
+	public int hashCode(Object x) throws HibernateException {
+		return x.hashCode();
+	}
+
+	public boolean isMutable() {
+		return true;
+	}
+
+	public Object nullSafeGet(ResultSet resultSet, String[] names, Object owner)
+			throws HibernateException, SQLException {
+		byte[] bytes = resultSet.getBytes(names[0]);
+		if (bytes == null){
+			Fame fame = (Fame)owner;
+			return new TransactionBag((Fame)owner,27+fame.level/5,0);
+		}
+		else {
+			return ItemUtil.getTransactionBagFromDB(bytes, (Fame) owner);
+		}
+	}
+
+	public void nullSafeSet(PreparedStatement statement, Object value, int index)
+			throws HibernateException, SQLException {
+		if (value == null)
+			statement.setNull(index, Hibernate.BINARY.sqlType());
+		else {
+			statement.setBytes(index, ItemUtil.getBagDBBytes((TransactionBag) value));
+		}
+	}
+
+	public Object replace(Object original, Object target, Object owner) {
+		return target;
+	}
+
+	@SuppressWarnings("unchecked")
+	public Class returnedClass() {
+		return TransactionBag.class;
+	}
+
+	public int[] sqlTypes() {
+		return SQL_TYPES;
+	}
+}

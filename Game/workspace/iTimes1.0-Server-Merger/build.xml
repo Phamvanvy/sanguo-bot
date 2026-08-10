@@ -1,0 +1,128 @@
+<project name="iTimes1.0" default="dist" basedir=".">
+  <property name="gtlsrc" location="../iTimes1.0-VM/src"/>
+  <property name="commonnetsrc" location="../net/src"/>
+  <property name="netsrc" location="net/src"/>
+  <property name="commonsrc" location="common/src"/>
+  <property name="dispatchersrc" location="DispatchServer/src"/>
+  <property name="worldsrc" location="WorldServer/src"/>
+  <property name="build" location="build"/>
+  <property name="dist"  location="dist"/>
+	<path id="libs">
+      <fileset dir="lib">
+        <include name="**/*.jar"/>
+      </fileset>
+	</path>
+	<target name="init">
+		<mkdir dir="${build}"/>
+	</target>
+  <target name="compilenet" depends="init">
+  	<javac destdir="${build}"  debug="true" source="1.5" target="1.5">
+  		<classpath refid="libs"/>
+  		<src path="${netsrc}"/>
+  	</javac>
+  </target>
+  <target name="compilegtl" depends="init">
+  	<javac destdir="${build}"  debug="true" source="1.5" target="1.5">
+  		<classpath refid="libs"/>
+  		<src path="${gtlsrc}"/>
+  	</javac>
+  </target> 
+  <target name="compilecommonnet" depends="init">
+  	<javac destdir="${build}"  debug="true" source="1.5" target="1.5">
+  		<classpath refid="libs"/>
+  		<src path="${commonnetsrc}"/>
+  	</javac>
+  </target>     
+  <target  name="compilecommon" depends="compilegtl,compilenet">
+  	<javac destdir="${build}"  debug="true" source="1.5" target="1.5">
+  		<classpath>
+  		  <path refid="libs"/>
+  			<pathelement path="${build}"/>
+  		</classpath>
+  		<src path="${commonsrc}"/>
+  	</javac>
+  <copy todir="${build}/com">
+    <fileset dir="${commonsrc}/com">
+      <include name="**/*.xml"/>
+    </fileset>
+  </copy>
+
+  </target>
+ 
+
+  <target  name="compiledispatcher" depends="compilecommon">
+  	<javac destdir="${build}"  debug="true" source="1.5" target="1.5">
+  		<classpath>
+  		  <path refid="libs"/>
+  			<pathelement path="${build}"/>
+  		</classpath>
+  		<src path="${dispatchersrc}"/>
+  	</javac>
+  </target>
+  
+  <target  name="compileworld" depends="compilecommonnet,compilecommon">
+  	<javac destdir="${build}"  debug="true" source="1.5" target="1.5">
+  		<classpath>
+  		  <path refid="libs"/>
+  			<pathelement path="${build}"/>
+  		</classpath>
+  		<src path="${worldsrc}"/>
+  	</javac>
+  </target>
+  
+  <target name="compileall" depends="compiledispatcher,compileworld"/>
+	
+	<target name="distnet" depends="compilenet">
+		<mkdir dir="${dist}"/>
+    <jar destfile="${dist}/Net.jar">
+      <fileset dir="${build}" includes="**/com/pip/itimes/net/**"/>
+    </jar>
+	</target>
+	
+	<target name="distcommon" depends="compilecommon">
+		<mkdir dir="${dist}"/>
+    <jar destfile="${dist}/Common.jar">
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/*.class"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/bean/**"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/dao/**"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/sms/**"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/stage/**"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/util/**"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/suit/**"/>
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/gift/**"/>
+      <fileset dir="${build}" includes="**/com/pip/security/**"/>
+    </jar>
+	</target>
+
+	<target name="distcommonnet" depends="compilecommonnet">
+		<mkdir dir="${dist}"/>
+    <jar destfile="${dist}/commonnet.jar">
+      <fileset dir="${build}" includes="**/com/pip/net/**"/>
+    </jar>
+	</target>	
+
+	<target name="distdispatcher" depends="compiledispatcher">
+		<mkdir dir="${dist}"/>
+    <jar destfile="${dist}/Dispatcher.jar">
+      <fileset dir="${build}" includes="**/com/pip/dispatch/**"/>
+    </jar>
+	</target>
+	
+	<target name="distworld" depends="compileworld">
+		<mkdir dir="${dist}"/>
+    <jar destfile="${dist}/WorldServer.jar">
+      <fileset dir="${build}" includes="**/com/pip/itimes/server/world/**"/>
+      <fileset dir="${build}" includes="**/com/pip/accountskeleton/**"/>
+      <fileset dir="${build}" includes="**/com/pip/merger/**"/>
+    </jar>
+	</target>
+	
+	<target name="dist" depends="clean,distnet,distcommon,distcommonnet,distdispatcher,distworld"/>
+			
+  <target name="clean"
+        description="clean up" >
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+  </target>
+        
+</project>

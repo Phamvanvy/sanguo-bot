@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+    <class name="com.pip.server.auth.bean.UserRegion" table="tbl_jilin">
+        <id name="userID" type="string">
+            <column name="userid" />
+        </id>
+        <property name="region" type="string">
+            <column name="region" not-null="true" />
+        </property>
+    </class>
+</hibernate-mapping>

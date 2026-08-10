@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="GBK"?>
+
+<models>
+  <config id="0" name="烂性能" minimap="2" playershowmode="1" textmode="3" playercount="1"/>
+  <config id="1" name="低性能" minimap="1" playershowmode="1" textmode="2" playercount="1"/>
+  <config id="2" name="中性能" minimap="0" playershowmode="1" textmode="0" playercount="2"/>
+  <config id="3" name="高性能" minimap="0" playershowmode="0" textmode="0" playercount="0"/>
+  <model name="Nokia Series40 SmallScreen" pattern="Nokia1680.*,Nokia1681.*,Nokia2320.*,Nokia2330.*,Nokia2332.*,Nokia2600.*,Nokia2610.*,Nokia2626.*,Nokia2630.*,Nokia2660.*,Nokia2680.*,Nokia2760.*,Nokia3109.*,Nokia3110.*,Nokia3220.*,Nokia3500.*,Nokia5070.*,Nokia5140.*,Nokia5200.*,Nokia5208.*,Nokia6020.*,Nokia6021.*,Nokia6030.*,Nokia6060.*,Nokia6070.*,Nokia6080.*,Nokia6085.*,Nokia6101.*,Nokia6102.*,Nokia6103.*,Nokia6111.*,Nokia6125.*,Nokia6151.*,Nokia6170.*,Nokia6220.*,Nokia6230.*,Nokia6235.*,Nokia7070.*,Nokia7210.*,Nokia7212.*,Nokia7250.*,Nokia7260.*,Nokia7270.*,Nokia7360.*,Nokia7600.*,Nokia8800.*,Nokia3120.*" config="0">
+  </model>
+  <model name="Nokia Series40 BigScreen" pattern="Nokia3610.*,Nokia5000.*,Nokia5130.*,Nokia5220.*,Nokia5300.*,Nokia5310.*,Nokia5610.*,Nokia5611.*,Nokia6131.*,Nokia6133.*,Nokia6208.*,Nokia6212.*,Nokia6233.*,Nokia6234.*,Nokia6267.*,Nokia6270.*,Nokia6280.*,Nokia6288.*,Nokia6300.*,Nokia6303.*,Nokia6500.*,Nokia6555.*,Nokia6700.*,Nokia7100.*,Nokia7310.*,Nokia7370.*,Nokia7373.*,Nokia7390.*,Nokia7500.*,Nokia7510.*,Nokia7900.*,Nokia8600.*,Nokia7230.*,Nokia6202.*,Nokia2700.*,Nokia2730.*" config="1">
+  </model>
+  <model name="Nokia Series60-1" pattern="Nokia3600.*,Nokia3602.*,Nokia3650.*,Nokia3660.*,NokiaN-Gage.*" config="1">
+  </model>
+  <model name="Nokia Series60-2 Init" pattern="Nokia6600.*,Nokia7610.*,Nokia7612.*" config="2">
+  </model>
+  <model name="Nokia Series60-2 FP1-2" pattern="Nokia3230.*,Nokia6260.*,Nokia6630.*,Nokia6670.*,Nokia6680.*,Nokia6681.*,Nokia6620.*" config="2">
+  </model>
+  <model name="Nokia Series60-2 FP3" pattern="NokiaN70.*,NokiaN72.*,NokiaN90.*" config="2">
+  </model>
+  <model name="Nokia Series60-3 Init" pattern="Nokia5500.*,Nokia3250.*,NokiaE50.*,NokiaE60.*,NokiaE61.*,NokiaE62.*,NokiaE65.*,NokiaE70.*,NokiaN71.*,NokiaN73.*,NokiaN75.*,NokiaN77.*,NokiaN80.*,NokiaN91.*,NokiaN92.*,NokiaN93.*" config="2">
+  </model>
+  <model name="Nokia Series60-3 FP1-2" pattern="Nokia5320.*,Nokia5630.*,Nokia5700.*,Nokia5730.*,Nokia6110.*,Nokia6120.*,Nokia6121.*,Nokia6122.*,Nokia6124.*,Nokia6210.*,Nokia6290.*,Nokia6650.*,NokiaE51.*,NokiaE63.*,NokiaE66.*,NokiaE71.*,NokiaE72.*,NokiaE75.*,NokiaE90.*,NokiaN76.*,NokiaN78.*,NokiaN79.*,NokiaN81.*,NokiaN82.*,NokiaN85.*,NokiaN86.*,NokiaN95.*,NokiaN96.*,Nokia6730.*,Nokia6710.*,Nokia6720.*,NokiaE52.*" config="3">
+  </model>
+  <model name="Nokia Series60-5" pattern="Nokia5800.*,Nokia5802.*,NokiaN97.*,Nokia5530.*,Nokia5230.*" config="3">
+  </model>
+  <model name="Nokia Unknown" pattern="Nokia.*" config="2">
+  </model>
+  <model name="SonyEricsson Platform1-6" pattern="SonyEricssonA100.*,SonyEricssonC123c.*,SonyEricssonC510.*,SonyEricssonD750.*,SonyEricssonF305.*,SonyEricssonJ300.*,SonyEricssonK300.*,SonyEricssonK310.*,SonyEricssonK320.*,SonyEricssonK500.*,SonyEricssonK506.*,SonyEricssonK508.*,SonyEricssonK510.*,SonyEricssonK600.*,SonyEricssonK608.*,SonyEricssonK700.*,SonyEricssonK750.*,SonyEricssonK758.*,SonyEricssonR306.*,SonyEricssonS700.*,SonyEricssonT303.*,SonyEricssonT610.*,SonyEricssonT628.*,SonyEricssonV600.*,SonyEricssonV800.*,SonyEricssonV802.*,SonyEricssonW200.*,SonyEricssonW300.*,SonyEricssonW508.*,SonyEricssonW550.*,SonyEricssonW600.*,SonyEricssonW700.*,SonyEricssonW705.*,SonyEricssonW800.*,SonyEricssonW810.*,SonyEricssonW900.*,SonyEricssonZ1010.*,SonyEricssonZ500.*,SonyEricssonZ520.*,SonyEricssonZ525.*,SonyEricssonZ530.*,SonyEricssonZ550.*,SonyEricssonZ800.*,SonyEricssonk608.*,SonyEricssonw810.*,SonyEricssonS312.*" config="1">
+  </model>
+  <model name="SonyEricsson UIQ Old" pattern="SonyEricssonM600.*,SonyEricssonM608.*,SonyEricssonP1.*,SonyEricssonP990.*,SonyEricssonW950.*,SonyEricssonW958.*,SonyEricssonW960.*" config="1">
+  </model>
+  <model name="SonyEricsson Platform7-8" pattern="SonyEricssonC702.*,SonyEricssonC902.*,SonyEricssonC905.*,SonyEricssonG502.*,SonyEricssonG700.*,SonyEricssonG705.*,SonyEricssonG900.*,SonyEricssonK330.*,SonyEricssonK530.*,SonyEricssonK550.*,SonyEricssonK610.*,SonyEricssonK618.*,SonyEricssonK630.*,SonyEricssonK660.*,SonyEricssonK770.*,SonyEricssonK790.*,SonyEricssonK800.*,SonyEricssonK810.*,SonyEricssonK818.*,SonyEricssonK850.*,SonyEricssonK858.*,SonyEricssonS500.*,SonyEricssonT650.*,SonyEricssonT658.*,SonyEricssonT700.*,SonyEricssonT707.*,SonyEricssonV630.*,SonyEricssonW350.*,SonyEricssonW380.*,SonyEricssonW395.*,SonyEricssonW580.*,SonyEricssonW595.*,SonyEricssonW610.*,SonyEricssonW660.*,SonyEricssonW710.*,SonyEricssonW715.*,SonyEricssonW750.*,SonyEricssonW760.*,SonyEricssonW830.*,SonyEricssonW850.*,SonyEricssonW880.*,SonyEricssonW888.*,SonyEricssonW890.*,SonyEricssonW898.*,SonyEricssonW902.*,SonyEricssonW908.*,SonyEricssonW910.*,SonyEricssonW980.*,SonyEricssonW995.*,SonyEricssonZ310.*,SonyEricssonZ555.*,SonyEricssonZ558.*,SonyEricssonZ610.*,SonyEricssonZ710.*,SonyEricssonZ750.*,SonyEricssonZ770.*,SonyEricssonZ780.*,SonyEricssonk530.*,SonyEricssonC901.*,SonyEricssonU100.*,SonyEricssonU10i.*,SonyEricssonJ105.*,SonyEricssonT715.*" config="3">
+  </model>
+  <model name="SonyEricsson Unknown" pattern="SonyEricsson.*" config="3">
+  </model>
+  <model name="Samsung Series60 Series" pattern=".*SamsungSGHi560.*,.*SamsungSGHi568.*,SAMSUNG-GT-I8510.*,SEC-SGHD720.*,Samsung/SGH-i550.*,Samsung/SGH-i458.*,Samsung/SGH-i450.*" config="3">
+  </model>
+  <model name="Samsung Default" pattern="Samsung.*,SAMSUNG.*,SEC-SGH.*,SGH-.*" config="1">
+  </model>
+  <model name="LG Default" pattern="LG-.*,LG/.*" config="2">
+  </model>
+  <model name="Motorola Unknown" pattern="Moto.*,MOT-.*" config="1">
+  </model>
+  <model name="Panasonic Series60 Series" pattern="Panasonic X700.*,Panasonic X800.*" config="2">
+  </model>
+  <model name="Dopod Series" pattern="dopod.*" config="3">
+  </model>
+  <model name="Vodafone Series" pattern="Vodafone.*" config="3">
+  </model>
+  <model name="Treo Series" pattern="Treo.*,Palm Treo.*" config="3">
+  </model>
+  <model name="HTC Series" pattern="HTC.*" config="3">
+  </model>
+  <model name="Mozilla Series" pattern="Mozilla.*" config="2">
+  </model>
+  <model name="Series60 OEM" pattern="Series60.*" config="2">
+  </model>
+  <model name="JBlend Series" pattern=".*JBlend.*,.*Jbed.*" config="2">
+  </model>
+  <model name="Emulator" pattern="j2me,generic,Symbian.*,Sun.*,Linux.*,MicroEmulator.*,MobileXP.*,Pocket PC Phone.*,RIM Wireless Handheld.*" config="3">
+  </model>
+  <model name="Android" pattern="Android.*" config="3">
+  </model>
+  <model name="MAUI" pattern=".*Maui.*,.*MAUI.*" config="0">
+  </model>
+  <model name="Default" pattern=".*" config="1">
+  </model>
+</models>

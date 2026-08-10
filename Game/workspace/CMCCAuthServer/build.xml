@@ -1,0 +1,38 @@
+<project name="CMCCWuLin2-2.0AuthServer" default="clean" basedir=".">
+
+	<!-- set global properties for this build -->
+	<property name="src" value="./src" />
+	<property name="build" value="tempBuild" />
+	<property name="dist" value="dist" />
+	<property name="lib.dir" value="lib" />
+
+	<path id="master-classpath">
+		<fileset file="${lib.dir}" id="mylib">
+			<include name="lib/*.jar" />
+		</fileset>
+	</path>
+
+	<target name="init">
+		<mkdir dir="${build}/auth" />
+	</target>
+
+	<target name="compile" depends="init">
+		<!-- Compile the java code from ${src} into ${build} -->
+		<javac source="1.5" debug="true" srcdir="${src}" destdir="${build}/auth" target="1.5">
+			<classpath refid="master-classpath" />
+		</javac>
+		<copy todir="${build}/auth/com/pip/server/auth/bean">
+			<fileset dir="${src}/com/pip/server/auth/bean" includes="*.xml" />
+		</copy>
+	</target>
+
+	<target name="dist" depends="compile">
+		<!-- Create the distribution directory -->
+		<jar jarfile="${dist}/AuthServer.jar" basedir="${build}/auth" />
+	</target>
+
+	<target name="clean" depends="dist">
+		<!-- Delete the ${build} and ${dist} directory trees -->
+		<delete dir="${build}" />
+	</target>
+</project>

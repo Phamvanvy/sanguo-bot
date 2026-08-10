@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+    <class name="com.pip.itimes.server.bean.Bbs" table="tbl_bbs">
+        <id name="id" type="int">
+            <column name="id" />
+            <generator class="identity"></generator>
+        </id>
+        <property name="bbsId" type="int">
+            <column name="bbsid" not-null="true" />
+        </property>
+        <property name="playerId" type="int">
+            <column name="playerid" not-null="true" />
+        </property>
+        <property name="playerName" type="string">
+            <column name="playername" not-null="true" />
+        </property>
+        <property name="title" type="string">
+            <column name="title" not-null="true" />
+        </property>
+        <property name="content" type="string">
+            <column name="content" length="65535" />
+        </property>
+        <property name="postTime" type="timestamp">
+            <column name="posttime" length="19" not-null="true" />
+        </property>
+        <property name="priority" type="int">
+            <column name="priority" />
+        </property>
+    </class>
+</hibernate-mapping>

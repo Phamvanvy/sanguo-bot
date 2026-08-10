@@ -1,0 +1,125 @@
+<?xml version="1.0"?>   
+<project name="sango" basedir="." default="build">
+    <property file="custom.properties"/>
+    <property name="cvsroot" value=":pserver:${cvsuser}:${cvspass}@192.168.0.3:/repository"/>   
+    <property name="server.dir" value="${basedir}/server"/>
+    <property name="client.dir" value="${basedir}/client"/>  
+    <property name="editor.dir" value="${basedir}/editor"/>
+    <property name="data.dir" value="${basedir}/data"/>
+    <property name="db.dir" value="${basedir}/db"/>
+    <!--property name="net.dir" value="${basedir}/net"/-->
+    <property name="workshop.dir" value="${basedir}/workshop"/>
+    <property name="co.server.dir" value="server"/>
+    <property name="co.client.dir" value="client"/>  
+    <property name="co.editor.dir" value="editor"/>
+    <property name="co.data.dir" value="data"/>
+    <property name="co.db.dir" value="db"/>
+    <property name="co.workshop.dir" value="workshop"/>
+    <property name="server.module.name" value="projects/sanguo1.0/Sango1.0-Server"/>
+    <property name="client.module.name" value="projects/sanguo1.0/Sanguo1.0-Client"/>
+    <property name="editor.module.name" value="projects/sanguo1.0/Sanguo-Editor1.0"/>
+    <property name="data.module.name" value="projects/sanguo1.0/Sanguo1.0-Data/data"/>
+    <property name="datatw.module.name" value="projects/sanguo1.0/Sanguo1.0-Data/data_zh_TW"/>
+    <property name="db.module.name" value="projects/sanguo1.0/db"/>
+    <!--property name="net.module.name" value="projects/Account1.0/net"/-->
+    <property name="workshop.module.name" value="library/ImageWorkshop1.0"/>
+    
+    
+    <target name="server-check-out" depends="">   
+        <cvs cvsRoot="${cvsroot}" package="${server.module.name}" command="checkout -P -d ./${co.server.dir}"/> 
+    </target>
+    <target name="client-check-out" depends="">   
+        <cvs cvsRoot="${cvsroot}" package="${client.module.name}" command="checkout -P -d ./${co.client.dir}"/>   
+    </target>
+    <target name="editor-check-out" depends="">   
+        <cvs cvsRoot="${cvsroot}" package="${editor.module.name}" command="checkout -P -d ./${co.editor.dir}"/>   
+    </target>
+    <target name="data-check-out" depends="">   
+        <cvs cvsRoot="${cvsroot}" package="${data.module.name}" command="checkout -P -d ./${co.data.dir}"/>   
+    </target>
+    <target name="db-check-out" depends="">   
+        <delete dir="${db.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${db.module.name}" command="checkout -P -d ./${co.db.dir}"/>   
+    </target>
+    <!--target name="net-check-out" depends="">   
+        <delete dir="${net.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${net.module.name}" command="checkout -P -d ./${co.net.dir}"/>   
+    </target-->  
+    <target name="workshop-check-out" depends="">   
+        <delete dir="${workshop.module.name}"/>    
+        <cvs cvsRoot="${cvsroot}" package="${workshop.module.name}" command="checkout -P -d ./${co.workshop.dir}"/>   
+    </target> 
+    
+    <target name="server-build" depends="">   
+        <ant antfile="serverbuild.xml" dir="${server.dir}" >
+        	<property file="custom.properties"/>
+        </ant>   
+    </target>
+	<target name="servertw-build" depends="">   
+	    <ant antfile="servertwbuild.xml" dir="${server.dir}" >
+	       	<property file="custom.properties"/>
+	    </ant>   
+	</target>
+   	<target name="7z" depends="">
+		<delete file="data.7z" />
+	    	<exec executable="${7z}" >
+    			<arg line="a -m0=BCJ2 -m1=LZMA:d23 -m2=LZMA:d19 -m3=LZMA:d19 -mb0:1 -mb0s1:2 -mb0s2:3 data.7z ${data.dir} "/>
+ 				 </exec>
+  	</target>
+
+		<target name="clean" description="clean up">
+			<delete dir="${server.dir}" />
+			<delete dir="${client.dir}" />
+			<delete dir="${editor.dir}" />
+			<delete dir="${data.dir}" />
+			<delete dir="${workshop.dir}" />
+			<delete dir="${db.dir}" />
+			<!--delete dir="${net.dir}" /-->
+		</target>
+		
+		<target name="deploy">
+ 			<scp todir="lighthu@125.39.152.165:/home/lighthu/sanguo_java_test/lib" password="o0*2Pgj$^+" trust="true" verbose="true">
+    		<fileset dir=".">
+      		<include name="editor.jar"/>
+      		<include name="workshop.jar"/>
+      		<include name="peony.jar"/>
+    		</fileset>
+  		</scp>
+  		<scp todir="lighthu@125.39.152.165:/home/lighthu/sanguo_java_test" password="o0*2Pgj$^+" trust="true" verbose="true">
+    		<fileset dir=".">
+      		<include name="skill.jar"/>
+    		</fileset>
+  		</scp>
+  		<scp todir="lighthu@125.39.152.165:/home/lighthu/sanguo_java_test" password="o0*2Pgj$^+" trust="true" verbose="true">
+    		<fileset dir=".">
+      		<include name="data.7z"/>
+    		</fileset>
+  		</scp>
+		</target>
+		
+		<target name="restart">
+ 			<sshexec host="125.39.152.165" username="lighthu" password="o0*2Pgj$^+" trust="true" command="/home/lighthu/sanguo_java_test/udata"/>
+ 			<sshexec host="125.39.152.165" username="lighthu" password="o0*2Pgj$^+" trust="true" command="/home/lighthu/sanguo_java_test/kserver"/>
+ 			<sshexec host="125.39.152.165" username="lighthu" password="o0*2Pgj$^+" trust="true" command="/home/lighthu/sanguo_java_test/startup_silent.sh"/>
+		</target>
+  	 
+    <target name="build">
+    	<antcall target="clean" />
+        <antcall target="server-check-out" />
+        <antcall target="client-check-out" />  
+        <antcall target="editor-check-out" /> 
+	<antcall target="data-check-out" />   
+        <antcall target="db-check-out" />  
+        <!--antcall target="net-check-out" /-->  
+        <antcall target="workshop-check-out" />
+        <antcall target="server-build" />  
+		<antcall target="7z" />
+		<copy file="${server.dir}/dist/editor.jar" todir="." />
+		<copy file="${server.dir}/dist/workshop.jar" todir="." />
+		<copy file="${server.dir}/dist/peony.jar" todir="." />
+		<copy file="${server.dir}/dist/skill.jar" todir="." />
+		<copy file="${server.dir}/lib/commonnet.jar" todir="." />
+		<copy file="${server.dir}/dist/db.jar" todir="." />
+    	<antcall target="clean" />
+    </target>    
+</project>   

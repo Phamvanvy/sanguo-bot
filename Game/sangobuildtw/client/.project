@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>Sanguo1.0-Client</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.jdt.core.javabuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.eclipse.jdt.core.javanature</nature>
+	</natures>
+	<linkedResources>
+		<link>
+			<name>Midp2Touch</name>
+			<type>2</type>
+			<location>C:/workspace/Sanguo-Editor1.0/data/scripts/Midp2Touch</location>
+		</link>
+		<link>
+			<name>client_res</name>
+			<type>2</type>
+			<location>C:/workspace/Sanguo-Editor1.0/data/client_res</location>
+		</link>
+	</linkedResources>
+</projectDescription>

@@ -1,0 +1,741 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="iTimes1.0" default="create-All">
+
+	<property name="wtk.home" value="c:\WTK25" />
+	<property name="polish.home" value="C:\Program Files\J2ME-Polish" />
+
+<property name="nokia.home" value="D:\eclipse\emulater\Nokia\Devices\S40_SDK_3rd_Edition" />
+<property name="motorola.home" value="D:\eclipse\emulater\Motorola\SDK v5.2.1 for J2ME" />
+
+<taskdef name="j2mepolish"
+	classname="de.enough.polish.ant.PolishTask"
+	classpath="${polish.home}/import/enough-j2mepolish-build.jar:${polish.home}/import/jdom.jar:${polish.home}/import/proguard.jar"/>
+
+<target name="create-All">
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-NokiaNGage-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-NokiaS60Midp2-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-NokiaBigScreen-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia403Big-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia403-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia3250-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Nokia6681-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SEK700-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SEK300-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SEK500-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-MotoGeneral-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Midp2General-PiP" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-SES700-PiP" />
+    <ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-Dopod585-PiP" />
+ 	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-ClientTouch-E680" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-ClientTouch--Midp2-General" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-ClientTouch-SE-General" />
+	<ant antfile="build.xml" inheritall="true" inheritrefs="true" target="create-ClientTouch-Nokia5800" />
+
+</target>
+
+<target name="create-NokiaNGage-PiP" depends="set-NokiaNGage-PiP,make-package" />
+<target name="create-ZTE-U860-PiP" depends="set-ZTE-U860-PiP,make-package" />
+<target name="create-NokiaS60Midp2-PiP" depends="set-NokiaS60Midp2-PiP,make-package" />
+<target name="create-NokiaBigScreen-PiP" depends="set-NokiaBigScreen-PiP,make-package" />
+<target name="create-Nokia403Big-PiP" depends="set-Nokia403Big-PiP,make-package" />
+<target name="create-Nokia403-PiP" depends="set-Nokia403-PiP,make-package" />
+<target name="create-Nokia3250-PiP" depends="set-Nokia3250-PiP,make-package" />
+<target name="create-SEK700-PiP" depends="set-SEK700-PiP,make-package" />
+<target name="create-SEK500-PiP" depends="set-SEK500-PiP,make-package" />
+<target name="create-SEK300-PiP" depends="set-SEK300-PiP,make-package" />
+<target name="create-Nokia6681-PiP" depends="set-Nokia6681-PiP,make-package" />
+<target name="create-MotoGeneral-PiP" depends="set-MotoGeneral-PiP,make-package" />
+<target name="create-Midp2General-PiP" depends="set-Midp2General-PiP,make-package" />
+<target name="create-Dopod585-PiP" depends="set-DOPOD-585-PiP,make-package" />
+<target name="create-SES700-PiP" depends="set-SES700-PiP,make-package" />
+<target name="create-ClientTouch-E680" depends="set-E680-PiP,make-package" />
+<target name="create-ClientTouch--Midp2-General" depends="set-Midp2-General,make-package" />
+<target name="create-ClientTouch-SE-General" depends="set-SE-General,make-package" />
+<target name="create-ClientTouch-Nokia5800" depends="set-ClientTouch-Nokia5800,make-package" />
+
+
+<target name="set-NokiaNGage-PiP">
+	<property name="NokiaS60" value="true" />
+    <property name="DrawMethod" value="SetClip" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="BufferType" value="Double" />
+    <property name="ModelID" value="NK-60-1" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="false" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="NK-NGage" />
+    <property name="PolishDevice" value="Nokia/Series60" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Stream"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "false" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-NokiaS60Midp2-PiP">
+	<property name="NokiaS60Midp2" value="true" />
+	<property name="BufferType" value="CopyArea" />
+    <property name="DrawMethod" value="DrawImage" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+    <property name="ModelID" value="NK-60-2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="true" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="NK-60-2" />
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-NokiaBigScreen-PiP">
+	<property name="NokiaS60Midp2" value="true" />
+	<property name="BufferType" value="Double" />
+    <property name="DrawMethod" value="SetClip" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="NK-60-2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="true" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="NK-BigScreen" />
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-Nokia403Big-PiP">
+	<property name="NokiaS60Midp2" value="true" />
+	<property name="BufferType" value="Double" />
+    <property name="DrawMethod" value="SetClip" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="NK-60-2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="false" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="NK-Nokia403Big" />
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-Nokia403-PiP">
+	<property name="NokiaS60Midp2" value="true" />
+	<property name="DrawMethod" value="DrawRegion" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+	<property name="ModelID" value="SE-K700" />
+	<property name="UserAgent" value="null" />
+	<property name="UseImageFont" value="false"/>
+	<property name="Launch-Obfuscator" value="false" />
+	<property name="Midlet-Name" value="iTimes" />
+	<property name="Midlet-Description" value="iTimes" />
+	<property name="Directory" value="Nokia403" />
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-Nokia6681-PiP">
+	<property name="NokiaS60Midp2" value="true" />
+	<property name="BufferType" value="CopyArea" />
+    <property name="DrawMethod" value="SetClip" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="NK-60-2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="false" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="NK-6681" />
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-Nokia3250-PiP">
+	<property name="NokiaS60Midp2" value="true" />
+	<property name="BufferType" value="Double" />
+    <property name="DrawMethod" value="SetClip" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="NK-60-2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="false" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="NK3250" />
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-SEK700-PiP">
+	<property name="SEK700" value="true" />
+    <property name="DrawMethod" value="DrawImage" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "FALSE"/>
+	<property name="ResourceCache" value = "FALSE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="SE-K700" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="false" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="SE-K700" />
+    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-SEK500-PiP">
+	<property name="SEK500" value="true" />
+	<property name="DrawMethod" value="DrawImage" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "FALSE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+	<property name="ModelID" value="SE-K700" />
+	<property name="UserAgent" value="null" />
+	<property name="UseImageFont" value="false"/>
+	<property name="Launch-Obfuscator" value="false" />
+	<property name="Midlet-Name" value="iTimes" />
+	<property name="Midlet-Description" value="iTimes" />
+	<property name="Directory" value="SE-K500" />
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-SEK300-PiP">
+	<property name="SEK300" value="true" />
+	<property name="DrawMethod" value="DrawImage" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "FALSE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+	<property name="ModelID" value="SE-K700" />
+	<property name="UserAgent" value="null" />
+	<property name="UseImageFont" value="false"/>
+	<property name="Launch-Obfuscator" value="false" />
+	<property name="Midlet-Name" value="iTimes" />
+	<property name="Midlet-Description" value="iTimes" />
+	<property name="Directory" value="SE-K300" />
+	<property name="PolishDevice" value="Nokia/Series60Midp2" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="UseProxy" value = "true" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-MotoGeneral-PiP">
+	<property name="MotoGeneral" value="true" />
+    <property name="DrawMethod" value="DrawRegion" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="MT-V300" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="true" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="MT-General" />
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="true" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Socket"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="UseProxy" value = "true" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-Midp2General-PiP">
+	<property name="Midp2General" value="true" />
+    <property name="DrawMethod" value="DrawRegion" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="Midp2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="true" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="Midp2-General" />
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Stream"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="UseProxy" value = "false" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-ZTE-U860-PiP">
+	<property name="Midp2General" value="true" />
+    <property name="DrawMethod" value="DrawRegion" />
+	<property name="BufferType" value="Double" />
+	<property name="AlphaMethod" value = "alpha"/>
+	<property name="Draw3DString" value = "TRUE"/>
+	<property name="ResourceCache" value = "TRUE"/>
+	<property name="LoadAllImage" value = "TRUE"/>
+	<property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="Midp2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="true" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="ZTE-U860" />
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+	<property name="protocol" value="tcp" />
+	<property name="Connection" value="Stream"/>
+	<property name="font" value = "native" />
+	<property name="port" value = "7777" />
+	<property name="ip" value = "211.100.18.94" />
+	<property name="EnableReg" value = "TRUE" />
+	<property name="TestVersion" value = "FALSE" />
+	<property name="UseProxy" value = "false" />
+	<property name="ChannelCode" value = "CCCCCPiP" />
+	<property name="CommandEmu" value="false" />
+	<property name="MIDP2Common" value="false" />
+	<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-SES700-PiP">
+		<property name="SEK700" value="true" />
+	    <property name="DrawMethod" value="DrawImage" />
+		<property name="BufferType" value="Double" />
+		<property name="AlphaMethod" value = "alpha"/>
+		<property name="Draw3DString" value = "FALSE"/>
+		<property name="ResourceCache" value = "FALSE"/>
+		<property name="LoadAllImage" value = "TRUE"/>
+		<property name="CacheImage" value = "TRUE"/>
+	    <property name="ModelID" value="SE-S700" />
+	    <property name="UserAgent" value="null" />
+	    <property name="UseImageFont" value="false"/>
+	    <property name="Launch-Obfuscator" value="true" />
+	    <property name="Midlet-Name" value="iTimes" />
+	    <property name="Midlet-Description" value="iTimes" />
+	    <property name="Directory" value="SE-S700" />
+	    <property name="PolishDevice" value="Nokia/Series60Midp2" />
+	    <property name="FontSize" value="Small" />
+	    <property name="JBlend" value="false" />
+		<property name="protocol" value="tcp" />
+		<property name="Connection" value="Socket"/>
+		<property name="font" value = "native" />
+		<property name="port" value = "7777" />
+		<property name="ip" value = "211.100.18.94" />
+		<property name="EnableReg" value = "TRUE" />
+		<property name="TestVersion" value = "FALSE" />
+		<property name="ChannelCode" value = "CCCCCPiP" />
+		<property name="UseProxy" value = "true" />
+        <property name="CommandEmu" value="false" />
+        <property name="MIDP2Common" value="false" />
+		<property name="TouchScreen" value="false" />
+</target>
+
+<target name="set-DOPOD-585-PiP">
+    <property name="Midp2General" value="true" />
+    <property name="DrawMethod" value="DrawRegion" />
+    <property name="BufferType" value="Double" />
+    <property name="AlphaMethod" value = "line"/>
+    <property name="Draw3DString" value = "TRUE"/>
+    <property name="ResourceCache" value = "TRUE"/>
+    <property name="LoadAllImage" value = "TRUE"/>
+    <property name="CacheImage" value = "TRUE"/>
+    <property name="ModelID" value="Midp2" />
+    <property name="UserAgent" value="null" />
+    <property name="UseImageFont" value="false"/>
+    <property name="Launch-Obfuscator" value="true" />
+    <property name="Midlet-Name" value="iTimes" />
+    <property name="Midlet-Description" value="iTimes" />
+    <property name="Directory" value="DOPOD-585" />
+    <property name="PolishDevice" value="Motorola/V3" />
+    <property name="FontSize" value="Small" />
+    <property name="JBlend" value="false" />
+    <property name="protocol" value="tcp" />
+    <property name="Connection" value="Socket"/>
+    <property name="font" value = "native" />
+    <property name="port" value = "7777" />
+    <property name="ip" value = "211.100.18.94" />
+    <property name="EnableReg" value = "TRUE" />
+    <property name="TestVersion" value = "FALSE" />
+    <property name="UseProxy" value = "false" />
+    <property name="ChannelCode" value = "CCCCCPiP" />
+    <property name="CommandEmu" value="true" />
+    <property name="MIDP2Common" value="true" />
+	<property name="TouchScreen" value="false" />
+</target>
+	<target name="set-E680-PiP">
+		<property name="Midp2General" value="true" />
+	    <property name="DrawMethod" value="DrawRegion" />
+		<property name="BufferType" value="Double" />
+		<property name="AlphaMethod" value = "alpha"/>
+		<property name="Draw3DString" value = "TRUE"/>
+		<property name="ResourceCache" value = "TRUE"/>
+		<property name="LoadAllImage" value = "TRUE"/>
+		<property name="CacheImage" value = "TRUE"/>
+	    <property name="ModelID" value="Midp2" />
+	    <property name="UserAgent" value="null" />
+	    <property name="UseImageFont" value="false"/>
+	    <property name="Launch-Obfuscator" value="true" />
+	    <property name="Midlet-Name" value="iTimes" />
+	    <property name="Midlet-Description" value="iTimes" />
+	    <property name="Directory" value="ClientTouch-E680" />
+	    <property name="PolishDevice" value="Motorola/V3" />
+	    <property name="FontSize" value="Small" />
+	    <property name="JBlend" value="true" />
+		<property name="protocol" value="tcp" />
+		<property name="Connection" value="Socket"/>
+		<property name="font" value = "native" />
+		<property name="port" value = "7777" />
+		<property name="ip" value = "211.100.18.94" />
+		<property name="EnableReg" value = "TRUE" />
+		<property name="TestVersion" value = "FALSE" />
+		<property name="UseProxy" value = "true" />
+		<property name="CommandEmu" value="false" />
+		<property name="ChannelCode" value = "CCCCCPiP" />
+		<property name="TouchScreen" value="true" />
+	</target>
+
+	<target name="set-Midp2-General">
+		<property name="Midp2General" value="true" />
+		<property name="DrawMethod" value="DrawRegion" />
+		<property name="BufferType" value="Double" />
+		<property name="AlphaMethod" value = "alpha"/>
+		<property name="Draw3DString" value = "TRUE"/>
+		<property name="ResourceCache" value = "TRUE"/>
+		<property name="LoadAllImage" value = "TRUE"/>
+		<property name="CacheImage" value = "TRUE"/>
+		<property name="ModelID" value="Midp2" />
+		<property name="UserAgent" value="null" />
+		<property name="UseImageFont" value="false"/>
+		<property name="Launch-Obfuscator" value="true" />
+		<property name="Midlet-Name" value="iTimes" />
+		<property name="Midlet-Description" value="iTimes" />
+		<property name="Directory" value="ClientTouch--Midp2-General" />
+		<property name="PolishDevice" value="Motorola/V3" />
+		<property name="FontSize" value="Small" />
+		<property name="JBlend" value="false" />
+		<property name="protocol" value="tcp" />
+		<property name="Connection" value="Socket"/>
+		<property name="font" value = "native" />
+		<property name="port" value = "7777" />
+		<property name="ip" value = "211.100.18.94" />
+		<property name="EnableReg" value = "TRUE" />
+		<property name="TestVersion" value = "FALSE" />
+		<property name="UseProxy" value = "true" />
+		<property name="CommandEmu" value="false" />
+		<property name="ChannelCode" value = "CCCCCPiP" />
+		<property name="TouchScreen" value="true" />
+	</target>
+		
+	<target name="set-SE-General">
+		<property name="Midp2General" value="true" />
+		<property name="DrawMethod" value="DrawRegion" />
+		<property name="BufferType" value="Double" />
+		<property name="AlphaMethod" value = "alpha"/>
+		<property name="Draw3DString" value = "TRUE"/>
+		<property name="ResourceCache" value = "TRUE"/>
+		<property name="LoadAllImage" value = "TRUE"/>
+		<property name="CacheImage" value = "TRUE"/>
+		<property name="ModelID" value="Midp2" />
+		<property name="UserAgent" value="null" />
+		<property name="UseImageFont" value="false"/>
+		<property name="Launch-Obfuscator" value="true" />
+		<property name="Midlet-Name" value="iTimes" />
+		<property name="Midlet-Description" value="iTimes" />
+		<property name="Directory" value="ClientTouch-SE-General" />
+		<property name="PolishDevice" value="Motorola/V3" />
+		<property name="FontSize" value="Small" />
+		<property name="JBlend" value="false" />
+		<property name="protocol" value="tcp" />
+		<property name="Connection" value="Socket"/>
+		<property name="font" value = "native" />
+		<property name="port" value = "7777" />
+		<property name="ip" value = "211.100.18.94" />
+		<property name="EnableReg" value = "TRUE" />
+		<property name="TestVersion" value = "FALSE" />
+		<property name="UseProxy" value = "true" />
+		<property name="CommandEmu" value="false" />
+		<property name="ChannelCode" value = "CCCCCPiP" />
+		<property name="TouchScreen" value="true" />
+	</target>
+	<target name="set-ClientTouch-Nokia5800">
+			<property name="Midp2General" value="true" />
+			<property name="DrawMethod" value="DrawRegion" />
+			<property name="BufferType" value="Double" />
+			<property name="AlphaMethod" value = "alpha"/>
+			<property name="Draw3DString" value = "TRUE"/>
+			<property name="ResourceCache" value = "TRUE"/>
+			<property name="LoadAllImage" value = "TRUE"/>
+			<property name="CacheImage" value = "TRUE"/>
+			<property name="ModelID" value="Midp2" />
+			<property name="UserAgent" value="null" />
+			<property name="UseImageFont" value="false"/>
+			<property name="Launch-Obfuscator" value="true" />
+			<property name="Midlet-Name" value="iTimes" />
+			<property name="Midlet-Description" value="iTimes" />
+			<property name="Directory" value="ClientTouch-Nokia5800" />
+			<property name="PolishDevice" value="Motorola/V3" />
+			<property name="FontSize" value="Small" />
+			<property name="JBlend" value="false" />
+			<property name="protocol" value="tcp" />
+			<property name="Connection" value="Socket"/>
+			<property name="font" value = "native" />
+			<property name="port" value = "7777" />
+			<property name="ip" value = "211.100.18.94" />
+			<property name="EnableReg" value = "TRUE" />
+			<property name="TestVersion" value = "FALSE" />
+			<property name="UseProxy" value = "true" />
+			<property name="CommandEmu" value="false" />
+			<property name="ChannelCode" value = "CCCCCPiP" />
+			<property name="TouchScreen" value="true" />
+		</target>
+
+<property name="Revision" value="PIP" />
+
+<target name="make-package">
+	<property name="deploy-url" value="" />
+	<j2mepolish>
+	    <!-- general settings -->
+		<info
+			license="GPL"
+			name="${Midlet-Name}"
+			version="2.0.1"
+			description="${Midlet-Description}"
+			vendorName="PiP"
+			icon="icon.png"
+			jarName="iTimes1.0-Client${Directory}-${ChannelCode}.jar"
+			jarUrl="${deploy-url}${polish.jarName}"
+		/>
+		<!-- selection of supported devices -->
+		<deviceRequirements>
+			<requirement name="Identifier" value="${PolishDevice}" />
+		</deviceRequirements>
+	    <!-- build settings  -->
+		<build
+			sourceDir="src"
+			workDir="temp"
+			destDir="dist"
+			usePolishGui="false"
+			fullscreen="yes"
+		>
+			<!-- midlets definition -->
+			<midlet class="pip.iTimesMIDlet" name="${Midlet-Name}" />
+			<!-- resources definition-->
+			<resources dir="res/${Directory}" excludes="CVS,.cvsignore">
+				<fileset dir="res/${Directory}" includes="*.png,*.pip,*.pkg,*.gz,*.etd,${Revision}/*.png"/>
+			</resources>
+			<!-- obfuscator settings -->
+			<obfuscator if="Launch-Obfuscator" enable="true" name="ProGuard" />
+			<variables includeAntProperties="true">
+				<variable name="polish.GameCanvas.useFullScreen" value="yes" />
+			</variables>
+			<debug if="Test" enable="true" showLogOnError="true" verbose="false">
+				<filter pattern=".*" level="debug" />
+				<filter pattern=".game.*" level="debug" />
+			</debug>
+			<!--
+			<jad>
+				<attribute name="MIDlet-Data-Size" value="20480" />
+			</jad>
+			-->
+		</build>
+		<!-- launch emulator	-->
+    	<emulator if="Launch-Emulator" />
+	</j2mepolish>
+    <delete dir="temp/${PolishDevice}/source/de" />
+    <mkdir dir="../iTimes1.0-Client${Directory}-${ChannelCode}-tcp/src" />
+    <mkdir dir="../iTimes1.0-Client${Directory}-${ChannelCode}-tcp/src" />
+    <copydir src="temp/${PolishDevice}/source" dest="../iTimes1.0-Client${Directory}-${ChannelCode}-tcp/src" forceoverwrite="yes" />
+	<copydir src="src" includes="*.etf" dest="../iTimes1.0-Client${Directory}-${ChannelCode}-tcp/src" forceoverwrite="yes" />
+	<copydir src="res/${Directory}" includes="*.pkg*,*.png,*.s,*.p" dest="../iTimes1.0-Client${Directory}-${ChannelCode}-tcp/src" forceoverwrite="yes" />
+	<copydir src="res/${Directory}/${Revision}" includes="*.png" dest="../iTimes1.0-Client${Directory}-${ChannelCode}-tcp/src" forceoverwrite="yes" />
+	<delete dir="temp" />
+
+</target>
+
+</project>

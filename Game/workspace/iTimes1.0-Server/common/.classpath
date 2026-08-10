@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="/lib/antlr-2.7.6rc1.jar"/>
+	<classpathentry kind="lib" path="/lib/asm-attrs.jar"/>
+	<classpathentry kind="lib" path="/lib/asm.jar"/>
+	<classpathentry kind="lib" path="/lib/backport-util-concurrent-2.2.jar"/>
+	<classpathentry kind="lib" path="/lib/c3p0-0.9.0.jar"/>
+	<classpathentry kind="lib" path="/lib/cglib-2.1.3.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-codec-1.3.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-collections-3.2.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-configuration-1.2.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-httpclient-3.0.1.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-io-1.2.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-lang-2.1.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-logging-1.0.4.jar"/>
+	<classpathentry kind="lib" path="/lib/commons-primitives-1.0.jar"/>
+	<classpathentry kind="lib" path="/lib/concurrent-1.3.2.jar"/>
+	<classpathentry kind="lib" path="/lib/connector.jar"/>
+	<classpathentry kind="lib" path="/lib/dom4j-1.6.1.jar"/>
+	<classpathentry kind="lib" path="/lib/ehcache-1.4.1.jar"/>
+	<classpathentry kind="lib" path="/lib/hibernate3.jar"/>
+	<classpathentry kind="lib" path="/lib/jdbc2_0-stdext.jar"/>
+	<classpathentry kind="lib" path="/lib/jetty-6.1.1.jar"/>
+	<classpathentry kind="lib" path="/lib/jetty-util-6.1.1.jar"/>
+	<classpathentry kind="lib" path="/lib/jta.jar"/>
+	<classpathentry kind="lib" path="/lib/log4j-1.2.11.jar"/>
+	<classpathentry kind="lib" path="/lib/mina-core-1.1.5.jar"/>
+	<classpathentry kind="lib" path="/lib/mysql-connector-java-3.1.10-bin.jar"/>
+	<classpathentry kind="lib" path="/lib/quartz-1.6.3.jar"/>
+	<classpathentry kind="lib" path="/lib/servlet-api-2.5-6.1.1.jar"/>
+	<classpathentry kind="lib" path="/lib/sign.jar"/>
+	<classpathentry kind="lib" path="/lib/slf4j-jdk14.jar"/>
+	<classpathentry kind="lib" path="/lib/xerces-2.6.2.jar"/>
+	<classpathentry kind="lib" path="/lib/xml-apis.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/iTimes1.0-VM"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/itimes-net"/>
+	<classpathentry kind="output" path="classes"/>
+</classpath>

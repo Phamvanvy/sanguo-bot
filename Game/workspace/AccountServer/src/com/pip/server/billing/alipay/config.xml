@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<partner>
+	<partnerId>2088101094200012</partnerId>
+	<secId>0001</secId>
+	<signAlgo>RSA</signAlgo>
+	<prikey>MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAMqZwmXoRU444ULYpndhtxP0ECBdQaAiGJFDGl4VkQwuSU0snxeXUr7reDxI4CUFXvMIDpXbJDo5wxDEnttztWgLv/Wz5ph6K8vgo8vfOFTnSMCuROGSEYVj8mHA6GiNnu3Zqxa2/RGVbuGgP2tqPobHvZXYn5m/9+XW1gYo/BFHAgMBAAECgYAdBzbRPxxe/stXto7zX+7JTxjYakQy22/FsGWgwVpM8nzSL+iDiszySe6qRI7I/yIBlE/yrLleFlSanHFeZA/DnR7y0Te0fyZI/imLYu5NjPl8YOHFoKWj3YvlqMmIo0ptpS8U4MnPK3MDEn7Rg8SWL/yePxMBKBbiPTMk6S0YkQJBAPdwFJuqN6dVR+1scR/TRHZUbCAjmtXRCQlV/bF+OPduLehiCejC/cvzmy2t8tT+Q/C+t8x9SMVNzzGa7lkbavMCQQDRnH14kbgmrYIHijEhmtBWlw3FMn4fWISOFwqsXOWubOvKxSZTzAt2+oZdlCR84AYVBjjXe3XPGNJuVwHiQK1dAkBKlftwTOgHxbovxE95Q2rQrHQHYBQtPZyWttgJJ74uP4URFnRcOGLelqkBJP0c3SRHroWi22UTLHg3QLd2HsCnAkEA0UqcqW9uXQgv5hFgnzoyPdNTh4u0DN5YdHujR5j2KKRPB0a0z0TUSbc5xGQvzpPs3r84sEdwyRjyvAOaOOv1bQJAO024wsxGGTPYZ1+NZpUA1I0BhnzXmADyuy68OTodhFVEP8NqyFqSTFjJPvSq9YGhavHPrPkF891fFDz1Dp8vuQ==</prikey>
+    <encryptAlgo>RSA</encryptAlgo>
+	<pubkey>MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDKmcJl6EVOOOFC2KZ3YbcT9BAgXUGgIhiRQxpeFZEMLklNLJ8Xl1K+63g8SOAlBV7zCA6V2yQ6OcMQxJ7bc7VoC7/1s+aYeivL4KPL3zhU50jArkThkhGFY/JhwOhojZ7t2asWtv0RlW7hoD9raj6Gx72V2J+Zv/fl1tYGKPwRRwIDAQAB</pubkey>
+    <alipayPubKey>MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCnxj/9qwVfgoUh/y2W89L6BkRAFljhNhgPdyPuBV64bfQNN1PjbCzkIM6qRdKBoLPXmKKMiFYnkd6rAoprih3/PrQEB/VsW8OoM8fxn67UDYuyBTqA23MML9q1+ilIZwBC2AQ2UBVOrFXfFl75p6/B5KsiNG9zpgmLCUYuLkxpLQIDAQAB</alipayPubKey>
+	<acount>pippay@pearlinpalm.com</acount>
+	<format>xml</format>
+	<version>1.0</version>
+	<service>alipay.wap.trade.create.direct</service>
+	<!--serverUrl>https://paygw.alipay.com</serverUrl-->
+	<serverUrl>https://wappaygw.alipay.com</serverUrl>
+	
+</partner>

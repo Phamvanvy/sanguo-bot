@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!DOCTYPE hibernate-mapping PUBLIC "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+"http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+<hibernate-mapping>
+    <class name="com.pip.server.auth.bean.UserPhone" table="tbl_userphone">
+        <id name="userID" type="string">
+            <column name="userid" />
+        </id>
+        <property name="phone" type="string">
+            <column name="phone" not-null="true" />
+        </property>
+        <property name="downloadDate" type="timestamp">
+            <column name="downloaddate"/>
+        </property>
+    </class>
+</hibernate-mapping>
