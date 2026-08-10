@@ -5,6 +5,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from src.config import PROJECT_ROOT
 from src.extension_server import (
     adapt_canvas_region,
     expand_activation_codes,
@@ -99,6 +100,18 @@ class ExtensionServerTest(unittest.TestCase):
         cfg = {"activity_macros": {"blessing": {"label": "Cầu phúc", "steps": []}}}
         ids = {flow["id"] for flow in flow_catalog(cfg)}
         self.assertTrue({"full_auto", "accept_quests", "do_quests", "blessing"} <= ids)
+
+    def test_activity_macros_route_to_non_os_extension_runner(self):
+        extension_dir = PROJECT_ROOT / "extension"
+        content = (extension_dir / "content.js").read_text(encoding="utf-8")
+        background = (extension_dir / "background.js").read_text(encoding="utf-8")
+        for runner in (
+            "blessing_loop", "code_redeem_loop", "discard_loop", "use_item_loop", "coin_shake_loop",
+        ):
+            self.assertIn(f'"{runner}"', content)
+        for flow in ("blessing", "code_redeem", "discard_items", "use_inventory_item", "coin_shake"):
+            self.assertIn(f'flow === "{flow}"', background)
+        self.assertIn('type: "run-native"', content)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):

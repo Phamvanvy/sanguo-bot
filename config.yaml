@@ -154,8 +154,8 @@ activity_macros:
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   code_redeem:
-    label: "Đổi code"
-    description: "Nhập tuần tự toàn bộ code tại NPC đổi mã"
+    label: "Đổi code xu"
+    description: "Nhập tuần tự MCH5TEST1 đến MCH5TEST100"
     icon: "券"
     runner: "code_redeem_loop"
     # Giữa thân NPC "Nhân viên đổi mã kích hoạt" tại Tân Giang Tân Thôn.
@@ -169,11 +169,51 @@ activity_macros:
     dismiss_delay_seconds: 0.8
     reopen_delay_seconds: 1.0
     notification_dismiss_key: "enter"
-    codes:
-      - "MCH5EXPH1-100"
     code_ranges:
-      - {prefix: "MCH5VIP", start: 1, end: 12}
       - {prefix: "MCH5TEST", start: 1, end: 100}
+  discard_items:
+    label: "Vứt đồ"
+    description: "Sắp xếp rồi vứt ô đầu tiên liên tục"
+    icon: "🗑"
+    runner: "discard_loop"
+    # Tọa độ theo viewport của tab game như các flow không-chuột khác.
+    sort_point: [0.796, 0.919]
+    first_item_point: [0.342, 0.229]
+    discard_point: [0.710, 0.502]
+    confirm_point: [0.685, 0.631]
+    sort_delay_seconds: 0.9
+    detail_delay_seconds: 0.7
+    confirm_delay_seconds: 0.7
+    refresh_delay_seconds: 1.0
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
+  use_inventory_item:
+    label: "Dùng vật phẩm"
+    description: "Dùng liên tục vật phẩm ở ô bên trái trong 2 ô đầu"
+    icon: "🎁"
+    runner: "use_item_loop"
+    # Ô trái: [0.342, 0.229]. Đổi thành [0.684, 0.229] để dùng ô phải.
+    item_point: [0.342, 0.229]
+    # Nút "Sử dụng" trong bảng chi tiết vật phẩm.
+    use_point: [0.620, 0.502]
+    # Đặt null nếu vật phẩm không hiện hộp thoại xác nhận.
+    confirm_point: [0.685, 0.631]
+    detail_delay_seconds: 0.7
+    confirm_delay_seconds: 0.7
+    refresh_delay_seconds: 1.0
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
+  coin_shake:
+    label: "Rung xu"
+    description: "Rung cây bằng xu rồi xác nhận liên tục"
+    icon: "🪙"
+    runner: "coin_shake_loop"
+    shake_point: [0.585, 0.820]
+    confirm_point: [0.685, 0.631]
+    confirm_delay_seconds: 0.7
+    result_delay_seconds: 1.2
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
 
 combat:
   hp_low_threshold_pct: 40

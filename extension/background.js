@@ -130,6 +130,53 @@ async function runCodeRedeem(target, token, macro) {
   }
 }
 
+async function runDiscardItems(target, token, macro) {
+  const maxCycles = Number(macro.max_cycles || 0);
+  for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+    await clickAt(target, token, macro.sort_point || [0.796, 0.919]);
+    await nativeDelay(macro.sort_delay_seconds || 0.9);
+    await clickAt(target, token, macro.first_item_point || [0.342, 0.229]);
+    await nativeDelay(macro.detail_delay_seconds || 0.7);
+    await clickAt(target, token, macro.discard_point || [0.710, 0.502]);
+    await nativeDelay(macro.confirm_delay_seconds || 0.7);
+    await clickAt(target, token, macro.confirm_point || [0.685, 0.631]);
+    nativeFlow = {
+      state: "running", flow: "discard_items", message: `Đã vứt: ${cycle + 1} vật phẩm`,
+    };
+    await nativeDelay(macro.refresh_delay_seconds || 1);
+  }
+}
+
+async function runUseInventoryItem(target, token, macro) {
+  const maxCycles = Number(macro.max_cycles || 0);
+  for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+    await clickAt(target, token, macro.item_point || [0.342, 0.229]);
+    await nativeDelay(macro.detail_delay_seconds || 0.7);
+    await clickAt(target, token, macro.use_point || [0.620, 0.502]);
+    if (macro.confirm_point != null) {
+      await nativeDelay(macro.confirm_delay_seconds || 0.7);
+      await clickAt(target, token, macro.confirm_point);
+    }
+    nativeFlow = {
+      state: "running", flow: "use_inventory_item", message: `Đã dùng: ${cycle + 1} vật phẩm`,
+    };
+    await nativeDelay(macro.refresh_delay_seconds || 1);
+  }
+}
+
+async function runCoinShake(target, token, macro) {
+  const maxCycles = Number(macro.max_cycles || 0);
+  for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+    await clickAt(target, token, macro.shake_point || [0.585, 0.820]);
+    await nativeDelay(macro.confirm_delay_seconds || 0.7);
+    await clickAt(target, token, macro.confirm_point || [0.685, 0.631]);
+    nativeFlow = {
+      state: "running", flow: "coin_shake", message: `Rung xu: ${cycle + 1} lượt`,
+    };
+    await nativeDelay(macro.result_delay_seconds || 1.2);
+  }
+}
+
 async function startNativeFlow(tabId, flow, macro) {
   if (nativeToken && !nativeToken.cancelled) throw new Error("Một flow không-chuột khác đang chạy");
   const controller = await apiRequest("/status");
@@ -150,6 +197,9 @@ async function startNativeFlow(tabId, flow, macro) {
     try {
       if (flow === "blessing") await runBlessing(target, token, macro);
       else if (flow === "code_redeem") await runCodeRedeem(target, token, macro);
+      else if (flow === "discard_items") await runDiscardItems(target, token, macro);
+      else if (flow === "use_inventory_item") await runUseInventoryItem(target, token, macro);
+      else if (flow === "coin_shake") await runCoinShake(target, token, macro);
       else throw new Error(`Flow không-chuột chưa hỗ trợ: ${flow}`);
       nativeFlow = { state: "done", flow, message: "Flow hoàn tất" };
     } catch (error) {

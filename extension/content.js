@@ -80,7 +80,13 @@
   async function runFlow(flow) {
     try {
       let result;
-      if (["blessing_loop", "code_redeem_loop"].includes(flow.runner)) {
+      if ([
+        "blessing_loop",
+        "code_redeem_loop",
+        "discard_loop",
+        "use_item_loop",
+        "coin_shake_loop",
+      ].includes(flow.runner)) {
         const config = await api(`/macro?id=${encodeURIComponent(flow.id)}`);
         result = await send({ type: "run-native", flow: flow.id, macro: config.macro });
       } else {
