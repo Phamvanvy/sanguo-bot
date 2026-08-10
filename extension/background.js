@@ -149,16 +149,20 @@ async function runDiscardItems(target, token, macro) {
 
 async function runUseInventoryItem(target, token, macro) {
   const maxCycles = Number(macro.max_cycles || 0);
+  const itemSlot = macro.item_slot === "right" ? "right" : "left";
+  const itemPoints = macro.item_points || {};
+  const itemPoint = itemPoints[itemSlot] || macro.item_point || [0.337, 0.207];
   for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
-    await clickAt(target, token, macro.item_point || [0.342, 0.229]);
+    await clickAt(target, token, itemPoint);
     await nativeDelay(macro.detail_delay_seconds || 0.7);
-    await clickAt(target, token, macro.use_point || [0.620, 0.502]);
+    await clickAt(target, token, macro.use_point || [0.724, 0.345]);
     if (macro.confirm_point != null) {
       await nativeDelay(macro.confirm_delay_seconds || 0.7);
       await clickAt(target, token, macro.confirm_point);
     }
     nativeFlow = {
-      state: "running", flow: "use_inventory_item", message: `Đã dùng: ${cycle + 1} vật phẩm`,
+      state: "running", flow: "use_inventory_item",
+      message: `Đã dùng ô ${itemSlot === "right" ? "phải" : "trái"}: ${cycle + 1} vật phẩm`,
     };
     await nativeDelay(macro.refresh_delay_seconds || 1);
   }
@@ -174,6 +178,32 @@ async function runCoinShake(target, token, macro) {
       state: "running", flow: "coin_shake", message: `Rung xu: ${cycle + 1} lượt`,
     };
     await nativeDelay(macro.result_delay_seconds || 1.2);
+  }
+}
+
+async function runAutoAttack(target, token, macro) {
+  const attackPoint = macro.attack_point || [0.927, 0.822];
+  const skillPoints = macro.skill_points || [
+    [0.927, 0.517],
+    [0.853, 0.566],
+    [0.799, 0.670],
+    [0.875, 0.710],
+    [0.927, 0.653],
+    [0.774, 0.820],
+    [0.845, 0.820],
+  ];
+  const maxCycles = Number(macro.max_cycles || 0);
+  for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+    await clickAt(target, token, attackPoint);
+    await nativeDelay(macro.button_delay_seconds || 0.18);
+    for (const point of skillPoints) {
+      await clickAt(target, token, point);
+      await nativeDelay(macro.button_delay_seconds || 0.18);
+    }
+    nativeFlow = {
+      state: "running", flow: "auto_attack", message: `Tự động đánh: ${cycle + 1} vòng`,
+    };
+    await nativeDelay(macro.round_delay_seconds || 0.3);
   }
 }
 
@@ -200,6 +230,7 @@ async function startNativeFlow(tabId, flow, macro) {
       else if (flow === "discard_items") await runDiscardItems(target, token, macro);
       else if (flow === "use_inventory_item") await runUseInventoryItem(target, token, macro);
       else if (flow === "coin_shake") await runCoinShake(target, token, macro);
+      else if (flow === "auto_attack") await runAutoAttack(target, token, macro);
       else throw new Error(`Flow không-chuột chưa hỗ trợ: ${flow}`);
       nativeFlow = { state: "done", flow, message: "Flow hoàn tất" };
     } catch (error) {

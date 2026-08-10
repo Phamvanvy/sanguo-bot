@@ -134,6 +134,25 @@ quest_actions:
 
 # Các flow hoạt động hiển thị tự động trong popup extension.
 activity_macros:
+  auto_attack:
+    label: "Tự động đánh"
+    description: "Bấm Đánh và 7 nút kỹ năng liên tục đến khi Stop"
+    icon: "⚔"
+    runner: "auto_attack_loop"
+    # Tọa độ theo viewport của tab game, đo từ cụm nút được khoanh trong ảnh.
+    attack_point: [0.927, 0.822]
+    skill_points:
+      - [0.927, 0.517]
+      - [0.853, 0.566]
+      - [0.799, 0.670]
+      - [0.875, 0.710]
+      - [0.927, 0.653]
+      - [0.774, 0.820]
+      - [0.845, 0.820]
+    button_delay_seconds: 0.18
+    round_delay_seconds: 0.3
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
   blessing:
     label: "Cầu phúc"
     description: "Cầu phúc 10 lần liên tục đến khi Stop"
@@ -184,15 +203,17 @@ activity_macros:
     max_cycles: 0
   use_inventory_item:
     label: "Dùng vật phẩm"
-    description: "Dùng liên tục vật phẩm ở ô bên trái trong 2 ô đầu"
+    description: "Chọn ô trái hoặc ô phải trong 2 ô đầu rồi dùng liên tục"
     icon: "🎁"
     runner: "use_item_loop"
-    # Ô trái: [0.342, 0.229]. Đổi thành [0.684, 0.229] để dùng ô phải.
-    item_point: [0.342, 0.229]
+    # Tâm 2 ô vật phẩm đầu tiên theo viewport của tab game.
+    item_points:
+      left: [0.337, 0.207]
+      right: [0.689, 0.207]
     # Nút "Sử dụng" trong bảng chi tiết vật phẩm.
-    use_point: [0.620, 0.502]
-    # Đặt null nếu vật phẩm không hiện hộp thoại xác nhận.
-    confirm_point: [0.685, 0.631]
+    use_point: [0.724, 0.345]
+    # Loại vật phẩm này dùng ngay, không có hộp thoại xác nhận.
+    confirm_point: null
     detail_delay_seconds: 0.7
     confirm_delay_seconds: 0.7
     refresh_delay_seconds: 1.0

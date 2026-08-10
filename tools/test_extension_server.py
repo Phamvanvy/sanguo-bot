@@ -101,17 +101,28 @@ class ExtensionServerTest(unittest.TestCase):
         ids = {flow["id"] for flow in flow_catalog(cfg)}
         self.assertTrue({"full_auto", "accept_quests", "do_quests", "blessing"} <= ids)
 
+    def test_default_catalog_contains_auto_attack(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("auto_attack_loop", flows["auto_attack"]["runner"])
+
     def test_activity_macros_route_to_non_os_extension_runner(self):
         extension_dir = PROJECT_ROOT / "extension"
         content = (extension_dir / "content.js").read_text(encoding="utf-8")
         background = (extension_dir / "background.js").read_text(encoding="utf-8")
         for runner in (
             "blessing_loop", "code_redeem_loop", "discard_loop", "use_item_loop", "coin_shake_loop",
+            "auto_attack_loop",
         ):
             self.assertIn(f'"{runner}"', content)
-        for flow in ("blessing", "code_redeem", "discard_items", "use_inventory_item", "coin_shake"):
+        for flow in (
+            "blessing", "code_redeem", "discard_items", "use_inventory_item", "coin_shake", "auto_attack",
+        ):
             self.assertIn(f'flow === "{flow}"', background)
         self.assertIn('type: "run-native"', content)
+        self.assertIn('["left", "Ô trái"]', content)
+        self.assertIn('["right", "Ô phải"]', content)
+        self.assertIn('itemPoints[itemSlot]', background)
+        self.assertIn('await clickAt(target, token, attackPoint)', background)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):

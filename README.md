@@ -75,6 +75,12 @@ kiểm tra lại bước 2.
 
 ## 4. Các flow hiện có
 
+### Tự động đánh
+
+Bấm **Đánh** và 7 nút kỹ năng trong cụm chiến đấu theo vòng lặp. Flow không tự di chuyển
+hay chọn tọa độ quái; game tự chọn mục tiêu khi nút **Đánh** được bấm. Bấm **Dừng flow đang
+chạy** trên panel để dừng.
+
 ### Full auto
 
 Gom nhiều nhiệm vụ từ các dấu `!`, sau đó tự làm, trả nhiệm vụ, bấm

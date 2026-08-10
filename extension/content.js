@@ -55,6 +55,24 @@
 
   function renderFlows(running) {
     flowsNode.replaceChildren(...flows.map((flow) => {
+      if (flow.id === "use_inventory_item") {
+        const card = document.createElement("div");
+        card.className = "sg-flow sg-item-flow";
+        card.innerHTML = `<span></span><strong></strong><small></small><div class="sg-item-slots"></div>`;
+        card.querySelector("span").textContent = flow.icon;
+        card.querySelector("strong").textContent = flow.label;
+        card.querySelector("small").textContent = flow.description;
+        const slots = card.querySelector(".sg-item-slots");
+        for (const [slot, label] of [["left", "Ô trái"], ["right", "Ô phải"]]) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.disabled = running;
+          button.textContent = label;
+          button.addEventListener("click", () => runFlow(flow, { item_slot: slot }));
+          slots.append(button);
+        }
+        return card;
+      }
       const button = document.createElement("button");
       button.className = "sg-flow";
       button.type = "button";
@@ -77,7 +95,7 @@
     renderFlows(running);
   }
 
-  async function runFlow(flow) {
+  async function runFlow(flow, macroOverrides = {}) {
     try {
       let result;
       if ([
@@ -86,9 +104,14 @@
         "discard_loop",
         "use_item_loop",
         "coin_shake_loop",
+        "auto_attack_loop",
       ].includes(flow.runner)) {
         const config = await api(`/macro?id=${encodeURIComponent(flow.id)}`);
-        result = await send({ type: "run-native", flow: flow.id, macro: config.macro });
+        result = await send({
+          type: "run-native",
+          flow: flow.id,
+          macro: { ...config.macro, ...macroOverrides },
+        });
       } else {
         result = await api("/run", { method: "POST", body: JSON.stringify({ flow: flow.id }) });
       }

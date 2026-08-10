@@ -6,6 +6,8 @@
 4. Mở `https://play.minhchauh5.com/` và reload tab. Panel được ghim trực tiếp trên game.
 
 Panel có thể kéo thả và thu gọn bằng nút `−`; bấm icon extension để ẩn/hiện.
+Flow **Tự động đánh** chỉ bấm nút **Đánh** và 7 nút kỹ năng trong cụm chiến đấu,
+lặp liên tục cho đến khi bấm **Dừng flow đang chạy**.
 `Cầu phúc` và `Đổi code` dùng Chrome Debugger Protocol nên không chiếm chuột hệ
 thống và có thể chạy khi tab nằm nền. Các flow cần computer vision vẫn đi qua
 Python OS-input. Đóng DevTools của tab game trước khi chạy flow không-chuột.
