@@ -1,7 +1,8 @@
 # Sanguo Bot + Flow Extension
 
-Bot tự động thao tác game bằng chuột và bàn phím Windows. Extension Brave/Chrome
-cung cấp popup để chạy từng flow mà không cần gõ lệnh Python.
+Bot tự động thao tác game qua Playwright/CDP nên không chiếm chuột và bàn phím
+Windows. Extension Brave/Chrome cung cấp popup để chạy từng flow mà không cần gõ
+lệnh Python; backend OS Input cũ vẫn có thể bật lại khi cần.
 
 > Extension chỉ là giao diện điều khiển. Controller Python phải được chạy trên
 > máy và cửa sổ game Brave phải đang mở.
@@ -13,7 +14,16 @@ Yêu cầu:
 - Windows 10/11.
 - Python 3.12.
 - Brave Browser.
-- Game đã đăng nhập và mở trong Brave.
+- Đăng nhập game một lần trong profile `.brave-cdp-profile` do bot tự mở.
+
+Mặc định `game.control_mode` là `cdp_attach`. Controller tự mở Brave bằng profile
+riêng và cổng CDP 9222 nếu chưa có phiên đang chạy. Không cần giữ cửa sổ game ở
+foreground; chuột vật lý vẫn dùng bình thường. Nếu game chặn CDP, đổi lại:
+
+```yaml
+game:
+  control_mode: "os_input"
+```
 
 Mở PowerShell tại thư mục project:
 
@@ -161,12 +171,15 @@ rồi chạy lại.
 Dùng đúng lệnh có `-ExecutionPolicy Bypass` ở trên. Lệnh này chỉ áp dụng cho
 lần chạy hiện tại, không thay đổi policy toàn hệ thống.
 
-### Bot click lệch
+### Bot click lệch khi dùng OS Input
 
 - Đảm bảo game nằm trong cửa sổ Brave đã được bot nhận diện.
 - Không thu nhỏ cửa sổ trong khi flow đang chạy.
 - Kiểm tra `canvas_insets_px` và các tọa độ flow trong `config.yaml`.
 - Dùng `tools/calibrate.py` nếu giao diện game thay đổi.
+
+Với `cdp_attach`, tọa độ được lấy trực tiếp từ bounding box của `#screen`, không
+dùng `canvas_insets_px` và không phụ thuộc vị trí cửa sổ trên màn hình.
 
 ### Flow bị kẹt
 

@@ -15,14 +15,20 @@ actually rendered (not a black screen / block page).
 """
 from __future__ import annotations
 
+import pathlib
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from typing import Optional
+from urllib.parse import urlparse
 
+import cv2
+import numpy as np
 from playwright.sync_api import BrowserContext, Page, Playwright, sync_playwright
 
-from src.config import load_config
+from src.config import PROJECT_ROOT, load_config
+from src.os_input import Rect
 
 # Patches applied via add_init_script BEFORE the page's own JS runs, so
 # navigator.webdriver etc. never show the automation signature to guard.js.
@@ -48,10 +54,64 @@ class GameSession:
     context: BrowserContext
     page: Page
     control_mode: str
+    canvas_selector: str
+    owns_context: bool = True
+    process: Optional[subprocess.Popen] = None
+
+    def __post_init__(self) -> None:
+        self._dry_run = False
+
+    def focus(self) -> None:
+        """CDP input targets this page directly; OS foreground focus is unnecessary."""
+
+    def client_rect(self) -> Rect:
+        size = self.page.evaluate("() => ({width: innerWidth, height: innerHeight})")
+        return Rect(left=0, top=0, width=int(size["width"]), height=int(size["height"]))
+
+    def canvas_rect(self) -> Rect:
+        box = self.page.locator(self.canvas_selector).bounding_box()
+        if box is None:
+            raise RuntimeError(f"Canvas {self.canvas_selector!r} is not visible")
+        return Rect(
+            left=int(box["x"]), top=int(box["y"]),
+            width=int(box["width"]), height=int(box["height"]),
+        )
+
+    def capture(self, rect: Optional[Rect] = None) -> np.ndarray:
+        rect = rect or self.canvas_rect()
+        png = self.page.screenshot(clip={
+            "x": rect.left, "y": rect.top,
+            "width": rect.width, "height": rect.height,
+        })
+        image = cv2.imdecode(np.frombuffer(png, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            raise RuntimeError("Playwright returned an invalid screenshot")
+        return image
+
+    def set_dry_run(self, dry_run: bool) -> None:
+        self._dry_run = dry_run
+
+    def click_fraction(self, fx: float, fy: float, rect: Optional[Rect] = None) -> None:
+        if self._dry_run:
+            return
+        rect = rect or self.canvas_rect()
+        self.page.mouse.click(rect.left + fx * rect.width, rect.top + fy * rect.height)
+
+    def type_text(self, text: str, interval: float = 0.03) -> None:
+        if self._dry_run:
+            return
+        self.page.keyboard.type(text, delay=max(0, interval * 1000))
+
+    def press(self, key: str) -> None:
+        if self._dry_run:
+            return
+        aliases = {"escape": "Escape", "enter": "Enter", "space": "Space"}
+        self.page.keyboard.press(aliases.get(key.lower(), key))
 
     def close(self) -> None:
         try:
-            self.context.close()
+            if self.owns_context:
+                self.context.close()
         finally:
             self.playwright.stop()
 
@@ -75,17 +135,70 @@ def _launch_persistent(cfg: dict) -> GameSession:
     )
     context.add_init_script(STEALTH_INIT_SCRIPT)
     page = context.pages[0] if context.pages else context.new_page()
-    return GameSession(playwright=pw, context=context, page=page, control_mode="playwright_persistent")
+    return GameSession(
+        playwright=pw, context=context, page=page,
+        control_mode="playwright_persistent",
+        canvas_selector=cfg["game"]["canvas_selector"],
+    )
 
 
 def _attach_cdp(cfg: dict) -> GameSession:
     pw = sync_playwright().start()
-    endpoint = cfg["game"]["cdp"]["endpoint"]
-    browser = pw.chromium.connect_over_cdp(endpoint)
+    cdp = cfg["game"]["cdp"]
+    endpoint = cdp["endpoint"]
+    process = None
+    try:
+        browser = pw.chromium.connect_over_cdp(endpoint)
+    except Exception as first_error:  # noqa: BLE001
+        if not cdp.get("auto_launch", False):
+            pw.stop()
+            raise RuntimeError(
+                f"Cannot connect to CDP at {endpoint}. Start Brave with "
+                "--remote-debugging-port or enable game.cdp.auto_launch."
+            ) from first_error
+
+        parsed = urlparse(endpoint)
+        if not parsed.port:
+            pw.stop()
+            raise ValueError(f"CDP endpoint must include a port: {endpoint}") from first_error
+        profile_dir = pathlib.Path(cdp.get("user_data_dir", "./.brave-cdp-profile"))
+        if not profile_dir.is_absolute():
+            profile_dir = PROJECT_ROOT / profile_dir
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        browser_exe = cdp.get("browser_exe") or cfg["game"]["os_input"]["browser_exe"]
+        window = cfg["game"]["window"]
+        process = subprocess.Popen([
+            browser_exe,
+            f"--remote-debugging-port={parsed.port}",
+            f"--user-data-dir={profile_dir}",
+            f"--window-size={window['width']},{window['height']}",
+            f"--window-position={window.get('pos_x', 0)},{window.get('pos_y', 0)}",
+            "--no-first-run",
+            cfg["game"]["url"],
+        ])
+        deadline = time.time() + float(cdp.get("connect_timeout_seconds", 15))
+        while True:
+            try:
+                browser = pw.chromium.connect_over_cdp(endpoint)
+                break
+            except Exception as retry_error:  # noqa: BLE001
+                if time.time() >= deadline:
+                    pw.stop()
+                    raise RuntimeError(f"Brave started but CDP did not become ready at {endpoint}") from retry_error
+                time.sleep(0.25)
+
     context = browser.contexts[0] if browser.contexts else browser.new_context()
     context.add_init_script(STEALTH_INIT_SCRIPT)
-    page = context.pages[0] if context.pages else context.new_page()
-    return GameSession(playwright=pw, context=context, page=page, control_mode="cdp_attach")
+    game_url = cfg["game"]["url"]
+    page = next((candidate for candidate in context.pages if candidate.url.startswith(game_url)), None)
+    page = page or (context.pages[0] if context.pages else context.new_page())
+    return GameSession(
+        playwright=pw, context=context, page=page,
+        control_mode="cdp_attach",
+        canvas_selector=cfg["game"]["canvas_selector"],
+        owns_context=False,
+        process=process,
+    )
 
 
 def open_game(cfg: Optional[dict] = None) -> GameSession:
@@ -104,7 +217,8 @@ def open_game(cfg: Optional[dict] = None) -> GameSession:
             print(f"[browser] playwright_persistent failed ({e}); trying cdp_attach", file=sys.stderr)
             session = _attach_cdp(cfg)
 
-    session.page.goto(cfg["game"]["url"], wait_until="domcontentloaded")
+    if not session.page.url.startswith(cfg["game"]["url"]):
+        session.page.goto(cfg["game"]["url"], wait_until="domcontentloaded")
     return session
 
 

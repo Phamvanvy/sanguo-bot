@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .browser-profile/
 .brave-os-profile/
+.brave-cdp-profile/
 .edge-os-profile/
 logs/
 secrets.yaml

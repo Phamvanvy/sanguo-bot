@@ -1,8 +1,6 @@
 """Unified capture/click interface so the vision and game layers don't care
-which control backend is active. Only os_input is confirmed to work against
-this game's guard (see src/os_input.py); the playwright path is kept for
-possible future use against pages without CDP detection, but is NOT wired to
-a live GameSession here since gate_check proved it gets blocked.
+which control backend is active. Both OS input and Playwright/CDP implement the
+same session contract, so vision and game actions keep their existing API.
 
 All coordinates in this module are fractions (0..1) of the game canvas's
 own width/height, resolution/DPI independent. `Frame` bundles the raw image
@@ -12,12 +10,12 @@ back into a fraction, and action code can convert a fraction into a click.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
 from src.config import load_config
-from src.os_input import OsGameSession, Rect, attach_or_launch
+from src.os_input import Rect, attach_or_launch
 
 
 @dataclass
@@ -41,19 +39,22 @@ class Frame:
 
 
 class GameControl:
-    """Wraps an OsGameSession, scoped to the game canvas region within the
-    browser window (config game.os_input.canvas_region), so every fraction
-    coordinate used elsewhere in the bot is relative to the canvas, not the
-    whole browser chrome (tabs/URL bar)."""
+    """Backend-neutral control scoped to the game canvas."""
 
-    def __init__(self, session: OsGameSession, cfg: dict):
+    def __init__(self, session: Any, cfg: dict):
         self.session = session
         self.cfg = cfg
+
+    @property
+    def control_mode(self) -> str:
+        return getattr(self.session, "control_mode", "os_input")
 
     def focus(self) -> None:
         self.session.focus()
 
     def canvas_rect(self) -> Rect:
+        if self.control_mode != "os_input":
+            return self.session.canvas_rect()
         window_rect = self.session.client_rect()
         region = self.cfg["game"]["os_input"].get("canvas_region")
         if not region:
@@ -91,14 +92,12 @@ class GameControl:
 def open_control(cfg: Optional[dict] = None) -> GameControl:
     cfg = cfg or load_config()
     mode = cfg["game"]["control_mode"]
-    if mode != "os_input":
-        raise ValueError(
-            f"control_mode={mode!r} is not usable against this game -- M0 confirmed "
-            "guard.js blocks any CDP-based backend (playwright_persistent, cdp_attach). "
-            "Set game.control_mode: os_input in config.yaml."
-        )
-    # attach_or_launch reuses an already-open game window if one exists,
-    # instead of spawning a new browser process/tab every call -- important
-    # during dev/calibration iteration.
-    session = attach_or_launch(cfg)
+    if mode == "os_input":
+        session = attach_or_launch(cfg)
+    elif mode in {"playwright_persistent", "cdp_attach", "auto"}:
+        from src.browser import open_game
+
+        session = open_game(cfg)
+    else:
+        raise ValueError(f"Unknown game.control_mode: {mode!r}")
     return GameControl(session=session, cfg=cfg)

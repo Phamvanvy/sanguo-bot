@@ -5,22 +5,17 @@ game:
   canvas_selector: "#screen"
   # Playwright persistent profile dir (keeps login/session between runs)
   profile_dir: "./.browser-profile"
-  # M0 RESULT (confirmed): playwright_persistent gets blocked -- guard.js
-  # shows "Da phat hien cong cu debug" as soon as the page's own JS runs,
-  # because Playwright drives the page over CDP and enabling the Runtime
-  # domain (needed for any page.evaluate/screenshot/console read) triggers
-  # the classic getter-preview devtools-detection trick. This is NOT fixable
-  # with stealth init scripts -- it's inherent to CDP, so cdp_attach would
-  # very likely be caught the same way. control_mode is now os_input:
-  # a real browser process launched with a plain, unmodified command line
-  # (no --remote-debugging-port, no CDP client ever attached), driven purely
-  # by OS-level input (pydirectinput) and OS-level screen capture (mss).
+  # cdp_attach sends mouse/keyboard events straight to the game page, so the
+  # physical mouse remains free. Switch back to os_input if the game guard
+  # rejects the CDP session.
   # Values: auto | playwright_persistent | cdp_attach | os_input
-  control_mode: "os_input"
+  control_mode: "cdp_attach"
   cdp:
-    # Used only when control_mode = cdp_attach. Launch the real browser
-    # yourself first with: brave.exe --remote-debugging-port=9222
     endpoint: "http://localhost:9222"
+    auto_launch: true
+    browser_exe: "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+    user_data_dir: "./.brave-cdp-profile"
+    connect_timeout_seconds: 15
   os_input:
     # Tried switching to Edge (2026-07-10) to avoid colliding with the
     # user's everyday Brave window -- reverted immediately: this machine's
