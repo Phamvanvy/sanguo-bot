@@ -51,13 +51,26 @@
     localStorage.setItem(NETWORK_EVENT_KEY, JSON.stringify({ type: "guard", at: Date.now() }));
   }
 
-  function recentGuardReload() {
+  function recentNetworkEvent() {
     try {
       const event = JSON.parse(localStorage.getItem(NETWORK_EVENT_KEY) || "null");
-      return event?.type === "guard" && Date.now() - Number(event.at) < 5 * 60 * 1000;
+      return event && Date.now() - Number(event.at) < 5 * 60 * 1000 ? event : null;
     } catch (_) {
-      return false;
+      return null;
     }
+  }
+
+  function networkEventMessage(event) {
+    if (!event) return "";
+    if (event.type === "guard" || event.code === 4001 || event.reason === "guard") {
+      return "Rớt do guard: WebSocket 4001/guard";
+    }
+    if (event.type === "close") {
+      const reason = event.reason ? ` (${event.reason})` : "";
+      return `WebSocket bị đóng: code ${event.code}${reason}`;
+    }
+    if (event.type === "error") return "WebSocket báo lá»—i trước khi rớt";
+    return "";
   }
 
   function watchGameGuard() {
@@ -361,6 +374,7 @@
     if (domToken && !domToken.cancelled) throw new Error("Một flow DOM khác đang chạy");
     const controller = await api("/status");
     if (controller.state === "running") throw new Error("Một flow Python khác đang chạy");
+    localStorage.removeItem(NETWORK_EVENT_KEY);
     const token = { cancelled: false };
     domToken = token;
     updateDomFlow(flow, `Đang chạy không-CDP: ${flow}`);
@@ -424,8 +438,11 @@
       if (!flows.length) flows = (await api("/flows")).flows;
       const status = domFlow.state !== "idle" ? domFlow : await api("/status");
       setConnected(true);
-      if (status.state !== "running" && recentGuardReload()) {
-        showStatus({ state: "error", message: "Game vừa tự reload do guard (không phải mất controller)" });
+      const networkMessage = status.state !== "running"
+        ? networkEventMessage(recentNetworkEvent())
+        : "";
+      if (networkMessage) {
+        showStatus({ state: "error", message: networkMessage });
       } else {
         showStatus(status);
       }

@@ -1,0 +1,86 @@
+# Keep the GitNexus index focused on source code we actually write and navigate.
+# Strategy: ignore everything, then whitelist real source trees.
+
+/*
+
+# --- Bot source (Python) ---
+!/src/
+!/src/**
+
+# --- Helper / test scripts ---
+!/tools/
+!/tools/**
+
+# --- Proof-of-concept / security scripts ---
+!/poc/
+!/poc/**
+
+# --- Browser extension (JS) ---
+!/extension/
+!/extension/**
+
+# --- Self-hosted server: only the source-ish files, NOT the binary runtime ---
+!/selfhost/
+!/selfhost/*.py
+!/selfhost/*.yml
+!/selfhost/*.yaml
+# Re-exclude the heavy game-server runtime & db data (271MB of binaries/assets)
+/selfhost/runtime/
+/selfhost/mysql/
+
+# --- Root config / docs worth indexing ---
+!/config.yaml
+!/README.md
+!/AGENTS.md
+!/requirements.txt
+
+# --- Game/: 3.4GB reference dump. Do NOT index the whole thing. ---
+# Whitelist ONLY the server tree we currently work on (sangobuildVn, Java server),
+# then strip its heavy data/build/asset dirs and binary files so mostly source
+# (.java/.sql/.xml/.lua/etc.) survives.
+!/Game/
+/Game/*
+!/Game/sangobuildVn/
+
+# Heavy non-source subtrees inside sangobuildVn (~840MB of assets/output/archives)
+/Game/sangobuildVn/data/
+/Game/sangobuildVn/dist/
+/Game/sangobuildVn/build/
+/Game/sangobuildVn/20110325/
+
+# Binary / asset / doc file types (stripped everywhere, incl. remaining game dirs)
+*.dll
+*.exe
+*.pdb
+*.7z
+*.rar
+*.jar
+*.class
+*.gz
+*.pip
+*.ctn
+*.cts
+*.pkg
+*.etd
+*.gtl
+*.map
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+*.mp3
+*.mid
+*.wav
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.pdf
+*.Extra
+*.Old
+
+# To add another server tree later, mirror the sangobuildVn block, e.g.:
+#   !/Game/Sango1.0-Server/   then re-exclude its data/build dirs as above.

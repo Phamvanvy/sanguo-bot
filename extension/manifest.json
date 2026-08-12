@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "118",
   "name": "Sanguo Flow Controller",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Chạy các flow nhiệm vụ Sanguo từ panel nổi trong game.",
   "permissions": ["activeTab", "scripting"],
   "host_permissions": [
@@ -13,6 +13,12 @@
     "service_worker": "background.js"
   },
   "content_scripts": [
+    {
+      "matches": ["https://play.minhchauh5.com/*"],
+      "js": ["network_probe.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": ["https://play.minhchauh5.com/*"],
       "css": ["content.css"],

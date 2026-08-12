@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:5.7
+    command:
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+      - --character-set-server=utf8
+      - --lower_case_table_names=1
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  accountserver:
+    image: eclipse-temurin:8-jdk
+    working_dir: /app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./runtime/accountserver:/app
+    command: ["java", "-Dfile.encoding=GBK", "-cp", "bin:lib/*", "com.pip.server.account.AccountServer"]
+    ports:
+      - "7100:7100"
+      - "7500:7500"
+
+  gameaccountserver:
+    image: eclipse-temurin:8-jdk
+    working_dir: /app
+    depends_on:
+      - accountserver
+    volumes:
+      - ./runtime/gameaccountserver:/app
+    command: ["java", "-Dfile.encoding=GBK", "-cp", "bin:lib/*", "com.pip.gameaccount.GameAccountServer"]
+    ports:
+      - "7101:7101"
+
+  world:
+    image: eclipse-temurin:8-jdk
+    working_dir: /app/app
+    depends_on:
+      - gameaccountserver
+    volumes:
+      - ./runtime/world:/app
+      - ./runtime/data:/data
+    command: ["java", "-Xmx2g", "-cp", "/app/conf:/app/libs/*", "peony.game.Server"]
+    ports:
+      - "7000:7000"
+      - "7001:7001"
+      - "7003:7003"
+
+volumes:
+  mysql-data:

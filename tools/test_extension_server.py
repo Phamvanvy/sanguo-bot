@@ -133,6 +133,7 @@ class ExtensionServerTest(unittest.TestCase):
         content = (extension_dir / "content.js").read_text(encoding="utf-8")
         background = (extension_dir / "background.js").read_text(encoding="utf-8")
         manifest = (extension_dir / "manifest.json").read_text(encoding="utf-8")
+        probe = (extension_dir / "network_probe.js").read_text(encoding="utf-8")
         for runner in (
             "blessing_loop", "code_redeem_loop", "discard_loop", "use_item_loop", "coin_shake_loop",
             "auto_attack_loop",
@@ -153,8 +154,12 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('await domClick(token, attackPoint)', content)
         self.assertIn('const BLESSING_SPEED_FACTOR = 1.0', content)
         self.assertIn('document.getElementById("__mch5_guard")', content)
-        self.assertIn('Game vừa tự reload do guard', content)
+        self.assertIn('Rớt do guard: WebSocket 4001/guard', content)
         self.assertIn('macro.rest_every_cycles || 10', content)
+        self.assertIn('"world": "MAIN"', manifest)
+        self.assertIn('"run_at": "document_start"', manifest)
+        self.assertIn('socket.addEventListener("close"', probe)
+        self.assertIn('code: Number(event.code)', probe)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):
