@@ -148,6 +148,8 @@ activity_macros:
       - [0.927, 0.653]
       - [0.774, 0.820]
       - [0.845, 0.820]
+    # Keep the renderer responsive so the site's debugger-latency guard does
+    # not false-positive and close the game WebSocket under sustained load.
     button_delay_seconds: 0.18
     round_delay_seconds: 0.3
     # 0 = lặp đến khi bấm Stop trong extension.
@@ -160,10 +162,14 @@ activity_macros:
     open_point: [0.73, 0.07]
     ten_times_point: [0.66, 0.84]
     ok_point: [0.70, 0.64]
-    open_delay_seconds: 1.5
-    click_delay_seconds: 0.55
-    confirm_delay_seconds: 0.8
-    result_delay_seconds: 1.5
+    # Let each animation/result settle before sending the next interaction.
+    # This avoids starving the renderer and tripping the site's guard.
+    open_delay_seconds: 2.0
+    click_delay_seconds: 1.2
+    confirm_delay_seconds: 1.5
+    result_delay_seconds: 3.0
+    rest_every_cycles: 10
+    rest_delay_seconds: 5.0
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   code_redeem:

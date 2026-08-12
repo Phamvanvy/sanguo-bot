@@ -81,6 +81,8 @@ def run_blessing(control: GameControl, cfg: dict, flow_id: str = "blessing") -> 
     click_delay = float(macro.get("click_delay_seconds", 0.55))
     confirm_delay = float(macro.get("confirm_delay_seconds", 1.2))
     result_delay = float(macro.get("result_delay_seconds", 1.5))
+    rest_every = int(macro.get("rest_every_cycles", 10))
+    rest_delay = float(macro.get("rest_delay_seconds", 5.0))
     max_cycles = int(macro.get("max_cycles", 0))
 
     control.click(float(open_point[0]), float(open_point[1]))
@@ -98,6 +100,9 @@ def run_blessing(control: GameControl, cfg: dict, flow_id: str = "blessing") -> 
         cycle += 1
         print(f"[extension] blessing cycle={cycle}", flush=True)
         time.sleep(result_delay)
+        if rest_every > 0 and cycle % rest_every == 0:
+            print(f"[extension] blessing resting after cycle={cycle}", flush=True)
+            time.sleep(rest_delay)
 
 
 def expand_activation_codes(macro: dict) -> list[str]:

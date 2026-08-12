@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from src.config import PROJECT_ROOT
 from src.extension_server import (
@@ -151,6 +151,10 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('["right", "Ô phải"]', content)
         self.assertIn('(macro.item_points || {})[itemSlot]', content)
         self.assertIn('await domClick(token, attackPoint)', content)
+        self.assertIn('const BLESSING_SPEED_FACTOR = 1.0', content)
+        self.assertIn('document.getElementById("__mch5_guard")', content)
+        self.assertIn('Game vừa tự reload do guard', content)
+        self.assertIn('macro.rest_every_cycles || 10', content)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):
@@ -180,6 +184,16 @@ class ExtensionServerTest(unittest.TestCase):
             ("click", 0.66, 0.84),
             ("click", 0.70, 0.64),
         ], control.actions)
+
+    @patch("src.extension_server.time.sleep")
+    def test_blessing_takes_a_periodic_rest(self, sleep):
+        cfg = {"activity_macros": {"blessing": {
+            "max_cycles": 2,
+            "rest_every_cycles": 2,
+            "rest_delay_seconds": 5,
+        }}}
+        run_blessing(FakeControl(), cfg)
+        self.assertIn(call(5.0), sleep.call_args_list)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_code_redeem_reopens_npc_for_each_code(self, _sleep):

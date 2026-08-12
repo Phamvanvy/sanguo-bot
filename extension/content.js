@@ -35,11 +35,38 @@
     "coin_shake_loop",
     "auto_attack_loop",
   ]);
+  // Running faster than the game's normal UI cadence can saturate its
+  // renderer. The site guard measures debugger latency on that same thread
+  // and can otherwise mistake a busy frame for an attached debugger, close
+  // the game WebSocket, and reload back to the server picker.
   const DOM_SPEED_FACTOR = 0.7;
+  const BLESSING_SPEED_FACTOR = 1.0;
+  const NETWORK_EVENT_KEY = "sanguo-last-network-event";
   let flows = [];
   let dragging = null;
   let domToken = null;
   let domFlow = { state: "idle", message: "Sẵn sàng" };
+
+  function rememberGuardReload() {
+    localStorage.setItem(NETWORK_EVENT_KEY, JSON.stringify({ type: "guard", at: Date.now() }));
+  }
+
+  function recentGuardReload() {
+    try {
+      const event = JSON.parse(localStorage.getItem(NETWORK_EVENT_KEY) || "null");
+      return event?.type === "guard" && Date.now() - Number(event.at) < 5 * 60 * 1000;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function watchGameGuard() {
+    const detect = () => {
+      if (document.getElementById("__mch5_guard")) rememberGuardReload();
+    };
+    detect();
+    new MutationObserver(detect).observe(document.documentElement, { childList: true, subtree: true });
+  }
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -106,8 +133,8 @@
     renderFlows(running);
   }
 
-  const domDelay = (seconds) => new Promise((resolve) => {
-    setTimeout(resolve, Math.max(120, Number(seconds) * 1000 * DOM_SPEED_FACTOR));
+  const domDelay = (seconds, speedFactor = DOM_SPEED_FACTOR) => new Promise((resolve) => {
+    setTimeout(resolve, Math.max(120, Number(seconds) * 1000 * speedFactor));
   });
 
   function ensureDomActive(token) {
@@ -229,17 +256,22 @@
 
   async function runBlessing(token, macro) {
     await domClick(token, macro.open_point || [0.73, 0.07]);
-    await domDelay(macro.open_delay_seconds || 1.5);
+    await domDelay(macro.open_delay_seconds || 2, BLESSING_SPEED_FACTOR);
     const maxCycles = Number(macro.max_cycles || 0);
+    const restEvery = Number(macro.rest_every_cycles || 10);
     for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
       for (let click = 0; click < (cycle === 0 ? 1 : 2); click += 1) {
         await domClick(token, macro.ten_times_point || [0.66, 0.84]);
-        await domDelay(macro.click_delay_seconds || 0.55);
+        await domDelay(macro.click_delay_seconds || 1.2, BLESSING_SPEED_FACTOR);
       }
-      await domDelay(macro.confirm_delay_seconds || 0.8);
+      await domDelay(macro.confirm_delay_seconds || 1.5, BLESSING_SPEED_FACTOR);
       await domClick(token, macro.ok_point || [0.70, 0.64]);
       updateDomFlow("blessing", `Cầu phúc: ${cycle + 1} lượt`);
-      await domDelay(macro.result_delay_seconds || 1.5);
+      await domDelay(macro.result_delay_seconds || 3, BLESSING_SPEED_FACTOR);
+      if (restEvery > 0 && (cycle + 1) % restEvery === 0) {
+        updateDomFlow("blessing", `Cầu phúc: nghỉ sau ${cycle + 1} lượt`);
+        await domDelay(macro.rest_delay_seconds || 5, BLESSING_SPEED_FACTOR);
+      }
     }
   }
 
@@ -392,7 +424,11 @@
       if (!flows.length) flows = (await api("/flows")).flows;
       const status = domFlow.state !== "idle" ? domFlow : await api("/status");
       setConnected(true);
-      showStatus(status);
+      if (status.state !== "running" && recentGuardReload()) {
+        showStatus({ state: "error", message: "Game vừa tự reload do guard (không phải mất controller)" });
+      } else {
+        showStatus(status);
+      }
     } catch (_) {
       setConnected(false);
       if (domToken && !domToken.cancelled) {
@@ -456,6 +492,7 @@
   });
 
   restorePanelState();
+  watchGameGuard();
   refresh();
   setInterval(refresh, 1200);
 })();
