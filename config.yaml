@@ -5,11 +5,10 @@ game:
   canvas_selector: "#screen"
   # Playwright persistent profile dir (keeps login/session between runs)
   profile_dir: "./.browser-profile"
-  # cdp_attach sends mouse/keyboard events straight to the game page, so the
-  # physical mouse remains free. Switch back to os_input if the game guard
-  # rejects the CDP session.
+  # The live site closes its game WebSocket when it detects a debugger/CDP
+  # client. Keep normal runs on OS input; use CDP only for isolated debugging.
   # Values: auto | playwright_persistent | cdp_attach | os_input
-  control_mode: "cdp_attach"
+  control_mode: "os_input"
   cdp:
     endpoint: "http://localhost:9222"
     auto_launch: true

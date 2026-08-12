@@ -11,4 +11,6 @@ lặp liên tục cho đến khi bấm **Dừng flow đang chạy**.
 Các flow hoạt động nhanh chạy bằng DOM events ngay trong tab: không dùng Chrome
 Debugger Protocol và không chiếm chuột/bàn phím hệ thống. Giữ tab game mở; trình
 duyệt có thể giảm tốc JavaScript nếu cửa sổ bị thu nhỏ hoặc tab bị đóng băng.
-Các flow cần computer vision vẫn đi qua backend được chọn trong `config.yaml`.
+Các flow cần computer vision luôn bám vào cửa sổ game hiện tại và dùng
+OS input. Không bật CDP/remote debugging cho cửa sổ game vì guard của trang sẽ
+chủ động đóng WebSocket.

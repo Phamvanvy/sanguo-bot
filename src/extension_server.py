@@ -16,10 +16,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from src.capture import GameControl, open_control
+from src.capture import GameControl
 from src.config import PROJECT_ROOT, load_config
 from src.game.actions import GameActions
 from src.game.quests import QuestExecutor
+from src.os_input import attach_existing
 
 
 HOST = "127.0.0.1"
@@ -171,9 +172,13 @@ def run_worker(flow_id: str, tab_title: str, fullscreen: bool = False) -> int:
     if flow_id not in valid_ids:
         raise ValueError(f"Unknown flow: {flow_id}")
 
-    control = open_control(cfg)
-    if control.control_mode == "os_input":
-        adapt_canvas_region(control, cfg, fullscreen=fullscreen)
+    # The live game deliberately closes its WebSocket when a debugger/CDP
+    # client is detected. Extension workers must therefore stay on the
+    # ordinary browser window selected by the user and use OS-level input,
+    # regardless of the backend configured for standalone tools.
+    cfg["game"]["control_mode"] = "os_input"
+    control = GameControl(session=attach_existing(cfg, tab_title), cfg=cfg)
+    adapt_canvas_region(control, cfg, fullscreen=fullscreen)
     control.set_dry_run(False)
     try:
         actions = GameActions(control, cfg)

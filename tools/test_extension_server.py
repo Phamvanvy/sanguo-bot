@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from src.config import PROJECT_ROOT
 from src.extension_server import (
@@ -14,6 +14,7 @@ from src.extension_server import (
     run_blessing,
     run_code_redeem,
     run_macro,
+    run_worker,
 )
 from src.os_input import attach_existing
 
@@ -59,6 +60,28 @@ class ExtensionServerTest(unittest.TestCase):
             process_exe=cfg["game"]["os_input"]["browser_exe"],
             timeout=3.0,
         )
+
+    def test_worker_forces_os_input_on_the_selected_game_window(self):
+        cfg = {
+            "runtime": {"dry_run": True},
+            "game": {"control_mode": "cdp_attach", "os_input": {}},
+        }
+        session = MagicMock()
+        with (
+            patch("src.extension_server.load_config", return_value=cfg),
+            patch("src.extension_server.flow_catalog", return_value=[{"id": "accept_quests"}]),
+            patch("src.extension_server.attach_existing", return_value=session) as attach,
+            patch("src.extension_server.adapt_canvas_region") as adapt,
+            patch("src.extension_server.GameActions") as actions,
+        ):
+            actions.return_value.accept_all_map_quests.return_value = 0
+            self.assertEqual(0, run_worker("accept_quests", "Minh Châu H5"))
+
+        self.assertEqual("os_input", cfg["game"]["control_mode"])
+        attach.assert_called_once_with(cfg, "Minh Châu H5")
+        adapt.assert_called_once()
+        session.set_dry_run.assert_called_once_with(False)
+        session.close.assert_called_once_with()
 
     def test_activation_code_ranges_expand_in_order(self):
         macro = {
