@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sanguo G2 — browser client (wire layer only)</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 16px; background: #14171a; color: #d7dde3;
+         font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #8fa3b0; margin: 0 0 8px; }
+  .sub { color: #7d8b96; margin: 0 0 16px; }
+  .grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.2fr); gap: 16px; align-items: start; }
+  .card { background: #1b2025; border: 1px solid #2a3138; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  label { display: block; font-size: 12px; color: #8fa3b0; margin: 8px 0 2px; }
+  input, select, button { font: inherit; }
+  input, select { background: #11151a; color: #d7dde3; border: 1px solid #313a42;
+                  border-radius: 5px; padding: 6px 8px; width: 100%; box-sizing: border-box; }
+  button { background: #2d6cdf; color: #fff; border: 0; border-radius: 5px;
+           padding: 7px 12px; cursor: pointer; margin: 8px 6px 0 0; }
+  button:hover { background: #3d7cef; }
+  button:disabled { background: #3a444d; cursor: default; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #status { font-size: 13px; padding: 6px 0; }
+  #status.ok { color: #6ddf8f; } #status.err { color: #ff7b72; }
+  #stats { font: 12px/1.6 ui-monospace, Consolas, monospace; color: #8fa3b0; }
+  #charList button { display: block; width: 100%; text-align: left; background: #232c34; }
+  #charList button:hover { background: #2c3742; }
+  #log { height: 320px; overflow-y: auto; background: #0e1216; border: 1px solid #232a31;
+         border-radius: 6px; padding: 8px; font: 12px/1.45 ui-monospace, Consolas, monospace; }
+  #log .row { white-space: pre-wrap; }
+  #log .in { color: #9ecbff; } #log .out { color: #7ee0a2; } #log .skip { color: #6f7c87; }
+  #log .err { color: #ff7b72; } #log .chat { color: #e3c07b; } #log .dim { color: #5c6771; }
+  canvas { width: 100%; height: auto; background: #111; border-radius: 6px; display: block; }
+  code { background: #11151a; padding: 1px 4px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<h1>Sanguo self-host — G2 browser client</h1>
+<p class="sub">
+  Wire layer only: login → character list/create → enter world → move. No game rendering yet
+  (that is G3). Needs the bridge running: <code>node web/bridge/bridge.js</code>, which also
+  serves this page.
+</p>
+
+<div id="status">not connected</div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <h2>Connect &amp; log in</h2>
+      <label for="url">Bridge WebSocket</label>
+      <input id="url" value="ws://127.0.0.1:8080">
+      <div class="row2">
+        <div><label for="account">Account</label><input id="account" autocomplete="username"></div>
+        <div><label for="password">Password</label><input id="password" type="password" autocomplete="current-password"></div>
+      </div>
+      <button id="loginBtn">Log in</button>
+    </div>
+
+    <div class="card" id="characters" hidden>
+      <h2>Characters</h2>
+      <div id="charList"></div>
+      <button id="refreshBtn">Refresh list</button>
+      <div id="createForm" hidden>
+        <label for="charName">Create a character — name</label>
+        <input id="charName" placeholder="letters, digits, _ (1–16 bytes)">
+        <div class="row2">
+          <div>
+            <label for="sex">Sex</label>
+            <select id="sex"><option value="0">Nam</option><option value="1">Nữ</option></select>
+          </div>
+          <div>
+            <label for="clazz">Class</label>
+            <select id="clazz"><option>0</option><option>1</option><option>2</option><option>3</option></select>
+          </div>
+        </div>
+        <label for="faction">Faction</label>
+        <select id="faction">
+          <option value="1">1 — Ngụy</option><option value="2">2 — Thục</option><option value="3">3 — Ngô</option>
+        </select>
+        <button id="createBtn">Create</button>
+      </div>
+    </div>
+
+    <div class="card" id="world" hidden>
+      <h2>In world</h2>
+      <div id="who">—</div>
+      <div id="pos">—</div>
+      <label for="step">Step size (arrow keys / WASD to move)</label>
+      <input id="step" type="number" value="1" min="1" max="20">
+      <canvas id="view" width="360" height="240"></canvas>
+      <label for="chatText">Say (area chat)</label>
+      <input id="chatText">
+      <button id="chatSend">Send</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Packet log</h2>
+    <div id="stats">—</div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script type="module" src="./src/app/debug-client.js"></script>
+</body>
+</html>

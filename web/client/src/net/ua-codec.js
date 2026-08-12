@@ -93,19 +93,32 @@ export class UASegmentReader {
   reset() { this.pos = 2; }
   remaining() { return this.data.length - this.pos; }
 
+  /**
+   * Java throws EOFException past the end; a JS typed array quietly yields `undefined`,
+   * which would turn a wrong layout into plausible-looking garbage instead of a failure.
+   * Every read goes through this so a short packet is a loud, catchable error.
+   */
+  _need(n) {
+    if (this.pos + n > this.data.length) {
+      throw new RangeError(`read past end of segment: need ${n} byte(s) at ${this.pos}, have ${this.remaining()}`);
+    }
+  }
+
   _num(len) {
+    this._need(len);
     let v = 0;
     for (let i = 0; i < len; i++) v = (v << 8) | (this.data[this.pos + i] & 0xff);
     this.pos += len;
     return v;
   }
-  readBoolean() { return this.data[this.pos++] === 1; }
-  readByte() { const b = this.data[this.pos++]; return b > 0x7f ? b - 0x100 : b; }
-  readUnsignedByte() { return this.data[this.pos++] & 0xff; }
+  readBoolean() { this._need(1); return this.data[this.pos++] === 1; }
+  readByte() { this._need(1); const b = this.data[this.pos++]; return b > 0x7f ? b - 0x100 : b; }
+  readUnsignedByte() { this._need(1); return this.data[this.pos++] & 0xff; }
   readShort() { const v = this._num(2); return v > 0x7fff ? v - 0x10000 : v; }
   readUnsignedShort() { return this._num(2); }
   readInt() { return this._num(4) | 0; }   // | 0 forces signed 32-bit
   readLong() {
+    this._need(8);
     let v = 0n;
     for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.data[this.pos + i] & 0xff);
     this.pos += 8;
@@ -113,13 +126,16 @@ export class UASegmentReader {
   }
   /** Mirrors UASegment.readString: modified-UTF8 branch OR high-bit UTF-16 branch. */
   readString() {
+    this._need(2);
     if ((this.data[this.pos] & 0x80) === 0) {
+      this._need(2 + (((this.data[this.pos] & 0xff) << 8) | (this.data[this.pos + 1] & 0xff)));
       const { value, next } = decodeModifiedUTF(this.data, this.pos);
       this.pos = next;
       return value;
     }
     // high bit set: raw UTF-16, length masked with 0x7FFF, chars are 2-byte BE
     const len = this._num(2) & 0x7fff;
+    this._need(len);
     let out = '';
     for (let i = 0; i < (len >> 1); i++) {
       out += String.fromCharCode(((this.data[this.pos] & 0xff) << 8) | (this.data[this.pos + 1] & 0xff));
@@ -128,7 +144,7 @@ export class UASegmentReader {
     return out;
   }
   readBooleans() { const n = this._num(2), r = new Array(n); for (let i = 0; i < n; i++) r[i] = this.readBoolean(); return r; }
-  readBytes() { const n = this._num(4), r = this.data.subarray(this.pos, this.pos + n); this.pos += n; return new Uint8Array(r); }
+  readBytes() { const n = this._num(4); this._need(n); const r = this.data.subarray(this.pos, this.pos + n); this.pos += n; return new Uint8Array(r); }
   readShorts() { const n = this._num(2), r = new Array(n); for (let i = 0; i < n; i++) r[i] = this.readShort(); return r; }
   readInts() { const n = this._num(2), r = new Array(n); for (let i = 0; i < n; i++) r[i] = this.readInt(); return r; }
   readLongs() { const n = this._num(2), r = new Array(n); for (let i = 0; i < n; i++) r[i] = this.readLong(); return r; }
@@ -151,6 +167,16 @@ export class UASegmentWriter {
     this.writeShort(this.type);
     if (needSerial) this.writeInt(this.serial);
   }
+  /**
+   * A writer with NO leading type field, for building a nested blob that is embedded with
+   * writeBytes (Java: a DataOutputStream handed to Packet.put(byte[])).
+   */
+  static raw() {
+    const w = Object.create(UASegmentWriter.prototype);
+    w._chunks = []; w._len = 0; w.type = -1; w.serial = -1;
+    return w;
+  }
+
   _push(u8) { this._chunks.push(u8); this._len += u8.length; }
   _int(value, len) {
     const b = new Uint8Array(len);

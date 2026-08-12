@@ -147,6 +147,16 @@ class ExtensionServerTest(unittest.TestCase):
         flows = {flow["id"]: flow for flow in flow_catalog()}
         self.assertEqual("auto_attack_loop", flows["auto_attack"]["runner"])
 
+    def test_default_catalog_contains_looping_star_reappraisal(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("star_reappraisal_loop", flows["star_reappraisal"]["runner"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('async function runStarReappraisal', content)
+        self.assertIn('flow === "star_reappraisal"', content)
+        self.assertIn('macro.star_button_point || [0.227, 0.869]', content)
+        self.assertIn('macro.reappraise_point || [0.498, 0.756]', content)
+        self.assertIn('macro.confirm_point || [0.499, 0.693]', content)
+
     def test_activity_macros_route_to_dom_extension_runner(self):
         extension_dir = PROJECT_ROOT / "extension"
         content = (extension_dir / "content.js").read_text(encoding="utf-8")
@@ -165,7 +175,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.4.2"', manifest)
+        self.assertIn('"version": "0.4.4"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('["left", "Ô trái"]', content)
@@ -196,6 +206,12 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('extensionVersion: chrome.runtime.getManifest().version', content)
         self.assertIn('controller.diagnosticsVersion !== 1', content)
         self.assertIn('Controller cũ: hãy restart', content)
+        self.assertIn('["ws_open", "ws_close"].includes(event.type)', content)
+        self.assertIn('Flow đã tự dừng.', content)
+        self.assertIn('startedAt: Date.now()', content)
+        self.assertIn('new RTCPeerConnection({ iceServers: [] })', content)
+        self.assertIn('timer_keepalive_open', content)
+        self.assertIn('stopTimerKeepAlive();', content)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):

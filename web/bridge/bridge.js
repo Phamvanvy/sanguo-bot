@@ -19,8 +19,14 @@
  *   WORLD_HOST    (default 127.0.0.1) target TCP host (the world server)
  *   WORLD_PORT    (default 7000)      target TCP port
  *   MAX_BUFFER    (default 4194304)   per-direction buffered bytes before the session is killed
+ *   STATIC_DIR    (default ../client) also serve this dir over HTTP on the same port so the
+ *                                     browser client is same-origin with the WS; 'off' disables
  */
 import net from 'node:net';
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const BRIDGE_HOST = process.env.BRIDGE_HOST || '0.0.0.0';
@@ -32,13 +38,41 @@ const MAX_BUFFER = Number(process.env.MAX_BUFFER || 4 * 1024 * 1024);
 let sessionSeq = 0;
 const log = (id, ...a) => console.log(`[bridge#${id}]`, ...a);
 
-const wss = new WebSocketServer({ host: BRIDGE_HOST, port: BRIDGE_PORT });
+// ---- static file serving (dev convenience) --------------------------------
+// Sharing the port keeps the page same-origin with the WS endpoint, so the browser client
+// needs no host configuration and no CORS. It is a dev server: local files, GET only.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const STATIC_DIR = process.env.STATIC_DIR === 'off' ? null
+  : path.resolve(HERE, process.env.STATIC_DIR || '../client');
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png',
+  '.mjs': 'text/javascript; charset=utf-8' };
 
-wss.on('listening', () => {
+const httpServer = http.createServer((req, res) => {
+  if (!STATIC_DIR || req.method !== 'GET') { res.writeHead(404).end('not found'); return; }
+  const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  const file = path.resolve(STATIC_DIR, '.' + (rel === '/' ? '/index.html' : rel));
+  // Never serve outside STATIC_DIR, whatever the path contains.
+  if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) { res.writeHead(403).end('forbidden'); return; }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404).end('not found'); return; }
+    res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
+    res.end(data);
+  });
+});
+
+const wss = new WebSocketServer({ server: httpServer });
+
+httpServer.listen(BRIDGE_PORT, BRIDGE_HOST, () => {
   console.log(`[bridge] WS listening ws://${BRIDGE_HOST}:${BRIDGE_PORT}  ->  tcp ${WORLD_HOST}:${WORLD_PORT}`);
+  if (STATIC_DIR) console.log(`[bridge] serving ${STATIC_DIR} at http://${BRIDGE_HOST}:${BRIDGE_PORT}/`);
+});
+httpServer.on('error', (err) => {
+  console.error('[bridge] server error:', err.message);
+  process.exit(1);
 });
 wss.on('error', (err) => {
-  console.error('[bridge] server error:', err.message);
+  console.error('[bridge] ws error:', err.message);
   process.exit(1);
 });
 
@@ -111,5 +145,9 @@ wss.on('connection', (ws, req) => {
 
 // Clean shutdown on Ctrl-C / container stop.
 for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => { console.log(`\n[bridge] ${sig}, closing`); wss.close(() => process.exit(0)); });
+  process.on(sig, () => {
+    console.log(`\n[bridge] ${sig}, closing`);
+    wss.close(() => httpServer.close(() => process.exit(0)));
+    setTimeout(() => process.exit(0), 1000).unref();
+  });
 }

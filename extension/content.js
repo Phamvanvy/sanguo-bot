@@ -34,6 +34,7 @@
     "use_item_loop",
     "coin_shake_loop",
     "auto_attack_loop",
+    "star_reappraisal_loop",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -48,6 +49,7 @@
   let dragging = null;
   let domToken = null;
   let domFlow = { state: "idle", message: "Sẵn sàng" };
+  let timerKeepAlive = null;
 
   function rememberGuardReload() {
     localStorage.setItem(NETWORK_EVENT_KEY, JSON.stringify({ type: "guard", at: Date.now() }));
@@ -92,6 +94,49 @@
       });
       localStorage.setItem(NETWORK_QUEUE_KEY, JSON.stringify(queue.slice(-100)));
     } catch (_) { /* Keep the flow running if diagnostics storage fails. */ }
+  }
+
+  async function startTimerKeepAlive() {
+    if (timerKeepAlive || typeof RTCPeerConnection !== "function") return;
+    const left = new RTCPeerConnection({ iceServers: [] });
+    const right = new RTCPeerConnection({ iceServers: [] });
+    const leftCandidates = [];
+    const rightCandidates = [];
+    const outbound = left.createDataChannel("sanguo-background-timer");
+    const state = { left, right, outbound, inbound: null };
+    timerKeepAlive = state;
+    right.addEventListener("datachannel", (event) => { state.inbound = event.channel; });
+    outbound.addEventListener("open", () => appendDiagnostic("timer_keepalive_open"));
+    left.addEventListener("icecandidate", (event) => {
+      if (!event.candidate) return;
+      if (right.remoteDescription) void right.addIceCandidate(event.candidate).catch(() => {});
+      else leftCandidates.push(event.candidate);
+    });
+    right.addEventListener("icecandidate", (event) => {
+      if (!event.candidate) return;
+      if (left.remoteDescription) void left.addIceCandidate(event.candidate).catch(() => {});
+      else rightCandidates.push(event.candidate);
+    });
+    try {
+      await left.setLocalDescription(await left.createOffer());
+      await right.setRemoteDescription(left.localDescription);
+      for (const candidate of leftCandidates) await right.addIceCandidate(candidate);
+      await right.setLocalDescription(await right.createAnswer());
+      await left.setRemoteDescription(right.localDescription);
+      for (const candidate of rightCandidates) await left.addIceCandidate(candidate);
+    } catch (error) {
+      appendDiagnostic("timer_keepalive_error", { message: String(error?.message || error) });
+      stopTimerKeepAlive();
+    }
+  }
+
+  function stopTimerKeepAlive() {
+    if (!timerKeepAlive) return;
+    const state = timerKeepAlive;
+    timerKeepAlive = null;
+    for (const resource of [state.inbound, state.outbound, state.left, state.right]) {
+      try { resource?.close(); } catch (_) { /* Already closed. */ }
+    }
   }
 
   function updateFlowContext(flow, cycle, step) {
@@ -201,6 +246,22 @@
 
   function ensureDomActive(token) {
     if (token.cancelled) throw new Error("FLOW_STOPPED");
+    let events = [];
+    try {
+      events = JSON.parse(localStorage.getItem(NETWORK_QUEUE_KEY) || "[]");
+      const lastEvent = JSON.parse(localStorage.getItem(NETWORK_EVENT_KEY) || "null");
+      if (lastEvent) events.push(lastEvent);
+    } catch (_) { /* Diagnostics must not break input when storage is unavailable. */ }
+    const socketEvent = events
+      .filter((event) => (
+        ["ws_open", "ws_close"].includes(event.type)
+        && Number(event.at || 0) >= Number(token.startedAt || 0)
+      ))
+      .sort((left, right) => Number(right.at || 0) - Number(left.at || 0))[0];
+    if (socketEvent?.type === "ws_close") {
+      const reason = socketEvent.reason ? ` (${socketEvent.reason})` : "";
+      throw new Error(`WebSocket bị đóng: code ${socketEvent.code}${reason}. Flow đã tự dừng.`);
+    }
   }
 
   function updateDomFlow(flow, message, step = "status") {
@@ -410,6 +471,23 @@
     }
   }
 
+  async function runStarReappraisal(token, macro) {
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      const cycleNumber = cycle + 1;
+      updateFlowContext("star_reappraisal", cycleNumber, "open_star_menu");
+      await domClick(token, macro.star_button_point || [0.227, 0.869]);
+      await domDelay(macro.menu_delay_seconds || 0.8);
+      updateFlowContext("star_reappraisal", cycleNumber, "reappraise");
+      await domClick(token, macro.reappraise_point || [0.498, 0.756]);
+      await domDelay(macro.result_delay_seconds || 1.2);
+      updateFlowContext("star_reappraisal", cycleNumber, "confirm_result");
+      await domClick(token, macro.confirm_point || [0.499, 0.693]);
+      updateDomFlow("star_reappraisal", `Giám định lại cấp sao: ${cycleNumber} lượt`);
+      await domDelay(macro.next_cycle_delay_seconds || 0.8);
+    }
+  }
+
   async function runAutoAttack(token, macro) {
     const attackPoint = macro.attack_point || [0.927, 0.822];
     const skillPoints = macro.skill_points || [
@@ -441,17 +519,19 @@
       flow, cycle: 0, step: "starting", startedAt: Date.now(), updatedAt: Date.now(),
     }));
     appendDiagnostic("flow_start", { flow });
-    const token = { cancelled: false };
+    const token = { cancelled: false, startedAt: Date.now() };
     domToken = token;
     updateDomFlow(flow, `Đang chạy không-CDP: ${flow}`);
     void (async () => {
       try {
+        await startTimerKeepAlive();
         if (flow === "blessing") await runBlessing(token, macro);
         else if (flow === "code_redeem") await runCodeRedeem(token, macro);
         else if (flow === "discard_items") await runDiscardItems(token, macro);
         else if (flow === "use_inventory_item") await runUseInventoryItem(token, macro);
         else if (flow === "coin_shake") await runCoinShake(token, macro);
         else if (flow === "auto_attack") await runAutoAttack(token, macro);
+        else if (flow === "star_reappraisal") await runStarReappraisal(token, macro);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {
@@ -460,6 +540,7 @@
           : { state: "error", flow, message: error.message };
       } finally {
         token.cancelled = true;
+        stopTimerKeepAlive();
         appendDiagnostic("flow_end", { flow, state: domFlow.state, message: domFlow.message });
         if (domToken === token) domToken = null;
         showStatus(domFlow);

@@ -164,12 +164,26 @@ activity_macros:
     ok_point: [0.70, 0.64]
     # Let each animation/result settle before sending the next interaction.
     # This avoids starving the renderer and tripping the site's guard.
-    open_delay_seconds: 2.0
-    click_delay_seconds: 1.2
-    confirm_delay_seconds: 1.5
-    result_delay_seconds: 3.0
+    open_delay_seconds: 0.3
+    click_delay_seconds: 0.2
+    confirm_delay_seconds: 0.3
+    result_delay_seconds: 0.7
     rest_every_cycles: 10
-    rest_delay_seconds: 5.0
+    rest_delay_seconds: 1
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
+  star_reappraisal:
+    label: "Giám định lại cấp sao"
+    description: "Lặp Cấp sao → Giám định lại → Xác nhận đến khi Stop"
+    icon: "★"
+    runner: "star_reappraisal_loop"
+    # Bắt đầu flow khi đang mở màn hình Luyện trang bị và đã chọn trang bị.
+    star_button_point: [0.227, 0.869]
+    reappraise_point: [0.498, 0.756]
+    confirm_point: [0.499, 0.693]
+    menu_delay_seconds: 0.8
+    result_delay_seconds: 1.2
+    next_cycle_delay_seconds: 0.8
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   code_redeem:
