@@ -75,7 +75,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 	
 	private Vector<IoSession> sessions = new Vector<IoSession>();
 	
-	public static String QUICKREG_PREFIX = "ÓÎ¿Í";
+	public static String QUICKREG_PREFIX = "ï¿½Î¿ï¿½";
 	
 	public UWAPSocketStub(ISourceManager manager,AccountService service, AccountCreditService cs,
 	        Configuration configuration,IStringValidator phoneValidator){
@@ -334,21 +334,21 @@ public class UWAPSocketStub implements IAccountServiceListener {
 	            		throw new BalanceException(Errors.UNKNOW_ACCOUNT);
 	            	}
 	            	
-	            	// ¼ì²éÊ¹ÓÃi±Ò¿¨
+	            	// ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½iï¿½Ò¿ï¿½
 	            	IMoneyCardDAO dao = new IMoneyCardDAO();
 	            	IMoneyCard card = dao.useCard(gamecode, accountID, cardno, password);
 	            	if (card == null) {
 	            		throw new BalanceException(Errors.ILLEGAL_IMONEY_CARD);
 	            	}
 	            	
-	            	// ¿¨Ê¹ÓÃ³É¹¦£¬Ôö¼Ói±ÒÓà¶î
+	            	// ï¿½ï¿½Ê¹ï¿½Ã³É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½iï¿½ï¿½ï¿½ï¿½ï¿½
 	            	service.addBBalance(ae.getName(), card.getAmount());
 					tx.commit();
 					
 					log.info("[USE_IMONEY_CARD]gamecode[" + gamecode + "]AccountID[" + accountID + "]cardno["
 							+ cardno + "]password[" + password + "]Amount[" + card.getAmount() + "]Balance[" + ae.getBalance().getValue() + "]OK");
 					
-					// ·¢ËÍ·µ»Ø°ü
+					// ï¿½ï¿½ï¿½Í·ï¿½ï¿½Ø°ï¿½
 					UWAPSegment seg = new UWAPSegment(GameAccountMessageType.USE_IMONEY_CARD_OK, data.getSerial(), data.getSessionId());
 					seg.writeInt(accountID);
 					seg.writeInt(card.getAmount());
@@ -381,7 +381,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 	            		throw new BalanceException(Errors.UNKNOW_ACCOUNT);
 	            	}
 	            	
-	            	// ¿Û³ýÓà¶î²¢´´½¨i±Ò¿¨
+	            	// ï¿½Û³ï¿½ï¿½ï¿½î²¢ï¿½ï¿½ï¿½ï¿½iï¿½Ò¿ï¿½
 					Balance[] bs = service.decBBalance(ae.getName(), sessionId, source.getId(), amount);
 					IMoneyCardDAO dao = new IMoneyCardDAO();
 					IMoneyCard card = dao.generateCard(gamecode, accountID, amount);
@@ -390,7 +390,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					log.info("[CREATE_IMONEY_CARD]gamecode[" + gamecode + "]AccountID[" + accountID + "]Amount["
 							+ amount + "]cardno[" + card.getCardno() + "]Balance[" + ae.getBalance().getValue() + "]OK");
 					
-					// ·¢ËÍ·µ»Ø°ü
+					// ï¿½ï¿½ï¿½Í·ï¿½ï¿½Ø°ï¿½
 					UWAPSegment seg = new UWAPSegment(GameAccountMessageType.CREATE_IMONEY_CARD_OK, data.getSerial(), data.getSessionId());
 					seg.writeInt(accountID);
 					seg.writeInt((int)(bs[0].getValue() - bs[1].getValue()));
@@ -491,8 +491,8 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					if(newName.startsWith(QUICKREG_PREFIX)){
 						throw new CreateAccountException(Errors.ILLEGAL_NAME_CHAR);
 					}
-					if (numberStringValidator.valid(newName) == IStringValidator.OK) { // ²»ÔÊÐí×¢²á´¿Êý×ÖÕÊºÅ
-						if (phoneValidator.valid(newName) != IStringValidator.OK) //ÔÊÐíÓÃÊÖ»úºÅ×¢²á
+					if (numberStringValidator.valid(newName) == IStringValidator.OK) { // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½á´¿ï¿½ï¿½ï¿½ï¿½ï¿½Êºï¿½
+						if (phoneValidator.valid(newName) != IStringValidator.OK) //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½×¢ï¿½ï¿½
 							throw new CreateAccountException(
 									Errors.ILLEGAL_NAME_CHAR);
 					}
@@ -618,7 +618,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 //				Transaction tx = sf.getCurrentSession().beginTransaction();
 //				try {
 //
-//					if (phoneValidator.valid(name) != IStringValidator.OK) // ÔÊÐíÓÃÊÖ»úºÅ×¢²á
+//					if (phoneValidator.valid(name) != IStringValidator.OK) // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½×¢ï¿½ï¿½
 //						throw new CreateAccountException(
 //								Errors.ILLEGAL_NAME_CHAR);
 //
@@ -684,7 +684,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					versionString = versions[0]+"-"+versions[1];
 					versionPatch = versions[2];
 				}
-				// ÐÂ°æ±¾Ð­Òé¿É´øÉÏÒ»¸öÊÖ»úºÅ
+				// ï¿½Â°æ±¾Ð­ï¿½ï¿½É´ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½
 				String loginPhone = "";
 				try {
 				    loginPhone = data.readString();
@@ -696,7 +696,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 //					if(name.startsWith(QUICKREG_PREFIX)){
 //						throw new CreateAccountException(Errors.ILLEGAL_NAME_CHAR);
 //					}
-//					if(numberStringValidator.valid(name)!=IStringValidator.OK){ //²»ÔÊÐí×¢²á´¿Êý×ÖÕÊºÅ
+//					if(numberStringValidator.valid(name)!=IStringValidator.OK){ //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½á´¿ï¿½ï¿½ï¿½ï¿½ï¿½Êºï¿½
 //						throw new CreateAccountException(Errors.ILLEGAL_NAME_CHAR);
 //					}
 					int id = Sequence2Generator.getNextId(gamecode);
@@ -895,7 +895,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					UWAPSegment seg = new UWAPSegment(
 							ServerMessageType.LOGINERROR, data.getSerial(), data
 									.getSessionId());
-					seg.writeString("ÒÑ¾­´æÔÚSource");
+					seg.writeString("ï¿½Ñ¾ï¿½ï¿½ï¿½ï¿½ï¿½Source");
 					session.write(seg);
 				} else {
 					String serviceId = data.readString();
@@ -906,7 +906,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 						UWAPSegment seg = new UWAPSegment(
 								ServerMessageType.LOGINERROR, data.getSerial(),
 								data.getSessionId());
-						seg.writeString("serviceId¶ÔÓ¦µÄSource²»´æÔÚ");
+						seg.writeString("serviceIdï¿½ï¿½Ó¦ï¿½ï¿½Sourceï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 						session.write(seg);
 						session.close();
 					} else {
@@ -914,7 +914,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 							UWAPSegment seg = new UWAPSegment(
 									ServerMessageType.LOGINERROR, data
 											.getSerial(), data.getSessionId());
-							seg.writeString("SourceÒÑ¾­ÔÚ¿ÉÓÃ×´Ì¬");
+							seg.writeString("Sourceï¿½Ñ¾ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½×´Ì¬");
 							session.write(seg);
 							session.close();
 						} else {
@@ -923,7 +923,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 										ServerMessageType.LOGINERROR, data
 												.getSerial(), data
 												.getSessionId());
-								seg.writeString("µÇÂ½ÃÜÂë´íÎó");
+								seg.writeString("ï¿½ï¿½Â½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
 								session.write(seg);
 								session.close();
 							}else{
@@ -965,7 +965,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					versionPatch = versions[2];
 				}
 				
-				// ÐÂ°æ±¾Ð­Òé´øÉÏÒ»¸öÊÖ»úºÅ
+				// ï¿½Â°æ±¾Ð­ï¿½ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½
 				String loginPhone = "";
 				try {
 				    loginPhone = data.readString();
@@ -988,7 +988,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 						seg.writeInt(ae.getId());
 						seg.writeString(ae.getName());
 						seg.writeString(ae.getPassWord());
-						seg.write((byte) 0);// ÐÂ½¨ÁËÕÊºÅ
+						seg.write((byte) 0);// ï¿½Â½ï¿½ï¿½ï¿½ï¿½Êºï¿½
 						session.write(seg);
 					} catch (CreateAccountException e) {
 //						e.printStackTrace();
@@ -1021,8 +1021,8 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					versionPatch = versions[2];
 				}
 				
-				// ÐÂÐ­Òé»á´øÒ»¸öÊÖ»úºÅ
-				// 090831¸üÐÂÐ­Òé¿ÉÔÚ×îºó¸½¼Ó³õÊ¼ÃÜÂë
+				// ï¿½ï¿½Ð­ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½
+				// 090831ï¿½ï¿½ï¿½ï¿½Ð­ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ó¸½¼Ó³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½
 				String loginPhone = "";
 				String initPass = "";
 				try {
@@ -1036,8 +1036,8 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					if(name.startsWith(QUICKREG_PREFIX)){
 						throw new CreateAccountException(Errors.ILLEGAL_NAME_CHAR);
 					}
-					if (numberStringValidator.valid(name) == IStringValidator.OK) { // ²»ÔÊÐí×¢²á´¿Êý×ÖÕÊºÅ
-						if (phoneValidator.valid(name) != IStringValidator.OK) //ÔÊÐíÓÃÊÖ»úºÅ×¢²á
+					if (numberStringValidator.valid(name) == IStringValidator.OK) { // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×¢ï¿½á´¿ï¿½ï¿½ï¿½ï¿½ï¿½Êºï¿½
+						if (phoneValidator.valid(name) != IStringValidator.OK) //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½×¢ï¿½ï¿½
 							throw new CreateAccountException(
 									Errors.ILLEGAL_NAME_CHAR);
 					}
@@ -1089,7 +1089,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 				String password = data.readString();
 				String loginPhone = "";
 
-				// ÐÂ°æ±¾Ð­Òé»á´øÒ»¸öÊÖ»úºÅÉÏÀ´
+				// ï¿½Â°æ±¾Ð­ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 				try {
 				    loginPhone = data.readString();
 				} catch (Exception e) {
@@ -1116,6 +1116,7 @@ public class UWAPSocketStub implements IAccountServiceListener {
 					seg.writeInt(0);
 					seg.writeInts(r.getAccountEntity().getPurchasedCodes());
 					seg.writeLong(r.getAccountEntity().getBalance().getValue());
+					seg.writeLong(r.getAccountEntity().getBalance().getBBalance());
 					session.write(seg);
 				} catch (LoginException ex) {
 					log.error(ex, ex);

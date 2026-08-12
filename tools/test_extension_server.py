@@ -1,6 +1,7 @@
 """Offline tests for the extension flow catalog and configurable macros."""
 from __future__ import annotations
 
+import json
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
@@ -11,6 +12,7 @@ from src.extension_server import (
     expand_activation_codes,
     flow_catalog,
     is_game_url,
+    log_network_event,
     run_blessing,
     run_code_redeem,
     run_macro,
@@ -44,6 +46,23 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertTrue(is_game_url("https://play.minhchauh5.com/server/1"))
         self.assertFalse(is_game_url("http://play.minhchauh5.com/"))
         self.assertFalse(is_game_url("https://play.minhchauh5.com.evil.example/"))
+
+    @patch("src.extension_server.NETWORK_LOG_PATH")
+    def test_network_event_is_written_as_json_line(self, log_path):
+        log_path.parent.mkdir = MagicMock()
+        handle = MagicMock()
+        log_path.open.return_value.__enter__.return_value = handle
+        event = log_network_event({
+            "type": "ws_close", "code": 1006, "reason": "", "cycle": 77,
+            "step": "result_wait", "navigatorOnline": True, "extensionVersion": "0.4.1",
+        })
+        self.assertEqual(1006, event["code"])
+        self.assertEqual(77, event["cycle"])
+        self.assertEqual("result_wait", event["step"])
+        self.assertTrue(event["navigator_online"])
+        self.assertEqual("0.4.1", event["extension_version"])
+        written = handle.write.call_args.args[0]
+        self.assertEqual(1006, json.loads(written)["code"])
 
     @patch("src.os_input.OsGameSession.focus")
     @patch("src.os_input._find_window", return_value=12345)
@@ -160,6 +179,15 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('"run_at": "document_start"', manifest)
         self.assertIn('socket.addEventListener("close"', probe)
         self.assertIn('code: Number(event.code)', probe)
+        self.assertIn('const EVENT_QUEUE_KEY = "sanguo-network-event-queue"', probe)
+        self.assertIn('queue.slice(-100)', probe)
+        self.assertIn('addEventListener("offline"', probe)
+        self.assertIn('addEventListener("pagehide"', probe)
+        self.assertIn('addEventListener("unhandledrejection"', probe)
+        self.assertIn('appendDiagnostic("flow_progress"', content)
+        self.assertIn('extensionVersion: chrome.runtime.getManifest().version', content)
+        self.assertIn('controller.diagnosticsVersion !== 1', content)
+        self.assertIn('Controller cũ: hãy restart', content)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):

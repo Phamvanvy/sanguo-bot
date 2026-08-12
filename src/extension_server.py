@@ -25,13 +25,54 @@ from src.os_input import attach_existing
 
 HOST = "127.0.0.1"
 PORT = 8765
+DIAGNOSTICS_VERSION = 1
 LOG_PATH = PROJECT_ROOT / "logs" / "extension-flow.log"
+NETWORK_LOG_PATH = PROJECT_ROOT / "logs" / "extension-network.log"
 
 _lock = threading.Lock()
 _process: subprocess.Popen | None = None
 _log_handle = None
 _active_flow: str | None = None
 _last_result: dict[str, Any] = {"state": "idle", "message": "Chưa chạy flow nào"}
+
+
+def log_network_event(data: dict[str, Any]) -> dict[str, Any]:
+    event = {
+        "received_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "type": str(data.get("type", "unknown"))[:32],
+        "code": int(data.get("code", 0) or 0),
+        "reason": str(data.get("reason", ""))[:200],
+        "clean": bool(data.get("clean", False)),
+        "url": str(data.get("url", ""))[:500],
+        "browser_at": int(data.get("at", 0) or 0),
+        "flow": str(data.get("flow", ""))[:64],
+        "cycle": int(data.get("cycle", 0) or 0),
+        "step": str(data.get("step", ""))[:100],
+        "event_id": str(data.get("id", ""))[:100],
+        "page_session": str(data.get("pageSession", ""))[:100],
+        "page_url": str(data.get("pageUrl", ""))[:500],
+        "started_at": int(data.get("startedAt", 0) or 0),
+        "updated_at": int(data.get("updatedAt", 0) or 0),
+        "flow_elapsed_ms": max(
+            0,
+            int(data.get("updatedAt", 0) or 0) - int(data.get("startedAt", 0) or 0),
+        ),
+        "navigator_online": bool(data.get("navigatorOnline", True)),
+        "visibility": str(data.get("visibility", ""))[:32],
+        "document_state": str(data.get("documentState", ""))[:32],
+        "performance_ms": int(data.get("perfMs", 0) or 0),
+        "persisted": bool(data.get("persisted", False)),
+        "message": str(data.get("message", ""))[:500],
+        "filename": str(data.get("filename", ""))[:500],
+        "line": int(data.get("line", 0) or 0),
+        "column": int(data.get("column", 0) or 0),
+        "extension_version": str(data.get("extensionVersion", ""))[:32],
+    }
+    NETWORK_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _lock:
+        with NETWORK_LOG_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+    return event
 
 
 def is_game_url(value: str) -> bool:
@@ -325,7 +366,7 @@ class ExtensionHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/flows":
             self._send(200, {"flows": flow_catalog()})
         elif parsed.path == "/api/status":
-            self._send(200, _refresh_status())
+            self._send(200, {**_refresh_status(), "diagnosticsVersion": DIAGNOSTICS_VERSION})
         elif parsed.path == "/api/macro":
             flow_id = parse_qs(parsed.query).get("id", [""])[0]
             macro = load_config().get("activity_macros", {}).get(flow_id)
@@ -356,6 +397,8 @@ class ExtensionHandler(BaseHTTPRequestHandler):
             self._send(200 if result.get("ok") else 409, result)
         elif self.path == "/api/stop":
             self._send(200, stop_flow())
+        elif self.path == "/api/network-event":
+            self._send(200, {"ok": True, "event": log_network_event(data)})
         else:
             self._send(404, {"error": "Not found"})
 
@@ -364,6 +407,7 @@ class ExtensionHandler(BaseHTTPRequestHandler):
 
 
 def serve(port: int = PORT) -> None:
+    log_network_event({"type": "controller_start"})
     server = ThreadingHTTPServer((HOST, port), ExtensionHandler)
     print(f"Sanguo extension controller: http://{HOST}:{port}", flush=True)
     try:

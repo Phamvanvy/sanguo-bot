@@ -42,6 +42,8 @@
   const DOM_SPEED_FACTOR = 0.7;
   const BLESSING_SPEED_FACTOR = 1.0;
   const NETWORK_EVENT_KEY = "sanguo-last-network-event";
+  const NETWORK_QUEUE_KEY = "sanguo-network-event-queue";
+  const FLOW_CONTEXT_KEY = "sanguo-flow-context";
   let flows = [];
   let dragging = null;
   let domToken = null;
@@ -53,7 +55,11 @@
 
   function recentNetworkEvent() {
     try {
-      const event = JSON.parse(localStorage.getItem(NETWORK_EVENT_KEY) || "null");
+      const queue = JSON.parse(localStorage.getItem(NETWORK_QUEUE_KEY) || "[]");
+      const event = [...queue].reverse().find((item) => (
+        ["guard", "ws_close", "ws_error", "browser_offline"].includes(item.type)
+        && Date.now() - Number(item.at) < 5 * 60 * 1000
+      )) || JSON.parse(localStorage.getItem(NETWORK_EVENT_KEY) || "null");
       return event && Date.now() - Number(event.at) < 5 * 60 * 1000 ? event : null;
     } catch (_) {
       return null;
@@ -65,12 +71,55 @@
     if (event.type === "guard" || event.code === 4001 || event.reason === "guard") {
       return "Rớt do guard: WebSocket 4001/guard";
     }
-    if (event.type === "close") {
+    if (event.type === "ws_close") {
       const reason = event.reason ? ` (${event.reason})` : "";
       return `WebSocket bị đóng: code ${event.code}${reason}`;
     }
-    if (event.type === "error") return "WebSocket báo lá»—i trước khi rớt";
+    if (event.type === "ws_error") return "WebSocket báo lá»—i trước khi rớt";
+    if (event.type === "browser_offline") return "Trình duyệt ghi nhận máy bị offline";
     return "";
+  }
+
+  function appendDiagnostic(type, extra = {}) {
+    try {
+      const context = JSON.parse(localStorage.getItem(FLOW_CONTEXT_KEY) || "{}");
+      const queue = JSON.parse(localStorage.getItem(NETWORK_QUEUE_KEY) || "[]");
+      queue.push({
+        id: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        at: Date.now(), type, pageUrl: location.href,
+        navigatorOnline: navigator.onLine !== false, visibility: document.visibilityState,
+        ...context, ...extra,
+      });
+      localStorage.setItem(NETWORK_QUEUE_KEY, JSON.stringify(queue.slice(-100)));
+    } catch (_) { /* Keep the flow running if diagnostics storage fails. */ }
+  }
+
+  function updateFlowContext(flow, cycle, step) {
+    let previous = {};
+    try { previous = JSON.parse(localStorage.getItem(FLOW_CONTEXT_KEY) || "{}"); } catch (_) { /* stale */ }
+    const context = {
+      flow, cycle, step,
+      startedAt: previous.flow === flow ? previous.startedAt : Date.now(),
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem(FLOW_CONTEXT_KEY, JSON.stringify(context));
+    return context;
+  }
+
+  async function reportQueuedNetworkEvents() {
+    let queue;
+    try { queue = JSON.parse(localStorage.getItem(NETWORK_QUEUE_KEY) || "[]"); }
+    catch (_) { return; }
+    for (const event of queue) {
+      await api("/network-event", {
+        method: "POST",
+        body: JSON.stringify({ ...event, extensionVersion: chrome.runtime.getManifest().version }),
+      });
+      let current;
+      try { current = JSON.parse(localStorage.getItem(NETWORK_QUEUE_KEY) || "[]"); }
+      catch (_) { current = []; }
+      localStorage.setItem(NETWORK_QUEUE_KEY, JSON.stringify(current.filter((item) => item.id !== event.id)));
+    }
   }
 
   function watchGameGuard() {
@@ -154,8 +203,10 @@
     if (token.cancelled) throw new Error("FLOW_STOPPED");
   }
 
-  function updateDomFlow(flow, message) {
+  function updateDomFlow(flow, message, step = "status") {
     domFlow = { state: "running", flow, message };
+    const cycle = Number(message.match(/\d+/)?.[0] || 0);
+    updateFlowContext(flow, cycle, step);
     showStatus(domFlow);
   }
 
@@ -268,21 +319,30 @@
   }
 
   async function runBlessing(token, macro) {
+    updateFlowContext("blessing", 0, "open_panel");
     await domClick(token, macro.open_point || [0.73, 0.07]);
     await domDelay(macro.open_delay_seconds || 2, BLESSING_SPEED_FACTOR);
     const maxCycles = Number(macro.max_cycles || 0);
     const restEvery = Number(macro.rest_every_cycles || 10);
     for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      const cycleNumber = cycle + 1;
       for (let click = 0; click < (cycle === 0 ? 1 : 2); click += 1) {
+        updateFlowContext("blessing", cycleNumber, cycle > 0 && click === 0 ? "dismiss_result" : "request_ten");
         await domClick(token, macro.ten_times_point || [0.66, 0.84]);
         await domDelay(macro.click_delay_seconds || 1.2, BLESSING_SPEED_FACTOR);
       }
       await domDelay(macro.confirm_delay_seconds || 1.5, BLESSING_SPEED_FACTOR);
+      updateFlowContext("blessing", cycleNumber, "confirm_ok");
       await domClick(token, macro.ok_point || [0.70, 0.64]);
-      updateDomFlow("blessing", `Cầu phúc: ${cycle + 1} lượt`);
+      updateFlowContext("blessing", cycleNumber, "result_wait");
+      updateDomFlow("blessing", `Cầu phúc: ${cycleNumber} lượt`, "result_wait");
+      if (cycleNumber === 1 || cycleNumber % 10 === 0) {
+        appendDiagnostic("flow_progress", { flow: "blessing", cycle: cycleNumber, step: "result_wait" });
+      }
       await domDelay(macro.result_delay_seconds || 3, BLESSING_SPEED_FACTOR);
-      if (restEvery > 0 && (cycle + 1) % restEvery === 0) {
-        updateDomFlow("blessing", `Cầu phúc: nghỉ sau ${cycle + 1} lượt`);
+      if (restEvery > 0 && cycleNumber % restEvery === 0) {
+        updateFlowContext("blessing", cycleNumber, "periodic_rest");
+        updateDomFlow("blessing", `Cầu phúc: nghỉ sau ${cycleNumber} lượt`, "periodic_rest");
         await domDelay(macro.rest_delay_seconds || 5, BLESSING_SPEED_FACTOR);
       }
     }
@@ -373,8 +433,15 @@
   async function startDomFlow(flow, macro) {
     if (domToken && !domToken.cancelled) throw new Error("Một flow DOM khác đang chạy");
     const controller = await api("/status");
+    if (controller.diagnosticsVersion !== 1) {
+      throw new Error("Hãy restart start-extension-server.ps1 để bật log chẩn đoán");
+    }
     if (controller.state === "running") throw new Error("Một flow Python khác đang chạy");
     localStorage.removeItem(NETWORK_EVENT_KEY);
+    localStorage.setItem(FLOW_CONTEXT_KEY, JSON.stringify({
+      flow, cycle: 0, step: "starting", startedAt: Date.now(), updatedAt: Date.now(),
+    }));
+    appendDiagnostic("flow_start", { flow });
     const token = { cancelled: false };
     domToken = token;
     updateDomFlow(flow, `Đang chạy không-CDP: ${flow}`);
@@ -394,6 +461,7 @@
           : { state: "error", flow, message: error.message };
       } finally {
         token.cancelled = true;
+        appendDiagnostic("flow_end", { flow, state: domFlow.state, message: domFlow.message });
         if (domToken === token) domToken = null;
         showStatus(domFlow);
       }
@@ -436,11 +504,16 @@
   async function refresh() {
     try {
       if (!flows.length) flows = (await api("/flows")).flows;
-      const status = domFlow.state !== "idle" ? domFlow : await api("/status");
+      const controllerStatus = await api("/status");
+      const status = domFlow.state !== "idle" ? domFlow : controllerStatus;
       setConnected(true);
-      const networkMessage = status.state !== "running"
-        ? networkEventMessage(recentNetworkEvent())
-        : "";
+      if (controllerStatus.diagnosticsVersion !== 1) {
+        showStatus({ state: "error", message: "Controller cũ: hãy restart để bật log chẩn đoán" });
+        return;
+      }
+      await reportQueuedNetworkEvents();
+      const networkEvent = recentNetworkEvent();
+      const networkMessage = status.state !== "running" ? networkEventMessage(networkEvent) : "";
       if (networkMessage) {
         showStatus({ state: "error", message: networkMessage });
       } else {

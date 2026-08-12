@@ -1,0 +1,15 @@
+{
+  "name": "sanguo-ws-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebSocket <-> TCP bridge for the self-hosted sanguo world server (1 WS = 1 TCP = 1 game session)",
+  "type": "module",
+  "bin": { "sanguo-bridge": "bridge.js" },
+  "scripts": {
+    "start": "node bridge.js",
+    "test:login": "node test_ws_login.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

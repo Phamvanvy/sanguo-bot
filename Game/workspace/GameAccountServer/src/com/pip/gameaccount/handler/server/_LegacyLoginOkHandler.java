@@ -55,7 +55,7 @@ public class _LegacyLoginOkHandler implements IMessageHandler {
 						ga.getId(), msg.getName(), msg.getKey(), msg
 								.getPhone(), msg.getModifiedNameTimes(), msg
 								.getIMoney(), Util.isMonth(ga.getMonthFee()), ga.isSubscribe(), msg
-								.getLoginErrorTimes(),msg.getPuchasedCodes(),msg.getLongBalance());
+								.getLoginErrorTimes(),msg.getPuchasedCodes(),msg.getLongBalance(),msg.getBBalance());
 				ISession session = sessionService.getSession(rq.getSessionId());
 				if(session!=null)
 					session.send(newMsg);

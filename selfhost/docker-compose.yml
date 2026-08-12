@@ -50,7 +50,7 @@ services:
     volumes:
       - ./runtime/world:/app
       - ./runtime/data:/data
-    command: ["java", "-Xmx2g", "-cp", "/app/conf:/app/libs/*", "peony.game.Server"]
+    command: ["java", "-Xmx2g", "-Dlog4j.configuration=file:/app/app/log4j1.properties", "-cp", "/app/conf:/app/libs/*", "peony.game.Server"]
     ports:
       - "7000:7000"
       - "7001:7001"

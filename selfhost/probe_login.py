@@ -86,8 +86,11 @@ def main():
     ap.add_argument("--port", type=int, default=7000)
     ap.add_argument("--name", default=os.environ.get("SANGO_USER", "vypv1"))
     ap.add_argument("--password", default=os.environ.get("SANGO_PASS", "123456"))
-    ap.add_argument("--model", default="j2me")
-    ap.add_argument("--version", default="2.4")
+    # Server parses these: cutModel/cutJvmCode split model on '/'  -> "MODEL/JVMCODE"
+    #                      cutVersion/cutChannel split version on '-' -> "VERSION-CHANNEL"
+    # A model without '/' or version without '-' crashes AccountLoginCall.callFinish.
+    ap.add_argument("--model", default="GenericMidp2/GenericMidp2")
+    ap.add_argument("--version", default="2.4-CCCCCPiP")
     args = ap.parse_args()
 
     pkt = build_account_login(args.name, args.password, args.model, args.version)
@@ -118,18 +121,33 @@ def main():
     print(f"[<] RX UA frame: frame_opcode={frame_opcode} len={total} payloadLen={len(payload)}")
     print(f"      payload hex: {hexdump(payload)}")
 
-    # Responses are wrapped: payload = int serial | int16 realOpcode | ...
-    serial = struct.unpack(">i", payload[0:4])[0]
-    real_op = struct.unpack(">h", payload[4:6])[0]
-    print(f"[=] serial={serial} real_opcode={real_op}")
-    if real_op == ACCOUNT_LOGIN_SERVER:
-        print("[=] RESULT: *** LOGIN SUCCESS *** (ACCOUNT_LOGIN_SERVER 167)")
-    elif real_op == ACCOUNT_LOGIN_CLIENT:
-        mlen = struct.unpack(">H", payload[6:8])[0]
-        msg = payload[8:8 + mlen].decode("utf-8", "replace")
+    # The opcode lives in the UA frame header (frame_opcode); the payload is the
+    # message body directly (NOT wrapped with an inner opcode).
+    #   ACCOUNT_LOGIN_SERVER(167) body (AccountLoginCall.callFinish, revision=PIP):
+    #     int serial | int accountId | UTF name | int iMoney/100 | int modifiedNameTimes
+    #   Rejection: ErrorHandler.sendErrorMessage -> frame_opcode == ACCOUNT_LOGIN_CLIENT(166),
+    #     body: int serial | ... | UTF errorMessage
+    if frame_opcode == ACCOUNT_LOGIN_SERVER:
+        serial = struct.unpack(">i", payload[0:4])[0]
+        account_id = struct.unpack(">i", payload[4:8])[0]
+        name_len = struct.unpack(">H", payload[8:10])[0]
+        name = payload[10:10 + name_len].decode("utf-8", "replace")
+        off = 10 + name_len
+        imoney = struct.unpack(">i", payload[off:off + 4])[0]
+        assert account_id > 0 and name == args.name, \
+            f"login response mismatch: accountId={account_id} name={name!r}"
+        print(f"[=] serial={serial} accountId={account_id} name={name!r} iMoney={imoney}")
+        print("[=] RESULT: *** LOGIN SUCCESS *** (ACCOUNT_LOGIN_SERVER 167) — G0.5b PASS")
+    elif frame_opcode == ACCOUNT_LOGIN_CLIENT:
+        # server rejected but framing is valid -> still proves the transport
+        try:
+            mlen = struct.unpack(">H", payload[8:10])[0]
+            msg = payload[10:10 + mlen].decode("utf-8", "replace")
+        except Exception:
+            msg = "<unparsed>"
         print(f"[=] RESULT: login rejected -> \"{msg}\"  (framing OK; G0.5b PASS)")
     else:
-        print(f"[=] RESULT: framing OK, real_opcode={real_op} (G0.5b PASS)")
+        print(f"[=] RESULT: framing OK, frame_opcode={frame_opcode} (G0.5b PASS)")
     s.close()
 
 if __name__ == "__main__":
