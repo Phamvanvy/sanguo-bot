@@ -39,9 +39,10 @@
 <body>
 <h1>Sanguo self-host — G2 browser client</h1>
 <p class="sub">
-  Wire layer only: login → character list/create → enter world → move. No game rendering yet
-  (that is G3). Needs the bridge running: <code>node web/bridge/bridge.js</code>, which also
-  serves this page.
+  Wire layer only: login → character list/create → enter world → move, with a packet log and a
+  dot for a map. For the rendered game — the original art, drawn from the server's own data —
+  open <a href="./game.html">game.html</a>. Both need the bridge running:
+  <code>node web/bridge/bridge.js</code>, which also serves this page.
 </p>
 
 <div id="status">not connected</div>

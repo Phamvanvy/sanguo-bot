@@ -181,9 +181,9 @@ activity_macros:
     star_button_point: [0.227, 0.869]
     reappraise_point: [0.498, 0.756]
     confirm_point: [0.499, 0.693]
-    menu_delay_seconds: 0.8
-    result_delay_seconds: 1.2
-    next_cycle_delay_seconds: 0.8
+    menu_delay_seconds: 1.2
+    result_delay_seconds: 1.8
+    next_cycle_delay_seconds: 1.2
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   code_redeem:

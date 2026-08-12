@@ -21,6 +21,9 @@
  *   MAX_BUFFER    (default 4194304)   per-direction buffered bytes before the session is killed
  *   STATIC_DIR    (default ../client) also serve this dir over HTTP on the same port so the
  *                                     browser client is same-origin with the WS; 'off' disables
+ *   DATA_DIR      (default ../../selfhost/runtime/data) the server's game data directory,
+ *                                     served read-only under /data/ so the client can decode
+ *                                     the original art itself; 'off' disables
  */
 import net from 'node:net';
 import http from 'node:http';
@@ -28,6 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { areaIndex, resolveDataFile } from './asset-index.js';
 
 const BRIDGE_HOST = process.env.BRIDGE_HOST || '0.0.0.0';
 const BRIDGE_PORT = Number(process.env.BRIDGE_PORT || 8080);
@@ -48,9 +52,50 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png',
   '.mjs': 'text/javascript; charset=utf-8' };
 
+// ---- game assets ----------------------------------------------------------
+// The client decodes the original 2011 art itself (see web/client/src/assets), so it needs the
+// raw files: an area's client.pkg, the .ctn animate sets and their .pip images. They are served
+// straight out of the server's data directory — nothing is pre-converted, and nothing is
+// written back. Plus /api/areas.json, the map id -> area directory lookup that would otherwise
+// cost the browser 96 downloads (see asset-index.js).
+const DATA_DIR = process.env.DATA_DIR === 'off' ? null
+  : path.resolve(HERE, process.env.DATA_DIR || '../../selfhost/runtime/data');
+
+function serveData(req, res, rel) {
+  if (!DATA_DIR) { res.writeHead(404).end('data serving disabled'); return; }
+  if (rel === '/areas.json') {
+    let index;
+    try {
+      index = areaIndex(DATA_DIR);
+    } catch (e) {
+      console.error('[bridge] area index failed:', e.message);
+      res.writeHead(500).end('area index failed: ' + e.message);
+      return;
+    }
+    if (index.failures.length) console.warn('[bridge] area index warnings:', index.failures.join('; '));
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ areas: index.areas, mapToArea: index.mapToArea }));
+    return;
+  }
+  const file = resolveDataFile(DATA_DIR, rel);
+  if (!file) { res.writeHead(403).end('forbidden'); return; }
+  fs.readFile(file, (err, data) => {
+    if (err) { res.writeHead(404).end('not found'); return; }
+    res.writeHead(200, {
+      'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+      // The data directory is a frozen 2011 export; re-downloading a 200 KB tileset on every
+      // map change would be pure waste.
+      'cache-control': 'public, max-age=86400',
+    });
+    res.end(data);
+  });
+}
+
 const httpServer = http.createServer((req, res) => {
-  if (!STATIC_DIR || req.method !== 'GET') { res.writeHead(404).end('not found'); return; }
+  if (req.method !== 'GET') { res.writeHead(405).end('method not allowed'); return; }
   const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  if (rel === '/data' || rel.startsWith('/data/')) { serveData(req, res, rel.slice(5) || '/'); return; }
+  if (!STATIC_DIR) { res.writeHead(404).end('not found'); return; }
   const file = path.resolve(STATIC_DIR, '.' + (rel === '/' ? '/index.html' : rel));
   // Never serve outside STATIC_DIR, whatever the path contains.
   if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) { res.writeHead(403).end('forbidden'); return; }
@@ -66,6 +111,7 @@ const wss = new WebSocketServer({ server: httpServer });
 httpServer.listen(BRIDGE_PORT, BRIDGE_HOST, () => {
   console.log(`[bridge] WS listening ws://${BRIDGE_HOST}:${BRIDGE_PORT}  ->  tcp ${WORLD_HOST}:${WORLD_PORT}`);
   if (STATIC_DIR) console.log(`[bridge] serving ${STATIC_DIR} at http://${BRIDGE_HOST}:${BRIDGE_PORT}/`);
+  if (DATA_DIR) console.log(`[bridge] serving game data ${DATA_DIR} at /data/`);
 });
 httpServer.on('error', (err) => {
   console.error('[bridge] server error:', err.message);

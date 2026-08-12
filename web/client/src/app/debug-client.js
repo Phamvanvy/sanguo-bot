@@ -146,9 +146,9 @@ function updatePos() {
 
 // ---------------------------------------------------------------- movement
 
-const DIRECTIONS = {   // Unit.DIRECT_* — the server clamps direct to 0..3
-  ArrowUp: [0, -1, 3], ArrowDown: [0, 1, 0], ArrowLeft: [-1, 0, 1], ArrowRight: [1, 0, 2],
-  w: [0, -1, 3], s: [0, 1, 0], a: [-1, 0, 1], d: [1, 0, 2],
+const DIRECTIONS = {   // Unit.DIRECT_*: down 0, right 1, left 2, up 3 (the server clamps to 0..3)
+  ArrowUp: [0, -1, 3], ArrowDown: [0, 1, 0], ArrowLeft: [-1, 0, 2], ArrowRight: [1, 0, 1],
+  w: [0, -1, 3], s: [0, 1, 0], a: [-1, 0, 2], d: [1, 0, 1],
 };
 
 function onKey(ev) {

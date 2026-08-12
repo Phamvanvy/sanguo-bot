@@ -83,3 +83,7 @@ Game/**/*.ctn
 Game/**/*.etd
 Game/**/*.gtl
 8pKq80XlJPUpwj39明珠三国.zip
+
+# Rendered proof images: `node tools/assets/spike.mjs` (G3a) and
+# `python tools/render_smoke.py` (G3b) regenerate them
+web/client/assets/spike/
