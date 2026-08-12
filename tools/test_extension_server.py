@@ -105,10 +105,11 @@ class ExtensionServerTest(unittest.TestCase):
         flows = {flow["id"]: flow for flow in flow_catalog()}
         self.assertEqual("auto_attack_loop", flows["auto_attack"]["runner"])
 
-    def test_activity_macros_route_to_non_os_extension_runner(self):
+    def test_activity_macros_route_to_dom_extension_runner(self):
         extension_dir = PROJECT_ROOT / "extension"
         content = (extension_dir / "content.js").read_text(encoding="utf-8")
         background = (extension_dir / "background.js").read_text(encoding="utf-8")
+        manifest = (extension_dir / "manifest.json").read_text(encoding="utf-8")
         for runner in (
             "blessing_loop", "code_redeem_loop", "discard_loop", "use_item_loop", "coin_shake_loop",
             "auto_attack_loop",
@@ -117,12 +118,16 @@ class ExtensionServerTest(unittest.TestCase):
         for flow in (
             "blessing", "code_redeem", "discard_items", "use_inventory_item", "coin_shake", "auto_attack",
         ):
-            self.assertIn(f'flow === "{flow}"', background)
-        self.assertIn('type: "run-native"', content)
+            self.assertIn(f'flow === "{flow}"', content)
+        self.assertNotIn('type: "run-native"', content)
+        self.assertNotIn('"debugger"', manifest)
+        self.assertNotIn("chrome.debugger", background)
+        self.assertIn("typeof PointerEvent", content)
+        self.assertIn("new KeyboardEvent", content)
         self.assertIn('["left", "Ô trái"]', content)
         self.assertIn('["right", "Ô phải"]', content)
-        self.assertIn('itemPoints[itemSlot]', background)
-        self.assertIn('await clickAt(target, token, attackPoint)', background)
+        self.assertIn('(macro.item_points || {})[itemSlot]', content)
+        self.assertIn('await domClick(token, attackPoint)', content)
 
     @patch("src.extension_server.time.sleep", return_value=None)
     def test_macro_runs_click_and_key_steps(self, _sleep):

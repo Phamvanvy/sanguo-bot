@@ -1,40 +1,36 @@
 package peony.auction;
 
+import java.util.ArrayList;
 import java.util.List;
 import com.pip.db.hibernateDAO.GenericHibernateDAO;
 
 public class AuctionDAO extends GenericHibernateDAO<Auction, Integer> {
 
 	/** 组拼查询字符串 */
-	private String getParameters(int type, int quality, int leveldown, int levelup, String name) {
-		StringBuffer buff = new StringBuffer();
+	private String getParameters(int type, int quality, int leveldown, int levelup, String name, List<Object> values) {
+		StringBuffer buff = new StringBuffer(" 1=1");
 		if (type != -1) {
-			buff.append(" a.type=" + type);
+			buff.append(" and a.type=?");
+			values.add(Integer.valueOf(type));
 		}
 		if (quality == 0 || quality == 1 && type != 3) {
-				buff.append(" and ");
-				buff.append(" a.quality=" + quality);
-		}else if(quality == 2 && type != 3){
-			buff.append(" and ");
-			buff.append(" a.quality>=" + quality);
+			buff.append(" and a.quality=?");
+			values.add(Integer.valueOf(quality));
+		} else if (quality == 2 && type != 3) {
+			buff.append(" and a.quality>=?");
+			values.add(Integer.valueOf(quality));
 		}
-		if (leveldown>=0) {
-			buff.append(" and ");
-			/*int beginLevel = (level >> 16 & 0xFFFF);
-			int endLevel = (level & 0xFFFF);
-			if (endLevel == 0) {
-				endLevel = 100;
-			}
-			buff.append(" a.level between " + beginLevel + " and " + endLevel);
-			*/
-			buff.append(" a.level>= " + leveldown);
+		if (leveldown >= 0) {
+			buff.append(" and a.level>=?");
+			values.add(Integer.valueOf(leveldown));
 		}
-		if(levelup>0){
-			buff.append(" and a.level<="+levelup);
+		if (levelup > 0) {
+			buff.append(" and a.level<=?");
+			values.add(Integer.valueOf(levelup));
 		}
-		if (name.length() != 0) {
-			buff.append(" and ");
-			buff.append(" a.name like '%" + name + "%'");
+		if (name != null && name.length() != 0) {
+			buff.append(" and a.name like ?");
+			values.add("%" + name + "%");
 		}
 		return buff.toString();
 	}
@@ -64,16 +60,23 @@ public class AuctionDAO extends GenericHibernateDAO<Auction, Integer> {
 			adesc = "desc";
 			break;
 		}
+		List<Object> values = new ArrayList<Object>();
+		String parameters = getParameters(type, quality, leveldown, levelup, name, values);
 		String hql = "select a from Auction a where"
-				+ getParameters(type, quality, leveldown, levelup, name)
+				+ parameters
 				+ " order by " + sort + " " + adesc;
 		// 分页查询
-		List l = limitList(hql, (pageNum - 1) * amount, amount);
+		long offset = ((long) pageNum - 1L) * amount;
+		if (pageNum <= 0 || amount <= 0 || amount > 100 || offset > Integer.MAX_VALUE) {
+			throw new IllegalArgumentException("Invalid auction pagination");
+		}
+		Object[] queryValues = values.toArray();
+		List l = limitList(hql, (int) offset, amount, queryValues);
 		Auction[] auctions = new Auction[l.size()];
 		for (int i = 0; i < auctions.length; i++) {
 			auctions[i] = (Auction) (l.get(i));
 		}
-		Long total = (Long) uniqueResult("select count(*) from Auction a where"+ getParameters(type, quality, leveldown, levelup, name));
+		Long total = (Long) uniqueResult("select count(*) from Auction a where" + parameters, queryValues);
 		//计算总页数
 		int pageAmount = (int) (total%amount==0 ? total/amount : (total/amount+1));
 		//计算当前页显示条数

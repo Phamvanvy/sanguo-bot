@@ -396,7 +396,7 @@ public class Player extends Unit implements Client {
 	@Transient
 	public static int ANTIPLUG_MODEL_NONBENEFIT = 1; //外挂处理方式--无收益
 	@Transient
-	public static int antiPlugModel = ANTIPLUG_MODEL_LOG; //外挂处理方式
+	public static int antiPlugModel = ANTIPLUG_MODEL_NONBENEFIT; //外挂处理方式
 	@Transient
 	public static int maxSkillOffsetTime = 100000; //攻击补偿上限
 	@Transient
@@ -758,7 +758,20 @@ public class Player extends Unit implements Client {
 	/*
 	 * 检查用户新到达的一个点是否合法的点，如果不合法，则视为作弊。
 	 */
-	protected void checkPosition(Position p1) {
+	protected boolean checkPosition(Position p1) {
+		if (lastPosition != null && lastPosition.mapId == p1.mapId && lastPosition.x == p1.x &&
+				lastPosition.y == p1.y) {
+			return true;
+		}
+		if (map != null && map.map != null && map.map.mapDef != null &&
+				map.map.mapDef.mapInfo != null &&
+				!map.map.mapDef.mapInfo.getPathFinder().canReach(p1.x, p1.y)) {
+			log.info("[REACHERROR]" + LogUtil.getPlayerLogString(this) +
+					"]DEST[" + p1.mapId + "," + p1.x + "," + p1.y + "]");
+			addForbidScore(20);
+			return false;
+		}
+		return true;
 //		if (lastPosition != null && lastPosition.mapId == p1.mapId && lastPosition.x == p1.x &&
 //				lastPosition.y == p1.y) {
 //			return;
@@ -986,7 +999,9 @@ public class Player extends Unit implements Client {
 		// log.info("["+id+","+x+","+y+"]");
 		Position currentPosition = new Position(map.id, x, y, Time.currTime,
 				time, getSpeed());
-		checkPosition(currentPosition);
+		if (!checkPosition(currentPosition)) {
+			return;
+		}
 		if (lastPosition != null) {
 			comparePosition(lastPosition, currentPosition);
 			if ((Time.currTime - lastPosition.time) > 10000 && diff <= 5000) { // 10秒

@@ -2,9 +2,9 @@
   "manifest_version": 3,
   "minimum_chrome_version": "118",
   "name": "Sanguo Flow Controller",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Chạy các flow nhiệm vụ Sanguo từ panel nổi trong game.",
-  "permissions": ["activeTab", "scripting", "debugger"],
+  "permissions": ["activeTab", "scripting"],
   "host_permissions": [
     "http://127.0.0.1:8765/*",
     "https://play.minhchauh5.com/*"

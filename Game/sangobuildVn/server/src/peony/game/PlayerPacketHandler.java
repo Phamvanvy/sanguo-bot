@@ -242,9 +242,30 @@ import com.pip.sanguo.data.quest.QuestRewardSet;
 import com.pip.util.Utils;
 
 public class PlayerPacketHandler implements PacketHandler {
+	private static final boolean CHAT_CHEATS_ENABLED = Boolean.getBoolean("peony.gmChatEnabled");
+	private static final boolean DANGEROUS_CHAT_CHEATS_ENABLED =
+			Boolean.getBoolean("peony.gmChatDangerousEnabled");
+	private static final String[] CHAT_CHEAT_PLAYER_IDS =
+			System.getProperty("peony.gmChatPlayerIds", "").split(",");
 	private static final Logger log = Logger
 			.getLogger(PlayerPacketHandler.class);
 	protected Random rnd = new Random();
+
+	private static boolean isChatCheatAllowed(int playerId) {
+		if (!CHAT_CHEATS_ENABLED) {
+			return false;
+		}
+		for (int i = 0; i < CHAT_CHEAT_PLAYER_IDS.length; i++) {
+			try {
+				if (Integer.parseInt(CHAT_CHEAT_PLAYER_IDS[i].trim()) == playerId) {
+					return true;
+				}
+			} catch (NumberFormatException e) {
+				// Ignore empty or malformed allowlist entries.
+			}
+		}
+		return false;
+	}
 
 	public PlayerPacketHandler() {
 	}
@@ -6418,6 +6439,9 @@ public class PlayerPacketHandler implements PacketHandler {
 		byte[] attachment = packet.getBytes();
 		Player player = (Player) session.getClient();
 		if (player != null) {
+			if (title.length() > 100 || content.length() > 2000 || attachment.length > 64 * 1024) {
+				return;
+			}
 			if (destName.equals(player.name)) {
 				ErrorHandler.sendErrorMessage(session, serial,
 						OpCode.MAIL_POST_CLIENT, "Không thể gửi thư cho chính mình");
@@ -6832,17 +6856,21 @@ public class PlayerPacketHandler implements PacketHandler {
 		Player player = (Player) session.getClient();
 		if (player != null) {
 			// 记录日志
+			if (message.length() > 500 || attachment.length > 64 * 1024) {
+				return;
+			}
 			LogUtil.logChat(player, ch, destId, message);
 			
 			// 统计
 			Server.server.getServiceRegistry().getRealtimeStatService().chatCounter++;
 
 			/** 密码 */
-			if (message.equals(Server.server.cheat)) {
-				player.cheat = true;
-				return;
+			boolean chatCheatAllowed = isChatCheatAllowed(player.id);
+			if (!chatCheatAllowed) {
+				player.cheat = false;
 			}
-			if (player.cheat && message.startsWith("/")) {
+			if (chatCheatAllowed && message.startsWith("/")) {
+				player.cheat = true;
 				String[] cmds = message.split("\\s+");
 				if (cmds[0].equals("/go")) {
 					if (cmds.length == 4) {
@@ -7133,7 +7161,7 @@ public class PlayerPacketHandler implements PacketHandler {
 						}
 					}
 					player.refreshProperties(false);
-				}else if(cmds[0].equals("/load") && cmds.length==2){
+				}else if(DANGEROUS_CHAT_CHEATS_ENABLED && cmds[0].equals("/load") && cmds.length==2){
 					String className = cmds[1];
 					try {
 						Class clazz = Class.forName("peony.patchs."+className);
@@ -7144,7 +7172,7 @@ public class PlayerPacketHandler implements PacketHandler {
 					}
 				}else if (cmds[0].equals("/bot")) {
 					player.antiPlug.isBot = true;
-				}else if(cmds[0].equals("/shut")){
+				}else if(DANGEROUS_CHAT_CHEATS_ENABLED && cmds[0].equals("/shut")){
 					System.exit(0);
 				}else if(cmds[0].equals("/throwhorse")){
 					player.horseBag.horses.clear();
@@ -8220,6 +8248,7 @@ public class PlayerPacketHandler implements PacketHandler {
 				log.error("[TIMEERROR]" + LogUtil.getPlayerLogString(player)
 						+ "SERVER[" + Time.currTime + "]CLIENT[" + time + "]");
 				player.addForbidScore(1);
+				return;
 			}
 			player.move(x, y, direct, state, time, diff, nextx, nexty);
 		}

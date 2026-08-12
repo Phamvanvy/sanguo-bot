@@ -125,16 +125,20 @@ public class AuctionListCall extends ClientSessionAsyncCall {
 				error(null, "Phương thức tăng thứ tự vô hiệu");
 			} else if(pageNum <= 0){
 				error(null, "Số trang vô hiệu");
-			}else if(amount <= 0){
+			}else if(amount <= 0 || amount > 100){
 				error(null, "无效的每页显示条数");
+			}else if(name != null && name.length() > 50){
+				error(null, "Auction search text is too long");
 			}else {
 				try {
 					this.result = auctionService.getAuctions(type, quality, leveldown, levelup, name, sortfeild, asc, pageNum, amount,p.id);
-				} catch (AuctionException e) {
+				} catch (Exception e) {
 					error(e,e.getMessage());
 				}
-				this.auctions = result.getAuctions();
-				if (this.auctions == null) {
+				if (result != null) {
+					this.auctions = result.getAuctions();
+				}
+				if (success && this.auctions == null) {
 					error(null, "Không có thông tin bán đầu giá phù hợp điều kiện");
 				}
 			}

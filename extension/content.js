@@ -27,8 +27,19 @@
   const dot = panel.querySelector(".sg-dot");
   const collapseButton = panel.querySelector(".sg-collapse");
   const stopButton = panel.querySelector(".sg-stop");
+  const DOM_RUNNERS = new Set([
+    "blessing_loop",
+    "code_redeem_loop",
+    "discard_loop",
+    "use_item_loop",
+    "coin_shake_loop",
+    "auto_attack_loop",
+  ]);
+  const DOM_SPEED_FACTOR = 0.7;
   let flows = [];
   let dragging = null;
+  let domToken = null;
+  let domFlow = { state: "idle", message: "Sẵn sàng" };
 
   function send(message) {
     return new Promise((resolve, reject) => {
@@ -95,24 +106,263 @@
     renderFlows(running);
   }
 
+  const domDelay = (seconds) => new Promise((resolve) => {
+    setTimeout(resolve, Math.max(120, Number(seconds) * 1000 * DOM_SPEED_FACTOR));
+  });
+
+  function ensureDomActive(token) {
+    if (token.cancelled) throw new Error("FLOW_STOPPED");
+  }
+
+  function updateDomFlow(flow, message) {
+    domFlow = { state: "running", flow, message };
+    showStatus(domFlow);
+  }
+
+  function eventTargetAt(point) {
+    const x = Number(point[0]) * innerWidth;
+    const y = Number(point[1]) * innerHeight;
+    const target = document.elementFromPoint(x, y);
+    if (!target) throw new Error(`Không tìm thấy phần tử game tại (${x.toFixed(0)}, ${y.toFixed(0)})`);
+    return { target, x, y };
+  }
+
+  function dispatchMouse(target, type, x, y, buttons) {
+    const EventClass = type.startsWith("pointer") && typeof PointerEvent === "function"
+      ? PointerEvent
+      : MouseEvent;
+    target.dispatchEvent(new EventClass(type, {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y,
+      button: 0,
+      buttons,
+      detail: type === "click" ? 1 : 0,
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true,
+    }));
+  }
+
+  async function domClick(token, point) {
+    ensureDomActive(token);
+    const { target, x, y } = eventTargetAt(point);
+    if (typeof target.focus === "function") target.focus({ preventScroll: true });
+    dispatchMouse(target, "pointermove", x, y, 0);
+    dispatchMouse(target, "mousemove", x, y, 0);
+    dispatchMouse(target, "pointerdown", x, y, 1);
+    dispatchMouse(target, "mousedown", x, y, 1);
+    dispatchMouse(target, "pointerup", x, y, 0);
+    dispatchMouse(target, "mouseup", x, y, 0);
+    dispatchMouse(target, "click", x, y, 0);
+  }
+
+  function dispatchKey(type, key, code, keyCode, modifiers = 0) {
+    const target = document.activeElement || window;
+    const event = new KeyboardEvent(type, {
+      key,
+      code,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      ctrlKey: Boolean(modifiers & 2),
+      altKey: Boolean(modifiers & 1),
+      shiftKey: Boolean(modifiers & 8),
+      metaKey: Boolean(modifiers & 4),
+    });
+    for (const property of ["keyCode", "which", "charCode"]) {
+      try { Object.defineProperty(event, property, { value: keyCode }); } catch (_) { /* Read-only. */ }
+    }
+    target.dispatchEvent(event);
+  }
+
+  async function domPress(token, key, code, keyCode, modifiers = 0) {
+    ensureDomActive(token);
+    dispatchKey("keydown", key, code, keyCode, modifiers);
+    if (key.length === 1) dispatchKey("keypress", key, code, keyCode, modifiers);
+    dispatchKey("keyup", key, code, keyCode, modifiers);
+  }
+
+  async function domClearAndType(token, text) {
+    ensureDomActive(token);
+    const target = document.activeElement;
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target), "value");
+      descriptor?.set?.call(target, "");
+      target.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "deleteContentBackward" }));
+      descriptor?.set?.call(target, text);
+      target.dispatchEvent(new InputEvent("input", {
+        bubbles: true,
+        inputType: "insertText",
+        data: text,
+      }));
+      target.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
+    if (target?.isContentEditable) {
+      document.execCommand("selectAll", false);
+      document.execCommand("insertText", false, text);
+      return;
+    }
+    await domPress(token, "a", "KeyA", 65, 2);
+    await domPress(token, "Backspace", "Backspace", 8);
+    for (const character of text) {
+      const upper = character.toUpperCase();
+      await domPress(token, character, /^[A-Z]$/i.test(character) ? `Key${upper}` : "", character.charCodeAt(0));
+    }
+  }
+
+  function expandCodes(macro) {
+    const codes = (macro.codes || []).map(String).filter(Boolean);
+    for (const range of macro.code_ranges || []) {
+      for (let number = Number(range.start || 1); number <= Number(range.end || 0); number += 1) {
+        codes.push(`${range.prefix || ""}${number}`);
+      }
+    }
+    return codes;
+  }
+
+  async function runBlessing(token, macro) {
+    await domClick(token, macro.open_point || [0.73, 0.07]);
+    await domDelay(macro.open_delay_seconds || 1.5);
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      for (let click = 0; click < (cycle === 0 ? 1 : 2); click += 1) {
+        await domClick(token, macro.ten_times_point || [0.66, 0.84]);
+        await domDelay(macro.click_delay_seconds || 0.55);
+      }
+      await domDelay(macro.confirm_delay_seconds || 0.8);
+      await domClick(token, macro.ok_point || [0.70, 0.64]);
+      updateDomFlow("blessing", `Cầu phúc: ${cycle + 1} lượt`);
+      await domDelay(macro.result_delay_seconds || 1.5);
+    }
+  }
+
+  async function runCodeRedeem(token, macro) {
+    const codes = expandCodes(macro);
+    for (let index = 0; index < codes.length; index += 1) {
+      updateDomFlow("code_redeem", `Mở NPC cho code ${index + 1}/${codes.length}`);
+      await domClick(token, macro.npc_point || [0.288, 0.465]);
+      await domDelay(macro.open_delay_seconds || 1);
+      await domClick(token, macro.option_point || [0.50, 0.43]);
+      await domDelay(macro.option_delay_seconds || 1);
+      await domClick(token, macro.input_point || [0.50, 0.51]);
+      await domClearAndType(token, codes[index]);
+      await domClick(token, macro.submit_point || [0.50, 0.57]);
+      await domDelay(macro.submit_delay_seconds || 1.4);
+      await domPress(token, "Enter", "Enter", 13);
+      await domDelay(macro.dismiss_delay_seconds || 0.8);
+      await domPress(token, "Escape", "Escape", 27);
+      await domDelay(macro.reopen_delay_seconds || 1);
+      updateDomFlow("code_redeem", `Đổi code ${index + 1}/${codes.length}: ${codes[index]}`);
+    }
+  }
+
+  async function runDiscardItems(token, macro) {
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      await domClick(token, macro.sort_point || [0.796, 0.919]);
+      await domDelay(macro.sort_delay_seconds || 0.9);
+      await domClick(token, macro.first_item_point || [0.342, 0.229]);
+      await domDelay(macro.detail_delay_seconds || 0.7);
+      await domClick(token, macro.discard_point || [0.710, 0.502]);
+      await domDelay(macro.confirm_delay_seconds || 0.7);
+      await domClick(token, macro.confirm_point || [0.685, 0.631]);
+      updateDomFlow("discard_items", `Đã vứt: ${cycle + 1} vật phẩm`);
+      await domDelay(macro.refresh_delay_seconds || 1);
+    }
+  }
+
+  async function runUseInventoryItem(token, macro) {
+    const maxCycles = Number(macro.max_cycles || 0);
+    const itemSlot = macro.item_slot === "right" ? "right" : "left";
+    const itemPoint = (macro.item_points || {})[itemSlot] || macro.item_point || [0.337, 0.207];
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      await domClick(token, itemPoint);
+      await domDelay(macro.detail_delay_seconds || 0.7);
+      await domClick(token, macro.use_point || [0.724, 0.345]);
+      if (macro.confirm_point != null) {
+        await domDelay(macro.confirm_delay_seconds || 0.7);
+        await domClick(token, macro.confirm_point);
+      }
+      updateDomFlow("use_inventory_item", `Đã dùng ô ${itemSlot === "right" ? "phải" : "trái"}: ${cycle + 1}`);
+      await domDelay(macro.refresh_delay_seconds || 1);
+    }
+  }
+
+  async function runCoinShake(token, macro) {
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      await domClick(token, macro.shake_point || [0.585, 0.820]);
+      await domDelay(macro.confirm_delay_seconds || 0.7);
+      await domClick(token, macro.confirm_point || [0.685, 0.631]);
+      updateDomFlow("coin_shake", `Rung xu: ${cycle + 1} lượt`);
+      await domDelay(macro.result_delay_seconds || 1.2);
+    }
+  }
+
+  async function runAutoAttack(token, macro) {
+    const attackPoint = macro.attack_point || [0.927, 0.822];
+    const skillPoints = macro.skill_points || [
+      [0.927, 0.517], [0.853, 0.566], [0.799, 0.670], [0.875, 0.710],
+      [0.927, 0.653], [0.774, 0.820], [0.845, 0.820],
+    ];
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      await domClick(token, attackPoint);
+      await domDelay(macro.button_delay_seconds || 0.18);
+      for (const point of skillPoints) {
+        await domClick(token, point);
+        await domDelay(macro.button_delay_seconds || 0.18);
+      }
+      updateDomFlow("auto_attack", `Tự động đánh: ${cycle + 1} vòng`);
+      await domDelay(macro.round_delay_seconds || 0.3);
+    }
+  }
+
+  async function startDomFlow(flow, macro) {
+    if (domToken && !domToken.cancelled) throw new Error("Một flow DOM khác đang chạy");
+    const controller = await api("/status");
+    if (controller.state === "running") throw new Error("Một flow Python khác đang chạy");
+    const token = { cancelled: false };
+    domToken = token;
+    updateDomFlow(flow, `Đang chạy không-CDP: ${flow}`);
+    void (async () => {
+      try {
+        if (flow === "blessing") await runBlessing(token, macro);
+        else if (flow === "code_redeem") await runCodeRedeem(token, macro);
+        else if (flow === "discard_items") await runDiscardItems(token, macro);
+        else if (flow === "use_inventory_item") await runUseInventoryItem(token, macro);
+        else if (flow === "coin_shake") await runCoinShake(token, macro);
+        else if (flow === "auto_attack") await runAutoAttack(token, macro);
+        else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
+        domFlow = { state: "done", flow, message: "Flow hoàn tất" };
+      } catch (error) {
+        domFlow = token.cancelled || error.message === "FLOW_STOPPED"
+          ? { state: "stopped", flow, message: "Đã dừng flow" }
+          : { state: "error", flow, message: error.message };
+      } finally {
+        token.cancelled = true;
+        if (domToken === token) domToken = null;
+        showStatus(domFlow);
+      }
+    })();
+    return domFlow;
+  }
+
   async function runFlow(flow, macroOverrides = {}) {
     try {
       let result;
-      if ([
-        "blessing_loop",
-        "code_redeem_loop",
-        "discard_loop",
-        "use_item_loop",
-        "coin_shake_loop",
-        "auto_attack_loop",
-      ].includes(flow.runner)) {
+      if (DOM_RUNNERS.has(flow.runner)) {
         const config = await api(`/macro?id=${encodeURIComponent(flow.id)}`);
-        result = await send({
-          type: "run-native",
-          flow: flow.id,
-          macro: { ...config.macro, ...macroOverrides },
-        });
+        result = await startDomFlow(flow.id, { ...config.macro, ...macroOverrides });
       } else {
+        domFlow = { state: "idle", message: "Sẵn sàng" };
         result = await api("/run", { method: "POST", body: JSON.stringify({ flow: flow.id }) });
       }
       showStatus(result);
@@ -123,10 +373,14 @@
 
   async function stopFlow() {
     try {
-      const native = await send({ type: "native-status" });
-      const result = native.state === "running" || native.state === "stopping"
-        ? await send({ type: "stop-native" })
-        : await api("/stop", { method: "POST", body: "{}" });
+      let result;
+      if (domToken && !domToken.cancelled) {
+        domToken.cancelled = true;
+        domFlow = { state: "stopping", flow: domFlow.flow, message: "Đang dừng flow" };
+        result = domFlow;
+      } else {
+        result = await api("/stop", { method: "POST", body: "{}" });
+      }
       showStatus(result);
     } catch (error) {
       showStatus({ state: "error", message: error.message });
@@ -136,12 +390,15 @@
   async function refresh() {
     try {
       if (!flows.length) flows = (await api("/flows")).flows;
-      const native = await send({ type: "native-status" });
-      const status = native.state !== "idle" ? native : await api("/status");
+      const status = domFlow.state !== "idle" ? domFlow : await api("/status");
       setConnected(true);
       showStatus(status);
     } catch (_) {
       setConnected(false);
+      if (domToken && !domToken.cancelled) {
+        showStatus(domFlow);
+        return;
+      }
       showStatus({ state: "error", message: "Controller chưa chạy. Mở start-extension-server.ps1" });
     }
   }

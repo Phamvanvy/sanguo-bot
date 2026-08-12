@@ -61,9 +61,12 @@ public class DepotService implements Service {
 	/**
 	 * 从仓库中取出物品放回背包
 	 */
-	public void getItemFromDepotToBag(Player p, ClientSession session, int serial,  
+	public void getItemFromDepotToBag(Player p, ClientSession session, int serial,
 			int gridId, int itemId, int instanceId, int count) throws DepotException {
 		if (p != null) {
+			if (count <= 0) {
+				throw new DepotException("Invalid item count");
+			}
 			if(p.depot==null || p.depot.getSize()==0){
 				throw new DepotException("Bạn chưa kích hoạt rương đồ!");
 			}
@@ -76,6 +79,10 @@ public class DepotService implements Service {
 			}
 			PlayerTransaction tx = p.newTransaction("UST");
 			TransactionBagGrid depootGrid = p.depot.removeDepotGridGameItem(gridId, itemId, instanceId, count, tx, false);
+			if (depootGrid == null) {
+				tx.rollback();
+				throw new DepotException("Invalid depot item");
+			}
 			// 记录日志
 			LogUtil.logDepotGetTry(p, depootGrid.getItem(), count);
 			try {
@@ -105,6 +112,9 @@ public class DepotService implements Service {
 	public void getItemFromBagToDepot(Player p, ClientSession session, int serial, 
 			int gridId, int itemId, int instanceId, int count) throws DepotException {
 		if (p != null) {
+			if (count <= 0) {
+				throw new DepotException("Invalid item count");
+			}
 			if(p.depot==null || p.depot.getSize()==0){
 				throw new DepotException("Bạn chưa kích hoạt rương đồ!");
 			}
@@ -118,6 +128,10 @@ public class DepotService implements Service {
 			}
 			PlayerTransaction tx = p.newTransaction("STO");
 			TransactionBagGrid bagGrid = p.bag.removeGridGameItem(gridId, itemId, instanceId, count, tx, false);
+			if (bagGrid == null) {
+				tx.rollback();
+				throw new DepotException("Invalid bag item");
+			}
 			// 记录日志
 			LogUtil.logDepotPutTry(p, bagGrid.getItem(), count);
 			List<TransactionBagGrid> depotGrids;

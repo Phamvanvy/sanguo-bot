@@ -21,6 +21,10 @@ public class MinaUADecoder extends ProtocolDecoderAdapter {
 		ByteBuffer buf = (ByteBuffer)session
 		.getAttribute(BUFFER);
 		if(buf!=null){
+			if (in.remaining() > Packet.MAX_PACKET_SIZE - buf.position()) {
+				session.setAttribute(BUFFER, null);
+				throw new IOException("UA packet exceeds maximum size.");
+			}
 //			buf.setAutoExpand(true);
 			buf.put(in);
 			buf.flip();
@@ -33,6 +37,10 @@ public class MinaUADecoder extends ProtocolDecoderAdapter {
 				int pos = buf.position();
 				if(buf.get()==85&&buf.get()==65){
 					int len = buf.getInt();
+					if (len < 8 || len > Packet.MAX_PACKET_SIZE) {
+						session.setAttribute(BUFFER, null);
+						throw new IOException("Invalid UA packet length: " + len);
+					}
 					if(buf.remaining()>=(len-6)){  //去掉head以及len一共6个字节
 						short opCode = buf.getShort();  
 						ByteBuffer data = EMPTY;
@@ -69,7 +77,11 @@ public class MinaUADecoder extends ProtocolDecoderAdapter {
 	}
 	
     private void storeRemainingInSession(ByteBuffer buf, IoSession session) {
-        ByteBuffer remainingBuf = ByteBuffer.allocate(buf.capacity());
+		if (buf.remaining() > Packet.MAX_PACKET_SIZE) {
+			session.setAttribute(BUFFER, null);
+			throw new IllegalArgumentException("UA packet exceeds maximum size.");
+		}
+        ByteBuffer remainingBuf = ByteBuffer.allocate(Math.max(8, buf.remaining()));
         remainingBuf.setAutoExpand(true);
         remainingBuf.order(buf.order());
         remainingBuf.put(buf);

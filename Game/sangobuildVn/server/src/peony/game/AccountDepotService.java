@@ -78,8 +78,11 @@ public class AccountDepotService implements Service{
 	public void getItemFromBagToDepot(Player p, ClientSession session, int serial, 
 			int gridId, int itemId, int instanceId, int count) throws Exception {
 		if (p != null) {
+			if (count <= 0) {
+				throw new Exception("Invalid item count");
+			}
 			AccountDepot accountDepot = accountDepots.get(p.accountId);
-			if(accountDepot.depot==null || accountDepot.depot.getSize()==0){
+			if(accountDepot == null || accountDepot.depot==null || accountDepot.depot.getSize()==0){
 				throw new Exception("您还没有开启珍宝阁!");
 			}
 			int currentCount = p.bag.getGameItemCount(itemId);
@@ -97,6 +100,10 @@ public class AccountDepotService implements Service{
 			}
 			PlayerTransaction tx = p.newTransaction("ASTO");
 			TransactionBagGrid bagGrid = p.bag.removeGridGameItem(gridId, itemId, instanceId, count, tx, false);
+			if (bagGrid == null) {
+				tx.rollback();
+				throw new Exception("Invalid bag item");
+			}
 			// 记录日志
 			LogUtil.logAccountDepotPutTry(p, bagGrid.getItem(), count);
 			List<TransactionBagGrid> depotGrids;
@@ -127,6 +134,9 @@ public class AccountDepotService implements Service{
 	public void getItemFromDepotToBag(Player p, ClientSession session, int serial,  
 			int gridId, int itemId, int instanceId, int count) throws Exception {
 		if (p != null) {
+			if (count <= 0) {
+				throw new Exception("Invalid item count");
+			}
 			AccountDepot accountDepot = accountDepots.get(p.accountId);
 			if(accountDepot == null || accountDepot.depot==null || accountDepot.depot.getSize()==0){
 				throw new DepotException("你还没有开启珍宝阁!");
@@ -142,6 +152,10 @@ public class AccountDepotService implements Service{
 			}
 			PlayerTransaction tx = p.newTransaction("AUST");
 			TransactionBagGrid depootGrid = accountDepot.depot.removeDepotGridGameItem(gridId, itemId, instanceId, count, tx, false);
+			if (depootGrid == null) {
+				tx.rollback();
+				throw new Exception("Invalid depot item");
+			}
 			// 记录日志
 			LogUtil.logAccountDepotGetTry(p, depootGrid.getItem(), count);
 			try {

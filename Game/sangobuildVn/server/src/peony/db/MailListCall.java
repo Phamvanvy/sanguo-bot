@@ -62,6 +62,11 @@ public class MailListCall extends ClientSessionAsyncCall{
 	}
 
 	public void run() {
+		if (pageSize <= 0 || pageSize > 100 || pageNo < 0 || pageNo > Integer.MAX_VALUE / pageSize) {
+			error(null, "Invalid mail pagination");
+			addToClientSession();
+			return;
+		}
 		DBService dbService = Server.server.getServiceRegistry().getDbService();
 //		Transaction tx = HibernateUtil.getSessionFactory().getCurrentSession()
 //		.beginTransaction();

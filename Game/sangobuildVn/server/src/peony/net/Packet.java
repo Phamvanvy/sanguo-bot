@@ -11,6 +11,7 @@ public class Packet{
 
 
 	public static final byte[] HEAD = {'U','A'};
+	public static final int MAX_PACKET_SIZE = 1024 * 1024;
 	
 	private static final Charset utf8 = Charset.forName("utf-8");
 	private static final Charset utf16be = Charset.forName("UTF-16BE");
@@ -62,6 +63,9 @@ public class Packet{
 	
 	public byte[] getBytes(){
 		int len = data.getInt();
+		if (len < 0 || len > data.remaining() || len > MAX_PACKET_SIZE) {
+			throw new IllegalArgumentException("Invalid byte array length: " + len);
+		}
 		byte[] ret = new byte[len];
 		data.get(ret);
 		return ret;
@@ -85,6 +89,9 @@ public class Packet{
 	
 	public int[] getInts() {
 		short len = data.getShort();
+		if (len < 0 || len > data.remaining() / 4) {
+			throw new IllegalArgumentException("Invalid int array length: " + len);
+		}
 		int[] ret = new int[len];
 		for (int i = 0; i < len; i++) {
 			ret[i] = data.getInt();
@@ -152,11 +159,17 @@ public class Packet{
 	public String getString() {
 	    int len = data.getShort() & 0xFFFF;
 	    if ((len & 0x8000) == 0) {
+	        if (len > data.remaining()) {
+	            throw new IllegalArgumentException("Invalid UTF-8 string length: " + len);
+	        }
 	        byte[] buf = new byte[len];
 	        data.get(buf);
 	        return new String(buf, utf8);
 	    } else {
 	        len &= 0x7FFF;
+	        if (len > data.remaining() || (len & 1) != 0) {
+	            throw new IllegalArgumentException("Invalid UTF-16 string length: " + len);
+	        }
 	        byte[] buf = new byte[len];
             data.get(buf);
             return new String(buf, utf16be);

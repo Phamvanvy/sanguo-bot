@@ -19,6 +19,10 @@ public class DispatchUADecoder extends ProtocolDecoderAdapter {
 		boolean useSessionBuffer = false;
 		ByteBuffer buf = (ByteBuffer)session.getAttribute(BUFFER);
 		if(buf!=null){
+			if (in.remaining() > Packet.MAX_PACKET_SIZE + 10 - buf.position()) {
+				session.setAttribute(BUFFER, null);
+				throw new IOException("DA packet exceeds maximum size.");
+			}
 			buf.put(in);
 			buf.flip();
 			useSessionBuffer = true;
@@ -30,10 +34,18 @@ public class DispatchUADecoder extends ProtocolDecoderAdapter {
 				int pos = buf.position();
 				if(buf.get()==68&&buf.get()==65){ //'D'&'A'
 					int len = buf.getInt();
+					if (len < 18 || len > Packet.MAX_PACKET_SIZE + 10) {
+						session.setAttribute(BUFFER, null);
+						throw new IOException("Invalid DA packet length: " + len);
+					}
 					int sessionId = buf.getInt();
 					if(buf.remaining()>=(len-10)){  //去掉head以及len一共10个字节
 						if (buf.get() == 85 && buf.get() == 65) {
 							int packetLen = buf.getInt();
+							if (packetLen < 8 || packetLen > Packet.MAX_PACKET_SIZE || packetLen != len - 10) {
+								session.setAttribute(BUFFER, null);
+								throw new IOException("Invalid nested UA packet length: " + packetLen);
+							}
 							short opCode = buf.getShort();
 							ByteBuffer data = EMPTY;
 							byte[] bytes = new byte[packetLen - 8];
@@ -57,8 +69,8 @@ public class DispatchUADecoder extends ProtocolDecoderAdapter {
 
 					}
 				}else{
-					buf.position(pos + 1);
-					continue;
+					session.setAttribute(BUFFER,null);
+					throw new IOException("DA head error.");
 					//session.setAttribute(BUFFER,null);
 					//throw new IOException("DA head error.");
 				}
@@ -81,7 +93,11 @@ public class DispatchUADecoder extends ProtocolDecoderAdapter {
 	}
 	
     private void storeRemainingInSession(ByteBuffer buf, IoSession session) {
-        ByteBuffer remainingBuf = ByteBuffer.allocate(buf.capacity());
+		if (buf.remaining() > Packet.MAX_PACKET_SIZE + 10) {
+			session.setAttribute(BUFFER, null);
+			throw new IllegalArgumentException("DA packet exceeds maximum size.");
+		}
+        ByteBuffer remainingBuf = ByteBuffer.allocate(Math.max(18, buf.remaining()));
         remainingBuf.setAutoExpand(true);
         remainingBuf.order(buf.order());
         remainingBuf.put(buf);
