@@ -244,13 +244,12 @@
     ensureDomActive(token);
     const { target, x, y } = eventTargetAt(point);
     if (typeof target.focus === "function") target.focus({ preventScroll: true });
-    dispatchMouse(target, "pointermove", x, y, 0);
-    dispatchMouse(target, "mousemove", x, y, 0);
-    dispatchMouse(target, "pointerdown", x, y, 1);
+    // The TeaVM canvas registers only mousedown/mouseup for a click. Emitting
+    // pointer/click duplicates calls into its coroutine bridge and eventually
+    // throws "Suspension point reached from non-threading context".
     dispatchMouse(target, "mousedown", x, y, 1);
-    dispatchMouse(target, "pointerup", x, y, 0);
+    await new Promise((resolve) => setTimeout(resolve, 40));
     dispatchMouse(target, "mouseup", x, y, 0);
-    dispatchMouse(target, "click", x, y, 0);
   }
 
   function dispatchKey(type, key, code, keyCode, modifiers = 0) {
@@ -477,6 +476,11 @@
         result = await startDomFlow(flow.id, { ...config.macro, ...macroOverrides });
       } else {
         domFlow = { state: "idle", message: "Sẵn sàng" };
+        localStorage.setItem(FLOW_CONTEXT_KEY, JSON.stringify({
+          flow: flow.id, cycle: 0, step: "python_os_input",
+          startedAt: Date.now(), updatedAt: Date.now(),
+        }));
+        appendDiagnostic("flow_start", { flow: flow.id, step: "python_os_input" });
         result = await api("/run", { method: "POST", body: JSON.stringify({ flow: flow.id }) });
       }
       showStatus(result);
