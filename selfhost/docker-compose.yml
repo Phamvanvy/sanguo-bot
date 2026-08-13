@@ -30,23 +30,37 @@ services:
     ports:
       - "7100:7100"
       - "7500:7500"
+    # gameaccountserver connects to :7100 exactly once at boot and its main thread
+    # dies if that connect fails, so "started" is not good enough to depend on.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/7100"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
 
   gameaccountserver:
     image: eclipse-temurin:8-jdk
     working_dir: /app
     depends_on:
-      - accountserver
+      accountserver:
+        condition: service_healthy
     volumes:
       - ./runtime/gameaccountserver:/app
     command: ["java", "-Dfile.encoding=GBK", "-cp", "bin:lib/*", "com.pip.gameaccount.GameAccountServer"]
     ports:
       - "7101:7101"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/7101"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
 
   world:
     image: eclipse-temurin:8-jdk
     working_dir: /app/app
     depends_on:
-      - gameaccountserver
+      gameaccountserver:
+        condition: service_healthy
     volumes:
       - ./runtime/world:/app
       - ./runtime/data:/data
@@ -55,6 +69,34 @@ services:
       - "7000:7000"
       - "7001:7001"
       - "7003:7003"
+    # ~90 s to boot: it compiles every quest script to bytecode. It binds :7000 before it can
+    # answer, so "healthy" here means "reachable" (enough to order the bridge) — for a login
+    # you still want 'World Started' in the log.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/7000"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  # WebSocket <-> TCP bridge + the browser client. Needs its dependency installed on the
+  # host first (it is mounted read-only, like the rest of web/):  npm --prefix web/bridge ci
+  bridge:
+    image: node:22-alpine
+    working_dir: /app/web/bridge
+    depends_on:
+      world:
+        condition: service_healthy
+    volumes:
+      - ../web:/app/web:ro
+      - ./runtime/data:/data:ro     # read-only at the mount, not just in the code
+    environment:
+      WORLD_HOST: world
+      WORLD_PORT: "7000"
+      DATA_DIR: /data
+    command: ["sh", "-c", "[ -d node_modules/ws ] || { echo 'missing dependencies: run  npm --prefix web/bridge ci' >&2; exit 1; }; exec node bridge.js"]
+    ports:
+      - "8080:8080"
 
 volumes:
   mysql-data:

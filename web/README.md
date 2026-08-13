@@ -35,8 +35,22 @@ Browser (JS)  --WebSocket(binary)-->  bridge  --TCP "UA"-->  world :7000
 - `bridge/` — Node `ws` <-> TCP passthrough. 1 WebSocket = 1 TCP = 1 game session, byte
   passthrough both ways, close propagation, per-direction buffer cap + backpressure. It also
   serves `client/` over HTTP on the same port (dev convenience; `STATIC_DIR=off` disables), and
-  the server's game data read-only under `/data/` (`DATA_DIR`, `off` disables) plus
+  part of the server's game data read-only under `/data/` (`DATA_DIR`, `off` disables) plus
   `/data/areas.json` — the map id -> area package index built by `bridge/asset-index.js`.
+  It runs as the `bridge` service in `selfhost/docker-compose.yml`; run
+  `npm --prefix web/bridge ci` once, since `web/` is mounted read-only.
+
+  **`/data/` is an allow-list, not a file server.** That directory is the *server's*: quest
+  scripts, drop tables, NPC spawns, per-map collision and exits all live in it. Only
+  `Areas/*/client(_l).pkg`, `client_pkg/**` and `client_res/**` are reachable; everything
+  else — including `info.xml`/`game.map` sitting next to the packages a map needs — is 403.
+  Anything the client needs from the rest should be *derived* into a small document served
+  by the bridge (that is what `/data/areas.json` is), not exposed by widening the list.
+  `bridge/asset-index.test.mjs` pins this, along with the containment check that keeps
+  `..` inside the data directory. Assets are cached hard (`immutable` + ETag/304); the
+  client files revalidate. Also: GET only, a per-address request budget (429 over it), and
+  caps on concurrent sessions overall and per address (`MAX_SESSIONS`, `MAX_PER_IP`).
+  None of this makes the bridge safe to expose directly — it makes an accident survivable.
 - `client/game.html` + `client/src/app/game-client.js` — **the G3b client**: log in, enter the
   world, and play on the rendered map. Click to walk, WASD/arrows to step, `+`/`-` to zoom.
 - `client/index.html` + `client/src/app/debug-client.js` — the G2 wire-layer client: same flow

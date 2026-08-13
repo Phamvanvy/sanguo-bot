@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<peony>
+	<connections>
+		<connection>
+			<type>direct</type>
+			<address>0.0.0.0</address>
+			<port>7000</port>
+		</connection>
+		<connection>
+			<type>admin</type>
+			<address>0.0.0.0</address>
+			<port>7001</port>
+		</connection>T
+	</connections>
+	<!-- 
+	<account>
+		<address>192.168.0.54</address>
+		<port>7103</port>
+		<name>sangojeff</name>
+		<password>sangojeff</password>
+	</account>
+	 -->
+	<account>
+		<address>gameaccountserver</address>
+		<port>7101</port>
+		<name>WorldServer1</name>
+		<password>itimes</password>
+	</account>
+	<!-- slaveaccount (CMCC carrier auth) disabled for self-host -->
+
+	 <!--
+	<account>
+		<address>211.100.18.94</address>
+		<port>28011</port>
+		<name>sango</name>
+		<password>itimes</password>
+	</account>
+	
+	<account>
+		<address>221.130.10.117</address>
+		<port>28001</port>
+		<name>sango</name>
+		<password>itimes</password>
+	</account>,
+	  -->
+	<datadir>/data</datadir>
+	<trustip>trustip.txt</trustip>
+<!--- 	<proxys>
+		<proxy>
+			<address>192.168.0.55</address>
+			<port>7001</port>
+			<password>proxy@pip2008</password>
+			<maxplayer>1000</maxplayer>
+		</prox	y>
+	</proxys>
+	-->
+	<ipd>http://218.206.80.185:7070/sanguoipd/report</ipd>
+	<sleepycat>./sleepycat</sleepycat>
+	<gamecode>sango</gamecode>
+	<jetty>
+		<ip>0.0.0.0</ip>
+		<port>7003</port>
+		<servlet>
+			<url>chinarun</url>
+			<class>peony.service.jetty.ChinarunServlet</class>
+		</servlet>
+	</jetty>
+	<cheat>timeismoney@@!!</cheat>
+	
+	<revision>PIP</revision>
+	<gmpassword>123</gmpassword>
+	<!-- 
+	<revision>CMCC</revision>
+	-->
+</peony>

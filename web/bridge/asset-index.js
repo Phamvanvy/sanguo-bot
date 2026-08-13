@@ -59,14 +59,49 @@ export function areaIndex(dataDir) {
   return cached;
 }
 
+/*
+ * What the browser is allowed to fetch out of the data directory.
+ *
+ * The data directory is not a public asset bundle: it is the SERVER's, and most of it is
+ * game logic — `scripts/` (the quest VM sources), `Quests/`, `npc.xml`, `config.xml`,
+ * drop tables, and per-area `info.xml` / `game.map` (spawns, exits, collision). Serving the
+ * whole tree hands all of that to anyone who can reach the bridge, so only the three
+ * client-asset trees are reachable, and inside `Areas/` only the client packages — never
+ * the map or info files that sit next to them.
+ *
+ * Anything the client legitimately needs from the rest of the tree should be computed here
+ * and published as a small derived document (that is what /data/areas.json is), not by
+ * widening this list.
+ */
+const DATA_ALLOW = [
+  /^Areas\/[^/]+\/client(_l)?\.pkg$/,
+  /^client_pkg\/.+$/,
+  /^client_res\/.+$/,
+];
+
+/** True if `rel` (a root-relative, forward-slash path) may be served. */
+export function isAllowedDataPath(rel) {
+  if (typeof rel !== 'string' || rel === '' || rel.includes('\0')) return false;
+  const segments = rel.split('/');
+  // empty, dot-prefixed or backslash-bearing segments never appear in a legitimate asset
+  // path; CVS holds the 2011 checkout metadata, which lists files we do not serve.
+  if (segments.some((s) => s === '' || s.startsWith('.') || s === 'CVS' || s.includes('\\'))) {
+    return false;
+  }
+  return DATA_ALLOW.some((re) => re.test(rel));
+}
+
 /**
- * Resolve a URL path under the data directory to a real file, or null if it escapes.
- * Callers must treat null as 403/404 — this is the only thing standing between a dev server
- * and the rest of the disk.
+ * Resolve a URL path under the data directory to a real file, or null if it escapes the
+ * directory or is not a client asset. Callers must treat null as 403 — this is the only
+ * thing standing between the bridge and the rest of the server's data (and the disk).
  */
 export function resolveDataFile(dataDir, relPath) {
   const root = path.resolve(dataDir);
   const file = path.resolve(root, '.' + (relPath.startsWith('/') ? relPath : '/' + relPath));
+  // containment first: path.resolve has already collapsed any ".." by here
   if (file !== root && !file.startsWith(root + path.sep)) return null;
+  const rel = file.slice(root.length + 1).split(path.sep).join('/');
+  if (!isAllowedDataPath(rel)) return null;
   return file;
 }

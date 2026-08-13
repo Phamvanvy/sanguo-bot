@@ -91,6 +91,12 @@ public class ByteListUtil {
 	}
 
 	public static void addString(ByteList list, String str) {
+		// SELF-HOST FIX: a nullable column reaches the wire as null (tbl_account.phone is
+		// NULL for any account that was never given one) and this threw NPE, killing the
+		// login reply. An empty string is what the reader on the other side expects.
+		if (str == null) {
+			str = "";
+		}
 		int strlen = str.length();
 		int utflen = 0;
 		char[] charr = new char[strlen];

@@ -21,9 +21,13 @@
  *   MAX_BUFFER    (default 4194304)   per-direction buffered bytes before the session is killed
  *   STATIC_DIR    (default ../client) also serve this dir over HTTP on the same port so the
  *                                     browser client is same-origin with the WS; 'off' disables
- *   DATA_DIR      (default ../../selfhost/runtime/data) the server's game data directory,
- *                                     served read-only under /data/ so the client can decode
- *                                     the original art itself; 'off' disables
+ *   DATA_DIR      (default ../../selfhost/runtime/data) the server's game data directory.
+ *                                     Only the client-asset trees are served, read-only,
+ *                                     under /data/ (see asset-index.js); 'off' disables
+ *   MAX_SESSIONS  (default 64)        concurrent WS sessions before new ones are refused
+ *   MAX_PER_IP    (default 8)         concurrent WS sessions from one address
+ *   RATE_BURST    (default 300)       HTTP requests one address may make back-to-back
+ *   RATE_PER_SEC  (default 30)        …and the rate that budget refills at
  */
 import net from 'node:net';
 import http from 'node:http';
@@ -38,9 +42,38 @@ const BRIDGE_PORT = Number(process.env.BRIDGE_PORT || 8080);
 const WORLD_HOST = process.env.WORLD_HOST || '127.0.0.1';
 const WORLD_PORT = Number(process.env.WORLD_PORT || 7000);
 const MAX_BUFFER = Number(process.env.MAX_BUFFER || 4 * 1024 * 1024);
+const MAX_SESSIONS = Number(process.env.MAX_SESSIONS || 64);
+const MAX_PER_IP = Number(process.env.MAX_PER_IP || 8);
+const RATE_BURST = Number(process.env.RATE_BURST || 300);
+const RATE_PER_SEC = Number(process.env.RATE_PER_SEC || 30);
+const MAX_URL_LENGTH = 2048;
 
 let sessionSeq = 0;
 const log = (id, ...a) => console.log(`[bridge#${id}]`, ...a);
+
+// ---- crude per-address limits ---------------------------------------------
+// Not a security boundary — the bridge is meant to sit behind something real if it is ever
+// exposed. This is here so one runaway tab (or one bored visitor) cannot spin the disk or
+// exhaust the world server's session table.
+const buckets = new Map();   // ip -> {tokens, at}
+const wsPerIp = new Map();   // ip -> count
+let wsCount = 0;
+
+function rateLimited(ip) {
+  const now = Date.now();
+  let b = buckets.get(ip);
+  if (!b) { b = { tokens: RATE_BURST, at: now }; buckets.set(ip, b); }
+  b.tokens = Math.min(RATE_BURST, b.tokens + ((now - b.at) / 1000) * RATE_PER_SEC);
+  b.at = now;
+  if (b.tokens < 1) return true;
+  b.tokens -= 1;
+  return false;
+}
+// Buckets for addresses that stopped talking are full anyway; drop them so the map cannot grow.
+setInterval(() => {
+  const cutoff = Date.now() - 5 * 60_000;
+  for (const [ip, b] of buckets) if (b.at < cutoff) buckets.delete(ip);
+}, 60_000).unref();
 
 // ---- static file serving (dev convenience) --------------------------------
 // Sharing the port keeps the page same-origin with the WS endpoint, so the browser client
@@ -61,49 +94,73 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const DATA_DIR = process.env.DATA_DIR === 'off' ? null
   : path.resolve(HERE, process.env.DATA_DIR || '../../selfhost/runtime/data');
 
+const BASE_HEADERS = { 'x-content-type-options': 'nosniff' };
+
+/** Send a file with an mtime/size ETag, answering a conditional request with 304. */
+function sendFile(req, res, file, cacheControl) {
+  fs.stat(file, (err, st) => {
+    if (err || !st.isFile()) { res.writeHead(404, BASE_HEADERS).end('not found'); return; }
+    const etag = `"${st.size.toString(16)}-${st.mtimeMs.toString(16)}"`;
+    const headers = {
+      ...BASE_HEADERS,
+      'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+      'cache-control': cacheControl,
+      etag,
+      'last-modified': st.mtime.toUTCString(),
+    };
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return; }
+    fs.readFile(file, (err2, data) => {
+      if (err2) { res.writeHead(404, BASE_HEADERS).end('not found'); return; }
+      res.writeHead(200, { ...headers, 'content-length': data.length });
+      res.end(data);
+    });
+  });
+}
+
 function serveData(req, res, rel) {
-  if (!DATA_DIR) { res.writeHead(404).end('data serving disabled'); return; }
+  if (!DATA_DIR) { res.writeHead(404, BASE_HEADERS).end('data serving disabled'); return; }
   if (rel === '/areas.json') {
     let index;
     try {
       index = areaIndex(DATA_DIR);
     } catch (e) {
       console.error('[bridge] area index failed:', e.message);
-      res.writeHead(500).end('area index failed: ' + e.message);
+      res.writeHead(500, BASE_HEADERS).end('area index failed: ' + e.message);
       return;
     }
     if (index.failures.length) console.warn('[bridge] area index warnings:', index.failures.join('; '));
-    res.writeHead(200, { 'content-type': 'application/json' });
+    res.writeHead(200, { ...BASE_HEADERS, 'content-type': 'application/json', 'cache-control': 'public, max-age=3600' });
     res.end(JSON.stringify({ areas: index.areas, mapToArea: index.mapToArea }));
     return;
   }
   const file = resolveDataFile(DATA_DIR, rel);
-  if (!file) { res.writeHead(403).end('forbidden'); return; }
-  fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404).end('not found'); return; }
-    res.writeHead(200, {
-      'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      // The data directory is a frozen 2011 export; re-downloading a 200 KB tileset on every
-      // map change would be pure waste.
-      'cache-control': 'public, max-age=86400',
-    });
-    res.end(data);
-  });
+  if (!file) { res.writeHead(403, BASE_HEADERS).end('forbidden'); return; }
+  // The data directory is a frozen 2011 export: a file at a given path never changes, so the
+  // browser should never re-download a 200 KB tileset it already has.
+  sendFile(req, res, file, 'public, max-age=86400, immutable');
 }
 
 const httpServer = http.createServer((req, res) => {
-  if (req.method !== 'GET') { res.writeHead(405).end('method not allowed'); return; }
-  const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  const ip = req.socket.remoteAddress || '?';
+  if (req.method !== 'GET') { res.writeHead(405, BASE_HEADERS).end('method not allowed'); return; }
+  if (!req.url || req.url.length > MAX_URL_LENGTH) { res.writeHead(414, BASE_HEADERS).end('uri too long'); return; }
+  // GET only, so anything with a body is a client we do not understand.
+  if (Number(req.headers['content-length'] || 0) > 0) { res.writeHead(413, BASE_HEADERS).end('payload too large'); return; }
+  if (rateLimited(ip)) { res.writeHead(429, { ...BASE_HEADERS, 'retry-after': '1' }).end('slow down'); return; }
+  let rel;
+  try {
+    rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  } catch {
+    res.writeHead(400, BASE_HEADERS).end('bad request');   // malformed percent-encoding
+    return;
+  }
   if (rel === '/data' || rel.startsWith('/data/')) { serveData(req, res, rel.slice(5) || '/'); return; }
-  if (!STATIC_DIR) { res.writeHead(404).end('not found'); return; }
+  if (!STATIC_DIR) { res.writeHead(404, BASE_HEADERS).end('not found'); return; }
   const file = path.resolve(STATIC_DIR, '.' + (rel === '/' ? '/index.html' : rel));
   // Never serve outside STATIC_DIR, whatever the path contains.
-  if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) { res.writeHead(403).end('forbidden'); return; }
-  fs.readFile(file, (err, data) => {
-    if (err) { res.writeHead(404).end('not found'); return; }
-    res.writeHead(200, { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' });
-    res.end(data);
-  });
+  if (file !== STATIC_DIR && !file.startsWith(STATIC_DIR + path.sep)) { res.writeHead(403, BASE_HEADERS).end('forbidden'); return; }
+  // The client is edited while the stack runs, so it must revalidate rather than be cached.
+  sendFile(req, res, file, 'no-cache');
 });
 
 const wss = new WebSocketServer({ server: httpServer });
@@ -124,7 +181,28 @@ wss.on('error', (err) => {
 
 wss.on('connection', (ws, req) => {
   const id = ++sessionSeq;
-  const peer = req.socket.remoteAddress + ':' + req.socket.remotePort;
+  const ip = req.socket.remoteAddress || '?';
+  const peer = ip + ':' + req.socket.remotePort;
+
+  // One WS session is one TCP session on the world server, and the world has a finite
+  // session table — refuse here rather than let it be filled from a browser.
+  const fromIp = wsPerIp.get(ip) || 0;
+  if (wsCount >= MAX_SESSIONS || fromIp >= MAX_PER_IP) {
+    log(id, `refusing ${peer}: ${wsCount}/${MAX_SESSIONS} sessions, ${fromIp}/${MAX_PER_IP} from this address`);
+    try { ws.close(1013, 'too many sessions'); } catch {}
+    return;
+  }
+  wsCount += 1;
+  wsPerIp.set(ip, fromIp + 1);
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    wsCount -= 1;
+    const n = (wsPerIp.get(ip) || 1) - 1;
+    if (n > 0) wsPerIp.set(ip, n); else wsPerIp.delete(ip);
+  };
+
   log(id, 'WS open from', peer, '-> connecting TCP', `${WORLD_HOST}:${WORLD_PORT}`);
 
   let closed = false;
@@ -135,6 +213,7 @@ wss.on('connection', (ws, req) => {
   const shutdown = (why) => {
     if (closed) return;
     closed = true;
+    release();
     log(id, 'closing:', why);
     try { tcp.destroy(); } catch {}
     try { ws.close(); } catch {}
