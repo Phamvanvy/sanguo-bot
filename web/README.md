@@ -29,6 +29,18 @@ Browser (JS)  --WebSocket(binary)-->  bridge  --TCP "UA"-->  world :7000
   coordinates the server accepts. Verified by `tools/render_smoke.py` (Playwright, against the
   live stack): 585 tile blits + 146 decor objects, character art loaded, click-to-walk moves it
   right, `MOVE_CLIENT` accepted, zero console errors.
+- **G3c the game shell: NOT THE REAL UI — frozen as a debug shell.** `client/game.html` boots
+  behind a splash, logs in, picks a character and plays under a HUD laid out after the live H5
+  client (play.minhchauh5.com). It works, but it was *drawn by us* — `theme.css`, a custom walk
+  pad, a custom minimap — and the goal of this project is the original game, not a re-creation
+  of it. So it stays only as a harness for testing the renderer, protocol, movement and NPCs,
+  and **gets no further UI features**: no bag, quest, shop or skill panels in HTML/CSS. It is
+  retired once G3d renders the world UI. See "G3c — the shell" below.
+- **G3d the original UI runtime: IN PROGRESS.** The client's interface is not layout code, it
+  is bytecode: every window, panel and button is a function in a `.etf` script that the client's
+  own VM executes. Those scripts are already on our server. The container reader, the
+  instruction set and the interpreter are ported and tested; the syscall layer and the widget
+  toolkit are next. See "G3d — the original UI runtime" below.
 
 ## Layout
 
@@ -51,8 +63,10 @@ Browser (JS)  --WebSocket(binary)-->  bridge  --TCP "UA"-->  world :7000
   client files revalidate. Also: GET only, a per-address request budget (429 over it), and
   caps on concurrent sessions overall and per address (`MAX_SESSIONS`, `MAX_PER_IP`).
   None of this makes the bridge safe to expose directly — it makes an accident survivable.
-- `client/game.html` + `client/src/app/game-client.js` — **the G3b client**: log in, enter the
-  world, and play on the rendered map. Click to walk, WASD/arrows to step, `+`/`-` to zoom.
+- `client/game.html` + `client/src/app/game-client.js` — **the client**: boot, log in, pick a
+  character, and play on the rendered map. Click or tap the map, drag the walk pad, WASD/arrows
+  to step, `+`/`-` to zoom, Enter to chat, F1 for the packet log.
+- `client/src/ui/` — the shell around the renderer. See "G3c — the shell" below.
 - `client/index.html` + `client/src/app/debug-client.js` — the G2 wire-layer client: same flow
   with a packet log and a debug dot plot instead of a view. Kept because it isolates protocol
   problems from rendering ones.
@@ -93,25 +107,33 @@ Browser (JS)  --WebSocket(binary)-->  bridge  --TCP "UA"-->  world :7000
 ## Run it
 
 ```bash
-# 1. server must be up (see selfhost/)
-cd selfhost && docker compose up -d
+# 1. server + bridge (see selfhost/). The bridge is a compose service; it needs its one
+#    dependency installed on the host first, because web/ is mounted read-only.
+npm --prefix web/bridge ci
+docker compose -f selfhost/docker-compose.yml up -d
 
-# 2. start the bridge (env: WORLD_HOST, WORLD_PORT=7000, BRIDGE_PORT=8080, STATIC_DIR)
-cd web/bridge && npm install && node bridge.js
+# 2. …or run the bridge on the host instead, against the containers' published ports
+#    (env: WORLD_HOST, WORLD_PORT=7000, BRIDGE_PORT, STATIC_DIR, DATA_DIR)
+cd web/bridge && node bridge.js
 
 # 3. unit tests (no server needed)
 node --test web/client/src/net/codec.test.mjs web/client/src/net/protocol.test.mjs
 node --test web/client/src/assets/assets.test.mjs web/client/src/assets/inflate.test.mjs
 node --test web/client/src/game/game.test.mjs    # the last three need selfhost/runtime/data,
                                                  # else those cases skip
+node --test web/client/src/ui/ui.test.mjs
+node --test web/client/src/vm/vm.test.mjs web/client/src/vm/vm-exec.test.mjs
+
+# 3b. what the shipped UI scripts actually call (scopes the G3d syscall work)
+node tools/vm/census.mjs --model Flash --top 20
 
 # 4. end-to-end over the bridge (server + bridge running)
 cd web/bridge && node test_ws_login.js --name "$SANGO_USER" --password "$SANGO_PASS"   # G1
 cd web/bridge && node test_ws_g2.js    --name "$SANGO_USER" --password "$SANGO_PASS"   # G2
 
 # 5. the browser clients
-#    http://127.0.0.1:8080/game.html  -> log in -> pick a character -> click to walk   (G3b)
-#    http://127.0.0.1:8080/           -> the same flow with a packet log, no rendering (G2)
+#    http://127.0.0.1:8090/game.html  -> log in -> pick a character -> click to walk   (G3b)
+#    http://127.0.0.1:8090/           -> the same flow with a packet log, no rendering (G2)
 
 # 6. the rendering smoke test (server + bridge running; drives a real Chromium)
 SANGUO_ACCOUNT=... SANGUO_PASSWORD=... python tools/render_smoke.py
@@ -244,7 +266,165 @@ and decodes them in JS.
   but no name or appearance: players borrow `male.ctn`, everything else renders as a marker.
   There is no "unit left" opcode ported either, so units unseen for 30 s are dropped.
 
+## G3c — the shell: DONE
+
+The renderer had a debug page around it: a form, a packet log, and a line of counters. The
+shell replaces that with the interface the game actually ships. The layout is copied from the
+live H5 client at `play.minhchauh5.com` — the same game, re-released — captured screen by
+screen with Playwright: portrait + HP/MP top left, place name and a labelled action bar top
+right, minimap under it, walk pad bottom left, round buttons bottom right, chat log along the
+bottom with an exp strip under it, and panels that are a gold header with a red title plaque
+over a parchment body.
+
+### `client/src/ui/`
+
+- `theme.css` — the design system: gold frames, parchment panels, red plaques, stat bars.
+  Everything sizes off one `--ui` variable, so the whole HUD scales together on a small screen.
+- `ui-assets.js` — the game's own interface art, made usable from the DOM: a `.pip` frame in,
+  a data URL out. Also `portraitCanvas`, which crops a portrait out of the walking sprite.
+- `minimap.js` — the scene's background bitmap scaled down, with unit dots and the camera
+  rectangle over it. `fitMap`/`minimapToWorld` are pure, so click-to-walk is unit-tested.
+- `joystick.js` — the walk pad. `stickVector` is pure; the class is pointer plumbing.
+- `ui.test.mjs` — 7 tests over the two pure modules.
+
+### Shell notes worth keeping
+
+- **The icons are the game's, the frames are CSS.** `ui_res480.pip` and `ability42x42.pip` hold
+  the real bag/chest/scroll/coin icons and they are used as-is. The frames around them are not:
+  the original chrome is bitmap art cut for a 480x320 phone, and blown up to a desktop window it
+  reads as a postage stamp. Buttons carrying **Chinese text** (`確定`, `返回`, `選單`) are
+  skipped outright — this client is in Vietnamese, like the live one.
+- **Atlas indices were checked by rendering them, not counted off the sheet.** A contact sheet
+  of `ui_res480.pip` is 9 wide, so it is easy to read an index one out — and one out gives you a
+  plausible-looking wrong icon rather than an error. The named frames in `ui-assets.js` were
+  each dumped and looked at.
+- **The HUD only shows numbers the server sent.** `ACTOR_LOGIN_SERVER` carries hp/mp/exp/money
+  and the four attributes, so those are real. Nothing *updates* them yet — `SYNC_PLAYER_SERVER`
+  is unported — so the character panel says so rather than implying a live gauge. Features
+  whose opcodes are missing (bag, quests) name the opcodes instead of drawing an empty bag.
+- **The walk pad reports a direction, not a destination.** Each frame the target is pushed
+  `PAD_LOOKAHEAD` px ahead of the character, which is what makes held-down movement continuous
+  and keeps every `MOVE_CLIENT` a short step the server's pathfinder will accept.
+- **Zoom fits the map inside the window, it does not cover it.** The maps are small (the spawn
+  map is 352x320 px) and covering a 1280x720 window would need 4x, which pins the camera to the
+  map edge and the character to a corner. Letterboxing a small map looks better than that.
+- **The packet log did not go away, it moved.** It is the same log G2 needed, behind the "Log"
+  button or F1, and still the first place to look when an opcode misbehaves.
+
+## G3d — the original UI runtime: IN PROGRESS
+
+The 2014 client does not hard-code its interface. `com/pip/ui/VM.java` is a bytecode
+interpreter ("GTVM"), and every screen is a compiled script — `game_world`, `game_panel`,
+`ui_bag`, `ui_ability`, … — running on it over the widget toolkit in `com/pip/gui/`.
+`VMGame.java` wires those scripts to the server. So the way to get the real UI is to replace
+the Java ME runtime under the scripts, not to redraw the screens:
+
+```
+original .etf scripts  ->  VM (this port)  ->  GWidget/GContainer/GWindow  ->  drawing
+syscalls  ->  original .pip art  ->  Canvas
+```
+
+The scripts ship with the server we already run: `selfhost/runtime/data/scripts/<UIModel>/`,
+and their strings are already Vietnamese. **The chosen model is `Flash`** — the same set the
+live H5 re-release runs. The Java source to port from is `Game/sangobuildVn/client/src/`,
+because that is the revision `selfhost/build_runtime.sh` stages the data from.
+
+### `client/src/vm/`
+
+- `etf.js` — the script container (`VM.loadETF`): `EGL0`/`EGL1` header, `ST` string table,
+  `CT` code table, `CB` callbacks, `LB` linked libraries. Strings are UTF-16BE with a 1- or
+  2-byte **character** count, unlike the modified UTF-8 the wire protocol and assets use.
+- `isa.js` — the 75 instructions, with `INSTRUCTION_LENGTH`/`STACK_EFFECT` transcribed from
+  VM.java, plus a disassembly walker.
+- `vm.js` — the interpreter, ported call-for-call: pointer encoding, dynamic heap with its
+  32-slot temp ring, stack frames, `TSWITCH`/`LSWITCH`, library calls, callbacks, and the
+  block/resume path a script uses while waiting on the server. Syscalls are *injected*, so
+  this file stays a pure machine and the platform layer can be filled in feature by feature.
+- `vm.test.mjs` (9) + `vm-exec.test.mjs` (20) + `syscalls-core.test.mjs` (12) — all pass.
+- `tools/vm/census.mjs` — scopes the remaining work from the bytecode instead of guessing:
+  which syscalls the shipped scripts actually call, how often, and from where.
+
+**G3d syscall layers (in progress).** The host is now a *stack* of layers behind one
+`composeHost(platform, ...)` dispatcher; each layer returns `UNHANDLED` for ids it does not
+own, so they compose without knowing each other's id maps:
+
+- `runtime.js` — the Java value types scripts see through syscalls: `JavaVector`,
+  `SortHashtable` (insertion-ordered, boxed-Integer keys compare by value), `VMInteger`,
+  `DataInputStream` / `ByteArrayOutputStream` over modified UTF-8.
+- `ua-segment.js` — the script-side `UASegment`: one growable buffer, read cursor after the
+  type field, array writers/readers with u16 counts; what `UWAP_Create` hands back.
+- `tool.js` — the `Tool` statics scripts reach: `splitString`, `mergeString(2)`, integer
+  `sqrt`/`distance`, and the rect predicates with Java's exact edge semantics.
+- `syscalls-core.js` — ~120 syscall cases needing no world/rendering: strings, objects,
+  `Realize`, vectors, hashtables, streams, UWAP, globals, keys/time/random, and the
+  `PauseUICycle`/`ResumeUICycle` pair that parks a script mid-function.
+- `gfx.js` — `javax.microedition.lcdui.Graphics`/`Font`/`Image` onto Canvas2D: MIDP anchors,
+  intersecting clips, degrees-CCW arcs, inclusive-edge rects, `drawRegion` with the game's
+  own 8 trans codes.
+- `widgets.js` — `GWidget`/`GContainer`/`GWindow`/`GScrollBar`. `vmData` is an Int32Array in
+  the exact GW_* layout; layout H/V/GRID/GRID2/GRID3/BORDER, scroll bookkeeping, focus, and
+  the CYCLE/CYCLEUI/PAINT/PROCESSPACKET call stacks follow GContainer.java/GWindow.java.
+- `syscalls-ui.js` — the drawing block (0x0011..0x001E, 0x201E.., 0x571D..) and the widget
+  block (0x12xx + the GWindow statics at 0x5705..0x571F).
+- `vmgame.js` — `VMGame` + `VMGameManager`: the registry keyed by vmKey, window stacks per
+  script, common callbacks, `cycle()`/`handleSegment()`/`drawAll()`, async ETF loading with
+  the STATE_REQUESTING_VMUI park, and hit testing. Script loading is injected
+  (`loadScript(name)` -> inflated bytes), so the same code runs under Node tests.
+
+Still open before the boot chain runs end to end: the resource layer behind the
+`ImageSet_*`/`AnimateSet_*`/`Res*` syscalls (the decoders already exist in
+`client/src/assets/`; they need ImageSet/PipAnimateSet wrappers with drawFrame), the
+remaining concrete widgets scripts construct (`GLabel`, `GIcon`, `GTextArea`, `GLinePanel`,
+`GImageNumer`, `GGameIcon`), the game-world processor syscalls (0x50xx/0x55xx/0x56xx), and
+then `game_init -> game_world -> game_panel` over `net/session.js`.
+
+Census of the Flash set (105 scripts, all parse and fully disassemble): 4 670 functions,
+256 434 instructions, 61 of 75 opcodes used, **620 distinct syscalls** — 475 of them reachable
+from the core scripts. Only 19 ids (38 call sites) have no case in either Java client, and all
+of them are Symbian/Android SMS/address-book hooks that a browser stubs out.
+
+### VM notes worth keeping
+
+- **Java int semantics are load-bearing.** The stack and static heap are `Int32Array` so stores
+  truncate like Java, `MUL` goes through `Math.imul` (a double would keep bits Java drops),
+  division truncates toward zero, and every `codeData[...]` byte is sign-extended.
+- **A VM value is either a number or a pointer**, told apart by its top bits: bit 31 means a
+  string-table reference (library id + index), otherwise bits 30..26 are a data type — ≥ 20 is
+  an `Object[]`, and bit 25 marks a pointer to one *element* with its index in bits 24..12.
+- **Struct instances are `int[]`**; `STLOAD`/`STSAVE` index straight into them.
+- **Jump tables are relative to the END of their instruction**, not to the function start the
+  way `JMP`/`JEQ`/`JNE` operands are. `TSWITCH` is dense (`0xFFFF` in a slot means "default"),
+  `LSWITCH` is a sorted table binary-searched by `searchTable`.
+- **Only `TSWITCH`/`LSWITCH` are variable-length.** That makes a full disassembly a real test:
+  one wrong length desynchronises the decoder, so 256 k instructions decoding cleanly and every
+  function ending exactly on its boundary pins the whole table.
+- **The temp ring is never freed.** The first 32 heap cells are a ring buffer for objects that
+  syscalls hand to scripts; `heapFree` ignores them by design, and they get overwritten in turn.
+- **`instructionLimit` is ours, not the original's.** A runaway script froze a 2014 handset;
+  in a browser it freezes the tab and the debugger with it, so tests and dev builds set a
+  budget. Default 0 = unlimited, exactly like Java.
+
 ## Next
+
+Continue G3d in this order:
+
+1. **Resource layer** — `ImageSet`/`PipAnimateSet` wrappers over the existing
+   `client/src/assets/` decoders, plus a `syscalls-res.js` layer for the `ImageSet_*`,
+   `AnimateSet_*`, `AnimatePlayer` and `Res*` blocks (0x0031..0x004C, 0x1301..0x1339).
+2. **Concrete widgets** — `GLabel`, `GIcon`, `GTextArea`, `GLinePanel`, `GImageNumer`,
+   `GGameIcon` and their 0x1243..0x12D9 syscall cases, on top of the toolkit already ported.
+3. **Boot chain** — preload the `lib_builtin` + core scripts through `loadScript`, boot
+   `game_init -> game_world -> game_panel` in a `VMGameManager`, wire `handleSegment()` to
+   `net/session.js` events (`CONN_VM_DATA` / `CONN_VM_COMMAND`) and drive
+   `cycle()/drawAll()` from the existing game loop.
+4. **World processor syscalls** — 0x50xx/0x55xx/0x56xx against the G3b renderer's scene.
+
+Only after the original world UI runs do the feature scripts (`ui_bag`, `ui_ability`,
+quests, shops) get opened — and only then is `client/src/ui/` retired.
+
+Still open from earlier milestones, and now expected to come *from the scripts* rather than
+from hand-written inference — G3b guesses the animation groups (0 = idle, 4 = walk) off the
+asset, but in the real client the VM scripts choose animations:
 
 Widen opcode coverage feature by feature (scene units -> chat -> bag -> combat), and give
 non-player units their real art (`NPCTemplates/` + `client_pkg.xml` name the sets).

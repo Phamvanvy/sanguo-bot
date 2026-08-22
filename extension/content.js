@@ -35,6 +35,8 @@
     "coin_shake_loop",
     "auto_attack_loop",
     "star_reappraisal_loop",
+    "mount_skill_learn_once",
+    "gem_upgrade_sequence",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -42,6 +44,7 @@
   // the game WebSocket, and reload back to the server picker.
   const DOM_SPEED_FACTOR = 0.7;
   const BLESSING_SPEED_FACTOR = 1.0;
+  const GEM_UPGRADE_SPEED_FACTOR = 1.0;
   const NETWORK_EVENT_KEY = "sanguo-last-network-event";
   const NETWORK_QUEUE_KEY = "sanguo-network-event-queue";
   const FLOW_CONTEXT_KEY = "sanguo-flow-context";
@@ -208,12 +211,22 @@
         card.querySelector("strong").textContent = flow.label;
         card.querySelector("small").textContent = flow.description;
         const slots = card.querySelector(".sg-item-slots");
-        for (const [slot, label] of [["left", "Ô trái"], ["right", "Ô phải"]]) {
+        const itemOptions = [
+          { label: "Ô trái", overrides: { item_slot: "left" } },
+          { label: "Ô phải", overrides: { item_slot: "right" } },
+          {
+            label: "Ô trái ×99 + sắp xếp",
+            overrides: { item_slot: "left", auto_sort_batches: true },
+            wide: true,
+          },
+        ];
+        for (const option of itemOptions) {
           const button = document.createElement("button");
           button.type = "button";
           button.disabled = running;
-          button.textContent = label;
-          button.addEventListener("click", () => runFlow(flow, { item_slot: slot }));
+          button.textContent = option.label;
+          button.classList.toggle("sg-wide", Boolean(option.wide));
+          button.addEventListener("click", () => runFlow(flow, option.overrides));
           slots.append(button);
         }
         return card;
@@ -368,6 +381,15 @@
     }
   }
 
+  async function domHtmlClick(token, point) {
+    ensureDomActive(token);
+    const { target } = eventTargetAt(point);
+    const clickable = target.closest?.('button, [role="button"], input[type="button"], input[type="submit"]') || target;
+    if (typeof clickable.focus === "function") clickable.focus({ preventScroll: true });
+    if (typeof clickable.click !== "function") throw new Error("Không tìm thấy nút HTML để bấm");
+    clickable.click();
+  }
+
   function expandCodes(macro) {
     const codes = (macro.codes || []).map(String).filter(Boolean);
     for (const range of macro.code_ranges || []) {
@@ -408,23 +430,32 @@
     }
   }
 
-  async function runCodeRedeem(token, macro) {
+  async function runCodeRedeem(token, macro, flow = "code_redeem") {
     const codes = expandCodes(macro);
-    for (let index = 0; index < codes.length; index += 1) {
-      updateDomFlow("code_redeem", `Mở NPC cho code ${index + 1}/${codes.length}`);
-      await domClick(token, macro.npc_point || [0.288, 0.465]);
-      await domDelay(macro.open_delay_seconds || 1);
-      await domClick(token, macro.option_point || [0.50, 0.43]);
-      await domDelay(macro.option_delay_seconds || 1);
-      await domClick(token, macro.input_point || [0.50, 0.51]);
-      await domClearAndType(token, codes[index]);
-      await domClick(token, macro.submit_point || [0.50, 0.57]);
-      await domDelay(macro.submit_delay_seconds || 1.4);
-      await domPress(token, "Enter", "Enter", 13);
-      await domDelay(macro.dismiss_delay_seconds || 0.8);
-      await domPress(token, "Escape", "Escape", 27);
-      await domDelay(macro.reopen_delay_seconds || 1);
-      updateDomFlow("code_redeem", `Đổi code ${index + 1}/${codes.length}: ${codes[index]}`);
+    if (!codes.length) throw new Error("Chưa cấu hình code để nhập");
+    const maxCycles = Number(macro.max_cycles ?? 1);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      for (let index = 0; index < codes.length; index += 1) {
+        const attempt = cycle * codes.length + index + 1;
+        if (macro.map_point != null) {
+          updateFlowContext(flow, attempt, "open_map");
+          await domClick(token, macro.map_point);
+          await domDelay(macro.map_delay_seconds || 1.2);
+        }
+        updateDomFlow(flow, `Mở NPC để nhập ${codes[index]} lần ${attempt}`);
+        await domClick(token, macro.npc_point || [0.288, 0.465]);
+        await domDelay(macro.open_delay_seconds || 1);
+        await domClick(token, macro.option_point || [0.50, 0.43]);
+        await domDelay(macro.option_delay_seconds || 1);
+        await domClick(token, macro.input_point || [0.50, 0.51]);
+        await domClearAndType(token, codes[index]);
+        await domHtmlClick(token, macro.submit_point || [0.494, 0.556]);
+        await domDelay(macro.submit_delay_seconds || 1.2);
+        await domClick(token, macro.notification_point || [0.500, 0.518]);
+        await domDelay(macro.dismiss_delay_seconds || 0.8);
+        await domDelay(macro.reopen_delay_seconds || 1);
+        updateDomFlow(flow, `Đã nhập ${codes[index]}: ${attempt} lần`);
+      }
     }
   }
 
@@ -444,19 +475,29 @@
   }
 
   async function runUseInventoryItem(token, macro) {
-    const maxCycles = Number(macro.max_cycles || 0);
+    const batchSize = Math.max(1, Number(macro.max_cycles ?? 99));
+    const autoSortBatches = Boolean(macro.auto_sort_batches);
+    const maxBatches = autoSortBatches ? Number(macro.max_batches ?? 0) : 1;
     const itemSlot = macro.item_slot === "right" ? "right" : "left";
     const itemPoint = (macro.item_points || {})[itemSlot] || macro.item_point || [0.337, 0.207];
-    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
-      await domClick(token, itemPoint);
-      await domDelay(macro.detail_delay_seconds || 0.7);
-      await domClick(token, macro.use_point || [0.724, 0.345]);
-      if (macro.confirm_point != null) {
-        await domDelay(macro.confirm_delay_seconds || 0.7);
-        await domClick(token, macro.confirm_point);
+    for (let batch = 0; maxBatches <= 0 || batch < maxBatches; batch += 1) {
+      for (let cycle = 0; cycle < batchSize; cycle += 1) {
+        await domClick(token, itemPoint);
+        await domDelay(macro.detail_delay_seconds || 0.7);
+        await domClick(token, macro.use_point || [0.724, 0.345]);
+        if (macro.confirm_point != null) {
+          await domDelay(macro.confirm_delay_seconds || 0.7);
+          await domClick(token, macro.confirm_point);
+        }
+        const total = batch * batchSize + cycle + 1;
+        updateDomFlow("use_inventory_item", `Đã dùng ô ${itemSlot === "right" ? "phải" : "trái"}: ${total}`);
+        await domDelay(macro.refresh_delay_seconds || 1);
       }
-      updateDomFlow("use_inventory_item", `Đã dùng ô ${itemSlot === "right" ? "phải" : "trái"}: ${cycle + 1}`);
-      await domDelay(macro.refresh_delay_seconds || 1);
+      if (!autoSortBatches) break;
+      updateFlowContext("use_inventory_item", batch + 1, "sort_next_batch");
+      await domClick(token, macro.batch_sort_point || [0.813, 0.917]);
+      updateDomFlow("use_inventory_item", `Đã sắp xếp sau batch ${batch + 1} × ${batchSize}`, "sort_next_batch");
+      await domDelay(macro.batch_sort_delay_seconds || 1);
     }
   }
 
@@ -485,6 +526,56 @@
       await domClick(token, macro.confirm_point || [0.499, 0.693]);
       updateDomFlow("star_reappraisal", `Giám định lại cấp sao: ${cycleNumber} lượt`);
       await domDelay(macro.next_cycle_delay_seconds || 0.8);
+    }
+  }
+
+  async function runMountSkillLearnOnce(token, macro) {
+    updateFlowContext("mount_skill_learn", 1, "select_book");
+    await domClick(token, macro.book_point || [0.289, 0.807]);
+    await domDelay(macro.detail_delay_seconds || 1.0);
+    updateFlowContext("mount_skill_learn", 1, "learn_skill");
+    await domClick(token, macro.learn_point || [0.703, 0.224]);
+    await domDelay(macro.confirm_delay_seconds || 0.8);
+    updateFlowContext("mount_skill_learn", 1, "confirm");
+    await domClick(token, macro.confirm_point || [0.696, 0.628]);
+    updateDomFlow("mount_skill_learn", "Đã học kỹ năng thú cưỡi 1 lần", "done");
+    await domDelay(macro.result_delay_seconds || 1.0);
+  }
+
+  async function runGemUpgradeSequence(token, macro) {
+    const gemPoints = macro.gem_points || [
+      [0.109, 0.315], [0.168, 0.315], [0.227, 0.315],
+      [0.285, 0.315], [0.344, 0.315], [0.402, 0.315],
+    ];
+    const confirmPoint = macro.confirm_point || [0.697, 0.630];
+    const upgradesPerGem = Math.max(1, Number(macro.upgrades_per_gem || 4));
+    for (const [index, gemPoint] of gemPoints.entries()) {
+      const gemNumber = index + 1;
+      for (let upgrade = 0; upgrade < upgradesPerGem; upgrade += 1) {
+        const upgradeNumber = upgrade + 1;
+        const completed = index * upgradesPerGem + upgradeNumber;
+        updateFlowContext("gem_upgrade", completed, "select_gem");
+        await domClick(token, gemPoint);
+        await domDelay(macro.menu_delay_seconds || 1.2, GEM_UPGRADE_SPEED_FACTOR);
+        updateFlowContext("gem_upgrade", completed, "upgrade_gem");
+        await domClick(token, macro.upgrade_point || [0.365, 0.549]);
+        await domDelay(macro.dialog_delay_seconds || 1.5, GEM_UPGRADE_SPEED_FACTOR);
+        updateFlowContext("gem_upgrade", completed, "confirm_material");
+        await domClick(token, confirmPoint);
+        await domDelay(macro.confirm_delay_seconds || 1.5, GEM_UPGRADE_SPEED_FACTOR);
+        updateFlowContext("gem_upgrade", completed, "confirm_cost");
+        await domClick(token, confirmPoint);
+        await domDelay(macro.result_delay_seconds || 0.8, GEM_UPGRADE_SPEED_FACTOR);
+        updateFlowContext("gem_upgrade", completed, "dismiss_notification");
+        await domClick(token, macro.notification_point || [0.200, 0.518]);
+        updateDomFlow(
+          "gem_upgrade",
+          `Đá ${gemNumber}/${gemPoints.length}: lần ${upgradeNumber}/${upgradesPerGem}`,
+          "upgrade_done",
+        );
+        await domDelay(macro.repeat_delay_seconds || 1.2, GEM_UPGRADE_SPEED_FACTOR);
+      }
+      await domDelay(macro.next_gem_delay_seconds || 1.0, GEM_UPGRADE_SPEED_FACTOR);
     }
   }
 
@@ -526,12 +617,16 @@
       try {
         await startTimerKeepAlive();
         if (flow === "blessing") await runBlessing(token, macro);
-        else if (flow === "code_redeem") await runCodeRedeem(token, macro);
+        else if (flow === "code_redeem" || flow === "mch5exp_redeem") {
+          await runCodeRedeem(token, macro, flow);
+        }
         else if (flow === "discard_items") await runDiscardItems(token, macro);
         else if (flow === "use_inventory_item") await runUseInventoryItem(token, macro);
         else if (flow === "coin_shake") await runCoinShake(token, macro);
         else if (flow === "auto_attack") await runAutoAttack(token, macro);
         else if (flow === "star_reappraisal") await runStarReappraisal(token, macro);
+        else if (flow === "mount_skill_learn") await runMountSkillLearnOnce(token, macro);
+        else if (flow === "gem_upgrade") await runGemUpgradeSequence(token, macro);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {

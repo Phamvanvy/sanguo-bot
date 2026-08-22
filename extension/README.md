@@ -6,6 +6,8 @@
 4. Mở `https://play.minhchauh5.com/` và reload tab. Panel được ghim trực tiếp trên game.
 
 Panel có thể kéo thả và thu gọn bằng nút `−`; bấm icon extension để ẩn/hiện.
+Flow **Học kỹ năng thú cưỡi** dùng sách thứ 3 đang hiển thị, bấm **Lĩnh ngộ** và
+xác nhận **OK** đúng một lần. Hãy mở sẵn tab **Thú cưỡi** trước khi chạy flow.
 Flow **Tự động đánh** chỉ bấm nút **Đánh** và 7 nút kỹ năng trong cụm chiến đấu,
 lặp liên tục cho đến khi bấm **Dừng flow đang chạy**.
 Các flow hoạt động nhanh chạy bằng cặp `mousedown`/`mouseup` mà canvas

@@ -147,6 +147,33 @@ class ExtensionServerTest(unittest.TestCase):
         flows = {flow["id"]: flow for flow in flow_catalog()}
         self.assertEqual("auto_attack_loop", flows["auto_attack"]["runner"])
 
+    def test_default_catalog_contains_looping_mch5exp_redeem(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("code_redeem_loop", flows["mch5exp_redeem"]["runner"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('flow === "mch5exp_redeem"', content)
+        self.assertIn('const maxCycles = Number(macro.max_cycles ?? 1)', content)
+        self.assertIn('maxCycles <= 0 || cycle < maxCycles', content)
+        redeem = content[
+            content.index("async function runCodeRedeem"):
+            content.index("async function runDiscardItems")
+        ]
+        self.assertIn('domHtmlClick(token, macro.submit_point || [0.494, 0.556])', redeem)
+        self.assertIn('macro.notification_point || [0.500, 0.518]', redeem)
+        self.assertIn('if (macro.map_point != null)', redeem)
+        self.assertLess(
+            redeem.index('domClick(token, macro.map_point)'),
+            redeem.index('domClick(token, macro.npc_point'),
+        )
+        self.assertNotIn('domPress(token, "Enter"', redeem)
+        self.assertNotIn('domPress(token, "Escape"', redeem)
+        self.assertIn('clickable.click();', content)
+        config = (PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8")
+        self.assertIn('codes: ["MCH5EXP"]', config)
+        self.assertIn('mch5exp_redeem:', config)
+        self.assertIn('map_point: [0.850, 0.070]', config)
+        self.assertIn('npc_point: [0.397, 0.490]', config)
+
     def test_default_catalog_contains_looping_star_reappraisal(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
         self.assertEqual("star_reappraisal_loop", flows["star_reappraisal"]["runner"])
@@ -156,6 +183,62 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('macro.star_button_point || [0.227, 0.869]', content)
         self.assertIn('macro.reappraise_point || [0.498, 0.756]', content)
         self.assertIn('macro.confirm_point || [0.499, 0.693]', content)
+
+    def test_default_catalog_contains_one_shot_mount_skill_learning(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("mount_skill_learn_once", flows["mount_skill_learn"]["runner"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('async function runMountSkillLearnOnce', content)
+        self.assertIn('flow === "mount_skill_learn"', content)
+        self.assertIn('macro.book_point || [0.289, 0.807]', content)
+        self.assertIn('macro.learn_point || [0.703, 0.224]', content)
+        self.assertIn('macro.confirm_point || [0.696, 0.628]', content)
+        one_shot = content[
+            content.index("async function runMountSkillLearnOnce"):
+            content.index("async function runGemUpgradeSequence")
+        ]
+        self.assertNotIn("for (", one_shot)
+        self.assertNotIn("while (", one_shot)
+
+    def test_default_catalog_contains_sequential_gem_upgrade(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("gem_upgrade_sequence", flows["gem_upgrade"]["runner"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('async function runGemUpgradeSequence', content)
+        self.assertIn('flow === "gem_upgrade"', content)
+        self.assertIn('for (const [index, gemPoint] of gemPoints.entries())', content)
+        self.assertIn('for (let upgrade = 0; upgrade < upgradesPerGem; upgrade += 1)', content)
+        self.assertIn('Number(macro.upgrades_per_gem || 4)', content)
+        self.assertIn('const GEM_UPGRADE_SPEED_FACTOR = 1.0', content)
+        self.assertIn('macro.upgrade_point || [0.365, 0.549]', content)
+        self.assertIn('macro.notification_point || [0.200, 0.518]', content)
+        sequence = content[
+            content.index("async function runGemUpgradeSequence"):
+            content.index("async function runAutoAttack")
+        ]
+        self.assertEqual(2, sequence.count("await domClick(token, confirmPoint)"))
+        self.assertNotIn("macro.enhance_point", sequence)
+        gem_defaults = sequence[
+            sequence.index("const gemPoints"):
+            sequence.index("const confirmPoint")
+        ]
+        self.assertEqual(6, gem_defaults.count("[0."))
+
+    def test_inventory_left_batches_use_99_then_sort_forever(self):
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('label: "Ô trái ×99 + sắp xếp"', content)
+        self.assertIn('overrides: { item_slot: "left", auto_sort_batches: true }', content)
+        runner = content[
+            content.index("async function runUseInventoryItem"):
+            content.index("async function runCoinShake")
+        ]
+        self.assertIn('Number(macro.max_cycles ?? 99)', runner)
+        self.assertIn('Number(macro.max_batches ?? 0)', runner)
+        self.assertIn('for (let cycle = 0; cycle < batchSize; cycle += 1)', runner)
+        self.assertIn('macro.batch_sort_point || [0.813, 0.917]', runner)
+        config = (PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8")
+        self.assertIn('max_cycles: 99', config)
+        self.assertIn('max_batches: 0', config)
 
     def test_activity_macros_route_to_dom_extension_runner(self):
         extension_dir = PROJECT_ROOT / "extension"
@@ -178,8 +261,8 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('"version": "0.4.4"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
-        self.assertIn('["left", "Ô trái"]', content)
-        self.assertIn('["right", "Ô phải"]', content)
+        self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
+        self.assertIn('label: "Ô phải", overrides: { item_slot: "right" }', content)
         self.assertIn('(macro.item_points || {})[itemSlot]', content)
         self.assertIn('await domClick(token, attackPoint)', content)
         self.assertIn('const BLESSING_SPEED_FACTOR = 1.0', content)

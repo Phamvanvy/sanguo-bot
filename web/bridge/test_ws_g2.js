@@ -26,7 +26,7 @@ function arg(name, def) {
 }
 const has = (name) => process.argv.includes('--' + name);
 
-const URL = arg('url', process.env.BRIDGE_URL || 'ws://127.0.0.1:8080');
+const URL = arg('url', process.env.BRIDGE_URL || 'ws://127.0.0.1:8090');
 const NAME = arg('name', process.env.SANGO_USER || 'vypv1');
 const PASSWORD = arg('password', process.env.SANGO_PASS || '123456');
 const CHAR = arg('char', process.env.SANGO_CHAR || 'g2test');

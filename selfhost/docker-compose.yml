@@ -96,7 +96,9 @@ services:
       DATA_DIR: /data
     command: ["sh", "-c", "[ -d node_modules/ws ] || { echo 'missing dependencies: run  npm --prefix web/bridge ci' >&2; exit 1; }; exec node bridge.js"]
     ports:
-      - "8080:8080"
+      # 8090 on the host, not 8080: on this machine llama-server also binds 0.0.0.0:8080 and
+      # Windows lets both listen, so requests went to whichever won the race.
+      - "8090:8080"
 
 volumes:
   mysql-data:

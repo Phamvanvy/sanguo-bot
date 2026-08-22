@@ -51,6 +51,11 @@ export class GameSession {
   // Named events: every ported message name ('ACTOR_LIST_SERVER', ...), plus
   // 'packet' (all decoded), 'unknown' (unported opcode), 'error' (decode failure),
   // 'fatal' (framing desync).
+  // 'rawSegment' fires for EVERY complete frame BEFORE any of those — known or
+  // unknown opcode, decoded or decode-error — carrying the raw wire segment.
+  // The VM UI layer observes it (G3d-f): the .etf scripts handle packets the
+  // JS port has not even heard of. `segment` is a private copy owned by the
+  // listener; the accumulator never reuses it.
 
   on(event, fn) {
     if (!this._handlers.has(event)) this._handlers.set(event, new Set());
@@ -156,6 +161,9 @@ export class GameSession {
 
   _dispatch(f) {
     this.stats.received++;
+    // Observer hook first: the VM layer must see packets we cannot decode yet,
+    // and must see them before the named-event handlers run.
+    this._emit('rawSegment', { opcode: f.opcode, segment: f.segment });
     const msg = decodeSegment(f.segment);
     if (!msg.known) {
       this.stats.unknown++;

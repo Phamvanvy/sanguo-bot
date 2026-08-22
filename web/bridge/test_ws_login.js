@@ -8,7 +8,7 @@
  *   world -> TCP -> bridge -> WS -> UAFrameAccumulator -> UASegmentReader
  *
  * Prereqs: world server up, and `node bridge.js` running.
- * Usage: node test_ws_login.js --url ws://127.0.0.1:8080 --name vypv1 --password 123456
+ * Usage: node test_ws_login.js --url ws://127.0.0.1:8090 --name vypv1 --password 123456
  * Credentials come from CLI/env (SANGO_USER/SANGO_PASS), never hardcoded/committed.
  */
 import { WebSocket } from 'ws';
@@ -20,7 +20,7 @@ function arg(name, def) {
   const i = process.argv.indexOf('--' + name);
   return i >= 0 && i + 1 < process.argv.length ? process.argv[i + 1] : def;
 }
-const URL = arg('url', process.env.BRIDGE_URL || 'ws://127.0.0.1:8080');
+const URL = arg('url', process.env.BRIDGE_URL || 'ws://127.0.0.1:8090');
 const NAME = arg('name', process.env.SANGO_USER || 'vypv1');
 const PASSWORD = arg('password', process.env.SANGO_PASS || '123456');
 const MODEL = arg('model', 'GenericMidp2/GenericMidp2');   // server splits on '/': MODEL/JVMCODE

@@ -206,7 +206,8 @@ function draw() {
 
 // ---------------------------------------------------------------- wiring
 
-$('url').value = `ws://${location.host}`;
+// same origin as the page the bridge served (wss if something terminates TLS in front)
+$('url').value = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
 $('loginBtn').onclick = doLogin;
 $('createBtn').onclick = createCharacter;
 $('refreshBtn').onclick = () => refreshCharacters().catch((e) => setStatus(e.message, 'err'));

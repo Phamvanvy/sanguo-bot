@@ -65,9 +65,10 @@ export function areaIndex(dataDir) {
  * The data directory is not a public asset bundle: it is the SERVER's, and most of it is
  * game logic — `scripts/` (the quest VM sources), `Quests/`, `npc.xml`, `config.xml`,
  * drop tables, and per-area `info.xml` / `game.map` (spawns, exits, collision). Serving the
- * whole tree hands all of that to anyone who can reach the bridge, so only the three
- * client-asset trees are reachable, and inside `Areas/` only the client packages — never
- * the map or info files that sit next to them.
+ * whole tree hands all of that to anyone who can reach the bridge, so only the client-asset
+ * trees are reachable (plus the compiled .etf script images the client must download to
+ * boot — see DATA_ALLOW), and inside `Areas/` only the client packages — never the map or
+ * info files that sit next to them.
  *
  * Anything the client legitimately needs from the rest of the tree should be computed here
  * and published as a small derived document (that is what /data/areas.json is), not by
@@ -77,6 +78,12 @@ const DATA_ALLOW = [
   /^Areas\/[^/]+\/client(_l)?\.pkg$/,
   /^client_pkg\/.+$/,
   /^client_res\/.+$/,
+  // The .etf VM scripts are game logic, but the client cannot boot without
+  // them — the 2011 Java client downloaded these same compiled images from
+  // the server. Serve ONLY compiled script images under a UI-model directory:
+  // names are [A-Za-z0-9_]+ and the extension is exactly ".etf.gz", so no
+  // source/config file anywhere else in scripts/ is reachable.
+  /^scripts\/[A-Za-z0-9_]+\/[A-Za-z0-9_]+\.etf\.gz$/,
 ];
 
 /** True if `rel` (a root-relative, forward-slash path) may be served. */

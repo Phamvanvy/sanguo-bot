@@ -11,7 +11,7 @@ server put it, and that walking moves it. It logs in for real, so it needs the s
 Credentials come from the environment or the command line, never the source:
 
     SANGUO_ACCOUNT=... SANGUO_PASSWORD=... python tools/render_smoke.py
-    python tools/render_smoke.py --account x --password y [--url http://127.0.0.1:8080/game.html]
+    python tools/render_smoke.py --account x --password y [--url http://127.0.0.1:8090/game.html]
 
 Screenshots land in a gitignored directory (default web/client/assets/spike/) and are the
 artefact worth looking at afterwards.
@@ -29,10 +29,15 @@ from playwright.sync_api import sync_playwright
 REPO = Path(__file__).resolve().parent.parent
 DEFAULT_OUT = REPO / "web" / "client" / "assets" / "spike"
 
+# The client is in Vietnamese and so are the names it prints back; a Windows console defaults
+# to a codepage that cannot encode them, which would fail the run over a log line.
+for stream in (sys.stdout, sys.stderr):
+    stream.reconfigure(encoding="utf-8", errors="replace")
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--url", default="http://127.0.0.1:8080/game.html")
+    p.add_argument("--url", default="http://127.0.0.1:8090/game.html")
     p.add_argument("--account", default=os.environ.get("SANGUO_ACCOUNT", ""))
     p.add_argument("--password", default=os.environ.get("SANGUO_PASSWORD", ""))
     p.add_argument("--out", default=str(DEFAULT_OUT))
@@ -59,6 +64,9 @@ def main() -> int:
         page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
         page.goto(args.url, wait_until="domcontentloaded")
+        # The client boots behind a splash while it decodes its UI art and the area index;
+        # the login form only exists to be filled once that is done.
+        page.wait_for_selector("#login:not([hidden]) #account", timeout=int(args.timeout * 1000))
         page.fill("#account", args.account)
         page.fill("#password", args.password)
         page.click("#loginBtn")
@@ -82,7 +90,7 @@ def main() -> int:
                 animate: g.player.animateId, hasSprites: !!g.player.sprites,
             };
         }""")
-        print(f"character   : {character.strip()}")
+        print(f"character   : {' · '.join(character.split())}")
         print(f"map         : {state['name']} ({state['map']}) {state['w']}x{state['h']}, "
               f"{state['tiles']} tile blits, {state['decor']} decor, built in {state['buildMs']}ms")
         print(f"spawn       : x={state['x']} y={state['y']} animate={state['animate']} "
@@ -91,15 +99,20 @@ def main() -> int:
         time.sleep(0.5)                       # let a frame or two land before capturing
         page.screenshot(path=str(out / "g3b_world.png"))
 
-        # --- walk: click a point to the right of the character and watch it get there ---
-        before = page.evaluate("() => ({x: window.__game.player.x, y: window.__game.player.y})")
-        page.evaluate("""() => {
+        # --- walk: send the character along the ground and watch it get there ---
+        # The server persists where the last run left the character, so "always walk right"
+        # eventually starts from the map's right edge with no room to move. Walk towards
+        # whichever side has space instead, and assert on the direction actually asked for.
+        before = page.evaluate("""() => {
             const g = window.__game;
-            // Straight along the ground, far enough to be unambiguous but inside the map.
-            const tx = Math.min(g.renderer.scene.width - 8, g.player.x + 60);
+            const span = 60;
+            const room = g.renderer.scene.width - 8 - g.player.x;
+            const dx = room >= span ? span : -span;
+            const tx = Math.max(8, Math.min(g.renderer.scene.width - 8, g.player.x + dx));
             g.player.setTarget(tx, g.player.y, performance.now());
+            return { x: g.player.x, y: g.player.y, tx, dx: Math.sign(tx - g.player.x) };
         }""")
-        time.sleep(0.6)
+        time.sleep(0.35)
         walking = page.evaluate("""() => ({x: window.__game.player.x, y: window.__game.player.y,
                                            moving: window.__game.player.moving,
                                            animate: window.__game.player.animateId})""")
@@ -112,7 +125,8 @@ def main() -> int:
                                          sent: window.__game.session.stats.sent})""")
         page.screenshot(path=str(out / "g3b_after_walk.png"))
         print(f"walk        : {before['x']},{before['y']} -> mid {walking['x']},{walking['y']} "
-              f"(animate {walking['animate']}, moving={walking['moving']}) -> {after['x']},{after['y']}")
+              f"(animate {walking['animate']}, moving={walking['moving']}) -> {after['x']},{after['y']} "
+              f"(target {before['tx']})")
 
         # --- the pixels: is anything actually drawn? ---
         pixels = page.evaluate("""() => {
@@ -145,8 +159,9 @@ def main() -> int:
     check(state["hasSprites"], "character art loaded")
     check(pixels["lit"] > pixels["total"] * 0.2, "the canvas is not mostly black")
     check(pixels["colours"] > 20, "the map is real art, not flat colour")
-    check(walking["moving"], "the character was walking mid-click")
-    check(after["x"] > before["x"], f"the character moved right ({before['x']} -> {after['x']})")
+    check(walking["moving"] or walking["x"] != before["x"], "the character was walking mid-click")
+    moved = (after["x"] - before["x"]) * before["dx"]
+    check(moved > 0, f"the character moved towards {before['tx']} ({before['x']} -> {after['x']})")
     check(after["sent"] > 0, "MOVE packets went to the server")
     check(not errors, "no console errors" + ("" if not errors else ": " + "; ".join(errors[:5])))
 

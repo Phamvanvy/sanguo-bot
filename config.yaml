@@ -172,6 +172,27 @@ activity_macros:
     rest_delay_seconds: 1
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
+  mch5exp_redeem:
+    label: "Nhập code MCH5EXP"
+    description: "Nhập MCH5EXP liên tục đến khi bấm Dừng"
+    icon: "券"
+    runner: "code_redeem_loop"
+    # Mỗi lượt mở Map rồi bấm marker "Nhân viên đổi mã kích hoạt" được khoanh trong ảnh.
+    map_point: [0.850, 0.070]
+    npc_point: [0.397, 0.490]
+    option_point: [0.50, 0.43]
+    input_point: [0.50, 0.51]
+    submit_point: [0.494, 0.556]
+    notification_point: [0.500, 0.518]
+    map_delay_seconds: 1.2
+    open_delay_seconds: 2.0
+    option_delay_seconds: 1.0
+    submit_delay_seconds: 1.2
+    dismiss_delay_seconds: 0.8
+    reopen_delay_seconds: 1.0
+    codes: ["MCH5EXP"]
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
   star_reappraisal:
     label: "Giám định lại cấp sao"
     description: "Lặp Cấp sao → Giám định lại → Xác nhận đến khi Stop"
@@ -186,24 +207,42 @@ activity_macros:
     next_cycle_delay_seconds: 1.2
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
-  code_redeem:
-    label: "Đổi code xu"
-    description: "Nhập tuần tự MCH5TEST1 đến MCH5TEST100"
-    icon: "券"
-    runner: "code_redeem_loop"
-    # Giữa thân NPC "Nhân viên đổi mã kích hoạt" tại Tân Giang Tân Thôn.
-    npc_point: [0.288, 0.465]
-    option_point: [0.50, 0.43]
-    input_point: [0.50, 0.51]
-    submit_point: [0.50, 0.57]
-    open_delay_seconds: 1.0
-    option_delay_seconds: 1.0
-    submit_delay_seconds: 1.4
-    dismiss_delay_seconds: 0.8
-    reopen_delay_seconds: 1.0
-    notification_dismiss_key: "enter"
-    code_ranges:
-      - {prefix: "MCH5TEST", start: 1, end: 100}
+  mount_skill_learn:
+    label: "Học kỹ năng thú cưỡi"
+    description: "Chọn sách thứ 3 → Lĩnh ngộ → OK đúng 1 lần"
+    icon: "🐎"
+    runner: "mount_skill_learn_once"
+    # Bắt đầu khi đang mở tab Thú cưỡi như ảnh mẫu.
+    book_point: [0.289, 0.807]
+    learn_point: [0.703, 0.224]
+    confirm_point: [0.696, 0.628]
+    detail_delay_seconds: 1.0
+    confirm_delay_seconds: 0.8
+    result_delay_seconds: 1.0
+  gem_upgrade:
+    label: "Nâng đá"
+    description: "Nâng lần lượt 6 viên, mỗi viên 4 lần"
+    icon: "◆"
+    runner: "gem_upgrade_sequence"
+    # Bắt đầu khi đang mở màn hình Luyện trang bị như ảnh mẫu.
+    gem_points:
+      - [0.109, 0.315]
+      - [0.168, 0.315]
+      - [0.227, 0.315]
+      - [0.285, 0.315]
+      - [0.344, 0.315]
+      - [0.402, 0.315]
+    upgrade_point: [0.365, 0.549]
+    confirm_point: [0.697, 0.630]
+    # Bấm mé trái banner; nếu banner đã tự tắt thì vùng bên dưới không chọn vật phẩm.
+    notification_point: [0.200, 0.518]
+    upgrades_per_gem: 4
+    menu_delay_seconds: 1.2
+    dialog_delay_seconds: 1.5
+    confirm_delay_seconds: 1.5
+    result_delay_seconds: 0.8
+    repeat_delay_seconds: 1.2
+    next_gem_delay_seconds: 1.0
   discard_items:
     label: "Vứt đồ"
     description: "Sắp xếp rồi vứt ô đầu tiên liên tục"
@@ -222,7 +261,7 @@ activity_macros:
     max_cycles: 0
   use_inventory_item:
     label: "Dùng vật phẩm"
-    description: "Chọn ô trái hoặc ô phải trong 2 ô đầu rồi dùng liên tục"
+    description: "Chọn ô trái hoặc ô phải rồi dùng tối đa 99 lần"
     icon: "🎁"
     runner: "use_item_loop"
     # Tâm 2 ô vật phẩm đầu tiên theo viewport của tab game.
@@ -236,8 +275,13 @@ activity_macros:
     detail_delay_seconds: 0.7
     confirm_delay_seconds: 0.7
     refresh_delay_seconds: 1.0
-    # 0 = lặp đến khi bấm Stop trong extension.
-    max_cycles: 0
+    # Option "Ô trái ×99 + sắp xếp" dùng các thiết lập batch này.
+    batch_sort_point: [0.813, 0.917]
+    batch_sort_delay_seconds: 1.0
+    # 0 = tiếp tục các batch 99 lượt đến khi bấm Stop.
+    max_batches: 0
+    # Tự kết thúc sau tối đa 99 lượt.
+    max_cycles: 99
   coin_shake:
     label: "Rung xu"
     description: "Rung cây bằng xu rồi xác nhận liên tục"

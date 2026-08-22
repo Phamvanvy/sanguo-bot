@@ -35,7 +35,7 @@ python selfhost/probe_login.py --name NAME --password PASSWORD    # raw TCP logi
 node web/bridge/test_ws_g2.js --name NAME --password PASSWORD     # login → world → move
 ```
 
-`http://127.0.0.1:8080/game.html` is the playable browser client (see `web/README.md`).
+`http://127.0.0.1:8090/game.html` is the playable browser client (see `web/README.md`).
 The bridge serves it, relays WebSocket↔TCP, and hands out **only** the client-asset trees
 out of `runtime/data` — the rest of that directory is server-side game logic. The data
 mount is read-only at the container as well as in the code.
