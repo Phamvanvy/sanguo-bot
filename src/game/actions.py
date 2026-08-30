@@ -210,7 +210,7 @@ class GameActions:
         h, w = image.shape[:2]
         x1, x2 = self.auto.get("hud_text_x_range", [0.04, 0.18])
         radius = float(self.auto.get("hud_row_radius", 0.025))
-        row_points = self.auto.get("hud_row_points", [0.265, 0.330, 0.395, 0.460, 0.525])
+        row_points = self.auto.get("hud_row_points", [0.265, 0.330, 0.395, 0.460])
         green_threshold = int(self.auto.get("hud_green_pixel_threshold", 80))
         white_threshold = int(self.auto.get("hud_white_pixel_threshold", 150))
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)

@@ -73,6 +73,17 @@ dừng controller.
 Chấm xanh trên popup nghĩa là extension đã kết nối controller. Nếu chấm đỏ,
 kiểm tra lại bước 2.
 
+### Chạy nhiều cửa sổ game
+
+- Cài hoặc reload extension trong từng profile Edge/Brave/Chrome cần chạy.
+- Mỗi tài khoản game phải nằm trong một **cửa sổ trình duyệt riêng**. Nếu đang
+  dùng nhiều tab trong cùng cửa sổ, kéo từng tab ra ngoài thành cửa sổ mới.
+- Có thể để các cửa sổ maximized và che lên nhau; controller chụp trực tiếp
+  từng HWND và mỗi panel chỉ điều khiển worker của cửa sổ đó.
+- Không minimize cửa sổ game vì Chromium có thể ngừng render canvas/WebSocket.
+- Bấm **Full auto** trong từng cửa sổ. Nút **Dừng flow đang chạy** chỉ dừng
+  worker thuộc cửa sổ chứa panel đó.
+
 ## 4. Các flow hiện có
 
 ### Tự động đánh

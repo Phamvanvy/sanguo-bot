@@ -11,9 +11,10 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
 from src.capture import GameControl
@@ -29,11 +30,16 @@ DIAGNOSTICS_VERSION = 1
 LOG_PATH = PROJECT_ROOT / "logs" / "extension-flow.log"
 NETWORK_LOG_PATH = PROJECT_ROOT / "logs" / "extension-network.log"
 
+@dataclass
+class WorkerState:
+    process: subprocess.Popen
+    log_handle: Any
+    flow: str
+
+
 _lock = threading.Lock()
-_process: subprocess.Popen | None = None
-_log_handle = None
-_active_flow: str | None = None
-_last_result: dict[str, Any] = {"state": "idle", "message": "Chưa chạy flow nào"}
+_workers: dict[str, WorkerState] = {}
+_last_results: dict[str, dict[str, Any]] = {}
 
 
 def log_network_event(data: dict[str, Any]) -> dict[str, Any]:
@@ -190,6 +196,16 @@ def run_code_redeem(control: GameControl, cfg: dict, flow_id: str = "code_redeem
 
 def adapt_canvas_region(control: GameControl, cfg: dict, fullscreen: bool = False) -> None:
     """Convert constant browser-chrome pixel insets for the current window size."""
+    if getattr(control.session, "window_capture", False):
+        client = control.session.client_rect()
+        renderer = control.session.renderer_rect()
+        cfg["game"]["os_input"]["canvas_region"] = {
+            "x": (renderer.left - client.left) / client.width,
+            "y": (renderer.top - client.top) / client.height,
+            "w": renderer.width / client.width,
+            "h": renderer.height / client.height,
+        }
+        return
     if fullscreen:
         cfg["game"]["os_input"]["canvas_region"] = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
         return
@@ -211,7 +227,13 @@ def adapt_canvas_region(control: GameControl, cfg: dict, fullscreen: bool = Fals
     }
 
 
-def run_worker(flow_id: str, tab_title: str, fullscreen: bool = False) -> int:
+def run_worker(
+    flow_id: str,
+    tab_title: str,
+    fullscreen: bool = False,
+    browser_process: Optional[str] = None,
+    window_token: Optional[str] = None,
+) -> int:
     cfg = load_config()
     cfg["runtime"]["dry_run"] = False
     valid_ids = {flow["id"] for flow in flow_catalog(cfg)}
@@ -223,7 +245,10 @@ def run_worker(flow_id: str, tab_title: str, fullscreen: bool = False) -> int:
     # ordinary browser window selected by the user and use OS-level input,
     # regardless of the backend configured for standalone tools.
     cfg["game"]["control_mode"] = "os_input"
-    control = GameControl(session=attach_existing(cfg, tab_title), cfg=cfg)
+    control = GameControl(
+        session=attach_existing(cfg, window_token or tab_title, process_name=browser_process),
+        cfg=cfg,
+    )
     adapt_canvas_region(control, cfg, fullscreen=fullscreen)
     control.set_dry_run(False)
     try:
@@ -251,41 +276,76 @@ def run_worker(flow_id: str, tab_title: str, fullscreen: bool = False) -> int:
         control.close()
 
 
-def _refresh_status() -> dict[str, Any]:
-    global _process, _log_handle, _last_result
+def _session_id(value: Optional[str]) -> str:
+    return (value or "legacy").strip()[:160] or "legacy"
+
+
+def _refresh_status(session_id: Optional[str] = None) -> dict[str, Any]:
+    requested = _session_id(session_id) if session_id else None
     with _lock:
-        if _process is not None:
-            code = _process.poll()
+        for key, worker in list(_workers.items()):
+            code = worker.process.poll()
             if code is None:
-                return {"state": "running", "flow": _active_flow, "pid": _process.pid}
-            if _log_handle is not None:
-                _log_handle.close()
-                _log_handle = None
-            _last_result = {
+                continue
+            worker.log_handle.close()
+            _last_results[key] = {
                 "state": "done" if code == 0 else "error",
-                "flow": _active_flow,
+                "flow": worker.flow,
                 "returncode": code,
+                "sessionId": key,
                 "message": "Flow hoàn tất" if code == 0 else "Flow bị lỗi; xem logs/extension-flow.log",
             }
-            _process = None
-        return dict(_last_result)
+            del _workers[key]
+
+        if requested:
+            worker = _workers.get(requested)
+            if worker:
+                return {
+                    "state": "running", "flow": worker.flow,
+                    "pid": worker.process.pid, "sessionId": requested,
+                }
+            return dict(_last_results.get(requested, {
+                "state": "idle", "sessionId": requested, "message": "Chưa chạy flow nào",
+            }))
+
+        running = [
+            {"sessionId": key, "flow": worker.flow, "pid": worker.process.pid}
+            for key, worker in _workers.items()
+        ]
+        if running:
+            first = running[0]
+            return {
+                "state": "running", "flow": first["flow"], "pid": first["pid"],
+                "runningCount": len(running), "sessions": running,
+            }
+        return {"state": "idle", "runningCount": 0, "message": "Chưa chạy flow nào"}
 
 
-def start_flow(flow_id: str, tab_title: str, tab_url: str, fullscreen: bool = False) -> dict[str, Any]:
-    global _process, _log_handle, _active_flow, _last_result
-    _refresh_status()
+def start_flow(
+    flow_id: str,
+    tab_title: str,
+    tab_url: str,
+    fullscreen: bool = False,
+    session_id: Optional[str] = None,
+    browser_process: Optional[str] = None,
+    window_token: Optional[str] = None,
+) -> dict[str, Any]:
+    key = _session_id(session_id)
+    _refresh_status(key)
     valid_ids = {flow["id"] for flow in flow_catalog()}
     if flow_id not in valid_ids:
         return {"ok": False, "error": "Flow không tồn tại"}
     if not tab_title.strip() or not is_game_url(tab_url):
         return {"ok": False, "error": "Hãy chọn tab https://play.minhchauh5.com/ trước khi chạy"}
     with _lock:
-        if _process is not None:
-            return {"ok": False, "error": "Một flow khác đang chạy"}
+        if key in _workers:
+            return {"ok": False, "error": "Cửa sổ này đang chạy một flow khác"}
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _log_handle = open(LOG_PATH, "a", encoding="utf-8")
-        _log_handle.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] START {flow_id}\n")
-        _log_handle.flush()
+        log_handle = open(LOG_PATH, "a", encoding="utf-8")
+        log_handle.write(
+            f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] START {flow_id} session={key}\n"
+        )
+        log_handle.flush()
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         worker_args = [
                 sys.executable,
@@ -296,40 +356,58 @@ def start_flow(flow_id: str, tab_title: str, tab_url: str, fullscreen: bool = Fa
                 "--tab-title",
                 tab_title,
             ]
+        if browser_process:
+            worker_args.extend(["--browser-process", browser_process])
+        if window_token:
+            worker_args.extend(["--window-token", window_token])
         if fullscreen:
             worker_args.append("--fullscreen")
-        _process = subprocess.Popen(
+        process = subprocess.Popen(
             worker_args,
             cwd=PROJECT_ROOT,
-            stdout=_log_handle,
+            stdout=log_handle,
             stderr=subprocess.STDOUT,
             creationflags=flags,
         )
-        _active_flow = flow_id
-        _last_result = {"state": "running", "flow": flow_id, "pid": _process.pid}
-        return {"ok": True, **_last_result}
+        _workers[key] = WorkerState(process=process, log_handle=log_handle, flow=flow_id)
+        result = {"state": "running", "flow": flow_id, "pid": process.pid, "sessionId": key}
+        _last_results[key] = result
+        return {"ok": True, **result}
 
 
-def stop_flow() -> dict[str, Any]:
-    global _process, _log_handle, _last_result
-    with _lock:
-        process = _process
-    if process is None or process.poll() is not None:
-        _refresh_status()
-        return {"ok": True, "state": "idle", "message": "Không có flow đang chạy"}
-    process.terminate()
-    try:
-        process.wait(timeout=3)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout=2)
-    with _lock:
-        if _log_handle is not None:
-            _log_handle.close()
-            _log_handle = None
-        _process = None
-        _last_result = {"state": "stopped", "flow": _active_flow, "message": "Đã dừng flow"}
-    return {"ok": True, **_last_result}
+def stop_flow(session_id: Optional[str] = None) -> dict[str, Any]:
+    keys = [_session_id(session_id)] if session_id else list(_workers)
+    stopped = []
+    for key in keys:
+        with _lock:
+            worker = _workers.get(key)
+        if worker is None:
+            continue
+        worker.process.terminate()
+        try:
+            worker.process.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            worker.process.kill()
+            worker.process.wait(timeout=2)
+        with _lock:
+            current = _workers.pop(key, None)
+            if current:
+                current.log_handle.close()
+            result = {
+                "state": "stopped", "flow": worker.flow,
+                "sessionId": key, "message": "Đã dừng flow",
+            }
+            _last_results[key] = result
+            stopped.append(result)
+    if session_id:
+        return {"ok": True, **(stopped[0] if stopped else {
+            "state": "idle", "sessionId": _session_id(session_id),
+            "message": "Không có flow đang chạy",
+        })}
+    return {
+        "ok": True, "state": "stopped" if stopped else "idle",
+        "stoppedCount": len(stopped), "message": "Đã dừng tất cả flow" if stopped else "Không có flow đang chạy",
+    }
 
 
 class ExtensionHandler(BaseHTTPRequestHandler):
@@ -366,7 +444,11 @@ class ExtensionHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/flows":
             self._send(200, {"flows": flow_catalog()})
         elif parsed.path == "/api/status":
-            self._send(200, {**_refresh_status(), "diagnosticsVersion": DIAGNOSTICS_VERSION})
+            session_id = parse_qs(parsed.query).get("sessionId", [None])[0]
+            self._send(200, {
+                **_refresh_status(session_id),
+                "diagnosticsVersion": DIAGNOSTICS_VERSION,
+            })
         elif parsed.path == "/api/macro":
             flow_id = parse_qs(parsed.query).get("id", [""])[0]
             macro = load_config().get("activity_macros", {}).get(flow_id)
@@ -393,10 +475,13 @@ class ExtensionHandler(BaseHTTPRequestHandler):
                 str(data.get("tabTitle", "")),
                 str(data.get("tabUrl", "")),
                 bool(data.get("fullscreen", False)),
+                str(data.get("sessionId", "")) or None,
+                str(data.get("browserProcess", "")) or None,
+                str(data.get("windowToken", "")) or None,
             )
             self._send(200 if result.get("ok") else 409, result)
         elif self.path == "/api/stop":
-            self._send(200, stop_flow())
+            self._send(200, stop_flow(str(data.get("sessionId", "")) or None))
         elif self.path == "/api/network-event":
             self._send(200, {"ok": True, "event": log_network_event(data)})
         else:
@@ -424,12 +509,20 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=PORT)
     parser.add_argument("--worker", metavar="FLOW")
     parser.add_argument("--tab-title", default="")
+    parser.add_argument("--browser-process", default="")
+    parser.add_argument("--window-token", default="")
     parser.add_argument("--fullscreen", action="store_true")
     args = parser.parse_args()
     if args.worker:
         if not args.tab_title:
             parser.error("--tab-title is required with --worker")
-        raise SystemExit(run_worker(args.worker, args.tab_title, fullscreen=args.fullscreen))
+        raise SystemExit(run_worker(
+            args.worker,
+            args.tab_title,
+            fullscreen=args.fullscreen,
+            browser_process=args.browser_process or None,
+            window_token=args.window_token or None,
+        ))
     serve(args.port)
 
 

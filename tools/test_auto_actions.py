@@ -77,6 +77,21 @@ class GameActionsTest(unittest.TestCase):
 
         self.assertEqual([(0, "pending", 0.265), (1, "completed", 0.33)], rows)
 
+    def test_hud_rows_ignore_green_quest_list_footer(self) -> None:
+        image = np.zeros((600, 1000, 3), dtype=np.uint8)
+        cv2.rectangle(image, (50, 310), (170, 335), (0, 255, 0), -1)
+        cfg = {
+            "ui": self.cfg["ui"],
+            "quest_actions": {
+                "hud_green_pixel_threshold": 20,
+                "hud_white_pixel_threshold": 20,
+            },
+        }
+
+        rows = GameActions(FakeControl(image), cfg).hud_quest_rows()
+
+        self.assertEqual([], rows)
+
     def test_accepts_wide_gold_dialog_row_without_map_scanning(self) -> None:
         dialog = np.zeros((600, 1000, 3), dtype=np.uint8)
         gold = cv2.cvtColor(np.uint8([[[25, 220, 220]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()

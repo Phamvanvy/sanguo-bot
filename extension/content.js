@@ -194,6 +194,9 @@
     path,
     options,
     fullscreen: Boolean(document.fullscreenElement),
+    browserProcess: navigator.userAgent.includes("Edg/")
+      ? "msedge.exe"
+      : (navigator.brave ? "brave.exe" : "chrome.exe"),
   });
 
   function setConnected(connected) {

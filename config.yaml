@@ -25,6 +25,7 @@ game:
     # not isolable, and not safe to keep automating against. Back to Brave,
     # which passed M0 cleanly with a fully separate profile dir.
     browser_exe: "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+    load_extension: true
     # Extension workers attach to the tab the user actually selected. Edge is
     # allowed as a fallback while still requiring the exact game window title.
     browser_exe_fallbacks:
@@ -32,6 +33,9 @@ game:
     # Send clicks directly to Chromium's render window so automation does not
     # move the user's real mouse cursor or steal foreground focus.
     background_clicks: true
+    # Capture the selected Chromium HWND instead of pixels from the desktop,
+    # allowing maximized game windows to remain behind one another.
+    window_capture: true
     # Separate profile dir so this doesn't collide with the user's main
     # Brave profile/history/bookmarks.
     user_data_dir: "./.brave-os-profile"
@@ -112,13 +116,13 @@ quest_actions:
   max_map_quests_to_accept: 10
   # Built-in quest automation: white HUD rows are pending, green rows are ready to return.
   hud_row_click_x: 0.10
-  hud_row_points: [0.265, 0.330, 0.395, 0.460, 0.525]
+  hud_row_points: [0.265, 0.330, 0.395, 0.460]
   hud_text_x_range: [0.04, 0.18]
   hud_row_radius: 0.025
   hud_green_pixel_threshold: 80
   hud_white_pixel_threshold: 150
   hud_poll_seconds: 2.0
-  auto_quest_timeout_seconds: 90.0
+  auto_quest_timeout_seconds: 15.0
   max_hud_quest_clicks_per_run: 50
   tutorial_confirm_delay_seconds: 2.0
   max_tutorial_confirms: 5

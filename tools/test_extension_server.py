@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
+import src.extension_server as extension_server
 from src.config import PROJECT_ROOT
 from src.extension_server import (
+    _refresh_status,
     adapt_canvas_region,
     expand_activation_codes,
     flow_catalog,
@@ -17,6 +21,8 @@ from src.extension_server import (
     run_code_redeem,
     run_macro,
     run_worker,
+    start_flow,
+    stop_flow,
 )
 from src.os_input import attach_existing
 
@@ -38,6 +44,16 @@ class FakeControl:
 class FakeSession:
     def client_rect(self):
         return SimpleNamespace(width=1920, height=1000)
+
+
+class FakeWindowCaptureSession(FakeSession):
+    window_capture = True
+
+    def client_rect(self):
+        return SimpleNamespace(left=10, top=20, width=1920, height=1000)
+
+    def renderer_rect(self):
+        return SimpleNamespace(left=14, top=100, width=1911, height=915)
 
 
 class ExtensionServerTest(unittest.TestCase):
@@ -130,10 +146,74 @@ class ExtensionServerTest(unittest.TestCase):
             self.assertEqual(0, run_worker("accept_quests", "Minh Châu H5"))
 
         self.assertEqual("os_input", cfg["game"]["control_mode"])
-        attach.assert_called_once_with(cfg, "Minh Châu H5")
+        attach.assert_called_once_with(cfg, "Minh Châu H5", process_name=None)
         adapt.assert_called_once()
         session.set_dry_run.assert_called_once_with(False)
         session.close.assert_called_once_with()
+
+    def test_worker_targets_the_requested_browser_window_token(self):
+        cfg = {
+            "runtime": {"dry_run": True},
+            "game": {"control_mode": "os_input", "os_input": {}},
+        }
+        session = MagicMock()
+        with (
+            patch("src.extension_server.load_config", return_value=cfg),
+            patch("src.extension_server.flow_catalog", return_value=[{"id": "accept_quests"}]),
+            patch("src.extension_server.attach_existing", return_value=session) as attach,
+            patch("src.extension_server.adapt_canvas_region"),
+            patch("src.extension_server.GameActions") as actions,
+        ):
+            actions.return_value.accept_all_map_quests.return_value = 0
+            run_worker(
+                "accept_quests", "Minh Châu H5",
+                browser_process="msedge.exe", window_token="SG-edge-1",
+            )
+
+        attach.assert_called_once_with(cfg, "SG-edge-1", process_name="msedge.exe")
+
+    def test_controller_runs_and_stops_independent_window_sessions(self):
+        first = MagicMock(pid=101)
+        first.poll.return_value = None
+        second = MagicMock(pid=202)
+        second.poll.return_value = None
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with (
+                patch.object(extension_server, "_workers", {}),
+                patch.object(extension_server, "_last_results", {}),
+                patch.object(extension_server, "LOG_PATH", Path(temp_dir) / "flow.log"),
+                patch("src.extension_server.subprocess.Popen", side_effect=[first, second]),
+            ):
+                edge = start_flow(
+                    "full_auto", "Minh Châu H5", "https://play.minhchauh5.com/",
+                    session_id="edge-window-1", browser_process="msedge.exe", window_token="SG-edge-1",
+                )
+                brave = start_flow(
+                    "full_auto", "Minh Châu H5", "https://play.minhchauh5.com/",
+                    session_id="brave-window-2", browser_process="brave.exe", window_token="SG-brave-2",
+                )
+
+                self.assertEqual(101, edge["pid"])
+                self.assertEqual(202, brave["pid"])
+                self.assertEqual(2, _refresh_status()["runningCount"])
+                stopped = stop_flow("edge-window-1")
+
+                self.assertEqual("stopped", stopped["state"])
+                self.assertEqual("running", _refresh_status("brave-window-2")["state"])
+                first.terminate.assert_called_once_with()
+                second.terminate.assert_not_called()
+                stop_flow("brave-window-2")
+
+    def test_extension_protocol_includes_window_identity(self):
+        background = (PROJECT_ROOT / "extension" / "background.js").read_text(encoding="utf-8")
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
+
+        self.assertIn("sessionId", background)
+        self.assertIn("windowToken", background)
+        self.assertIn("browserProcess", background)
+        self.assertIn('"msedge.exe"', content)
+        self.assertIn("storage", manifest["permissions"])
 
     def test_activation_code_ranges_expand_in_order(self):
         macro = {
@@ -157,6 +237,21 @@ class ExtensionServerTest(unittest.TestCase):
         adapt_canvas_region(control, cfg)
         region = cfg["game"]["os_input"]["canvas_region"]
         self.assertAlmostEqual(80 / 1000, region["y"])
+        self.assertAlmostEqual(915 / 1000, region["h"])
+
+    def test_canvas_uses_chromium_renderer_bounds_for_window_capture(self):
+        cfg = {"game": {"os_input": {"canvas_insets_px": {
+            "left": 999, "top": 999, "right": 999, "bottom": 999,
+        }}}}
+        control = FakeControl()
+        control.session = FakeWindowCaptureSession()
+
+        adapt_canvas_region(control, cfg)
+
+        region = cfg["game"]["os_input"]["canvas_region"]
+        self.assertAlmostEqual(4 / 1920, region["x"])
+        self.assertAlmostEqual(80 / 1000, region["y"])
+        self.assertAlmostEqual(1911 / 1920, region["w"])
         self.assertAlmostEqual(915 / 1000, region["h"])
 
     def test_canvas_uses_full_client_area_in_fullscreen(self):
@@ -271,7 +366,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.4.4"', manifest)
+        self.assertIn('"version": "0.5.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

@@ -54,6 +54,7 @@ import pygetwindow as gw
 import win32con
 import win32gui
 import win32process
+import win32ui
 
 from src.config import load_config
 
@@ -75,6 +76,7 @@ class OsGameSession:
     process: Optional[subprocess.Popen]
     hwnd: int
     background_clicks: bool = False
+    window_capture: bool = False
 
     def __post_init__(self) -> None:
         self._dry_run = False
@@ -82,11 +84,35 @@ class OsGameSession:
     def client_rect(self) -> Rect:
         return _client_rect(self.hwnd)
 
+    def renderer_rect(self) -> Rect:
+        render_windows = []
+        win32gui.EnumChildWindows(
+            self.hwnd,
+            lambda child, _extra: render_windows.append(child)
+            if win32gui.GetClassName(child) == "Chrome_RenderWidgetHostHWND"
+            else None,
+            None,
+        )
+        if not render_windows:
+            raise RuntimeError(f"No Chromium renderer found for hwnd={self.hwnd}")
+        target = max(
+            render_windows,
+            key=lambda child: (
+                win32gui.GetWindowRect(child)[2] - win32gui.GetWindowRect(child)[0]
+            ) * (
+                win32gui.GetWindowRect(child)[3] - win32gui.GetWindowRect(child)[1]
+            ),
+        )
+        left, top, right, bottom = win32gui.GetWindowRect(target)
+        return Rect(left=left, top=top, width=right - left, height=bottom - top)
+
     def focus(self) -> None:
         _focus(self.hwnd)
 
     def capture(self, rect: Optional[Rect] = None) -> np.ndarray:
         rect = rect or self.client_rect()
+        if self.window_capture:
+            return _print_window_region(self.hwnd, rect)
         return _grab(rect)
 
     def set_dry_run(self, dry_run: bool) -> None:
@@ -220,6 +246,60 @@ def _grab(rect: Rect) -> np.ndarray:
     return cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
 
 
+def _print_window_region(hwnd: int, rect: Rect) -> np.ndarray:
+    """Capture a Chromium window region even when another window covers it."""
+    render_windows = []
+    win32gui.EnumChildWindows(
+        hwnd,
+        lambda child, _extra: render_windows.append(child)
+        if win32gui.GetClassName(child) == "Chrome_RenderWidgetHostHWND"
+        else None,
+        None,
+    )
+
+    def contains(target: int) -> bool:
+        left, top, right, bottom = win32gui.GetWindowRect(target)
+        return (
+            left <= rect.left
+            and top <= rect.top
+            and right >= rect.left + rect.width
+            and bottom >= rect.top + rect.height
+        )
+
+    candidates = [child for child in render_windows if contains(child)]
+    target = min(
+        candidates,
+        key=lambda child: (
+            win32gui.GetWindowRect(child)[2] - win32gui.GetWindowRect(child)[0]
+        ) * (
+            win32gui.GetWindowRect(child)[3] - win32gui.GetWindowRect(child)[1]
+        ),
+        default=hwnd,
+    )
+    left, top, right, bottom = win32gui.GetWindowRect(target)
+    width, height = right - left, bottom - top
+    window_dc = win32gui.GetWindowDC(target)
+    source_dc = win32ui.CreateDCFromHandle(window_dc)
+    memory_dc = source_dc.CreateCompatibleDC()
+    bitmap = win32ui.CreateBitmap()
+    bitmap.CreateCompatibleBitmap(source_dc, width, height)
+    memory_dc.SelectObject(bitmap)
+    try:
+        if not ctypes.windll.user32.PrintWindow(target, memory_dc.GetSafeHdc(), 2):
+            raise RuntimeError(f"PrintWindow failed for hwnd={target}")
+        bgra = np.frombuffer(bitmap.GetBitmapBits(True), dtype=np.uint8).reshape(height, width, 4)
+        x1, y1 = rect.left - left, rect.top - top
+        x2, y2 = x1 + rect.width, y1 + rect.height
+        if x1 < 0 or y1 < 0 or x2 > width or y2 > height:
+            raise ValueError(f"Capture rect {rect} is outside hwnd={target} bounds")
+        return bgra[y1:y2, x1:x2, :3].copy()
+    finally:
+        win32gui.DeleteObject(bitmap.GetHandle())
+        memory_dc.DeleteDC()
+        source_dc.DeleteDC()
+        win32gui.ReleaseDC(target, window_dc)
+
+
 def _owning_process_name(hwnd: int) -> str:
     try:
         _, pid = win32process.GetWindowThreadProcessId(hwnd)
@@ -253,7 +333,11 @@ def _find_window(title_hint: str, process_exe: Optional[str] = None, timeout: fl
     )
 
 
-def attach_existing(cfg: Optional[dict] = None, title_hint: Optional[str] = None) -> OsGameSession:
+def attach_existing(
+    cfg: Optional[dict] = None,
+    title_hint: Optional[str] = None,
+    process_name: Optional[str] = None,
+) -> OsGameSession:
     """Attach to an already-open browser window without launching anything.
 
     The extension passes the active tab title. Chromium exposes that title in
@@ -264,6 +348,12 @@ def attach_existing(cfg: Optional[dict] = None, title_hint: Optional[str] = None
     oi = cfg["game"]["os_input"]
     hint = title_hint or oi["window_title_hint"]
     browser_exes = [oi.get("browser_exe"), *oi.get("browser_exe_fallbacks", [])]
+    if process_name:
+        expected = pathlib.Path(process_name).name.lower()
+        browser_exes = [
+            value for value in browser_exes
+            if value and pathlib.Path(value).name.lower() == expected
+        ] or [process_name]
     attempted = []
     for browser_exe in dict.fromkeys(value for value in browser_exes if value):
         attempted.append(pathlib.Path(browser_exe).name.lower())
@@ -277,7 +367,12 @@ def attach_existing(cfg: Optional[dict] = None, title_hint: Optional[str] = None
             f"No browser window matching title={hint!r}; tried processes={attempted!r}"
         )
     background_clicks = bool(oi.get("background_clicks", False))
-    session = OsGameSession(process=None, hwnd=hwnd, background_clicks=background_clicks)
+    session = OsGameSession(
+        process=None,
+        hwnd=hwnd,
+        background_clicks=background_clicks,
+        window_capture=bool(oi.get("window_capture", False)),
+    )
     if not background_clicks:
         session.focus()
     return session
@@ -293,15 +388,24 @@ def launch(cfg: Optional[dict] = None) -> OsGameSession:
     profile_dir = cfg["_resolved_os_profile_dir"]
     profile_dir.mkdir(parents=True, exist_ok=True)
 
-    process = subprocess.Popen([
+    browser_args = [
         oi["browser_exe"],
         f"--user-data-dir={profile_dir}",
         f"--window-size={window['width']},{window['height']}",
         f"--window-position={window.get('pos_x', 0)},{window.get('pos_y', 0)}",
-        cfg["game"]["url"],
-    ])
+    ]
+    if oi.get("load_extension", False):
+        extension_dir = pathlib.Path(__file__).resolve().parents[1] / "extension"
+        browser_args.append(f"--load-extension={extension_dir}")
+    browser_args.append(cfg["game"]["url"])
+    process = subprocess.Popen(browser_args)
     hwnd = _find_window(oi["window_title_hint"], process_exe=oi["browser_exe"])
-    session = OsGameSession(process=process, hwnd=hwnd)
+    session = OsGameSession(
+        process=process,
+        hwnd=hwnd,
+        background_clicks=bool(oi.get("background_clicks", False)),
+        window_capture=bool(oi.get("window_capture", False)),
+    )
     session.focus()
     return session
 
