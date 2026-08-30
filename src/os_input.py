@@ -51,6 +51,7 @@ import numpy as np
 import psutil
 import pydirectinput
 import pygetwindow as gw
+import win32con
 import win32gui
 import win32process
 
@@ -73,6 +74,7 @@ class Rect:
 class OsGameSession:
     process: Optional[subprocess.Popen]
     hwnd: int
+    background_clicks: bool = False
 
     def __post_init__(self) -> None:
         self._dry_run = False
@@ -99,6 +101,9 @@ class OsGameSession:
         rect = rect or self.client_rect()
         x = int(rect.left + fx * rect.width)
         y = int(rect.top + fy * rect.height)
+        if self.background_clicks:
+            _post_background_click(self.hwnd, x, y)
+            return
         self.focus()
         pydirectinput.moveTo(x, y)
         time.sleep(0.05)
@@ -115,6 +120,9 @@ class OsGameSession:
 
     def press(self, key: str) -> None:
         if getattr(self, "_dry_run", False):
+            return
+        if self.background_clicks:
+            _post_background_key(self.hwnd, key)
             return
         self.focus()
         pydirectinput.press(key)
@@ -135,11 +143,74 @@ def _client_rect(hwnd: int) -> Rect:
 
 def _focus(hwnd: int) -> None:
     try:
-        win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
+        if win32gui.IsIconic(hwnd):
+            win32gui.ShowWindow(hwnd, 9)  # SW_RESTORE
         win32gui.SetForegroundWindow(hwnd)
     except Exception:  # noqa: BLE001
         pass
     time.sleep(0.1)
+
+
+def _post_background_click(hwnd: int, screen_x: int, screen_y: int) -> None:
+    """Post a click to Chromium's renderer without moving the real cursor."""
+    render_windows = []
+
+    def collect(child: int, _extra: object) -> None:
+        if win32gui.GetClassName(child) != "Chrome_RenderWidgetHostHWND":
+            return
+        left, top, right, bottom = win32gui.GetWindowRect(child)
+        if left <= screen_x < right and top <= screen_y < bottom:
+            render_windows.append(child)
+
+    win32gui.EnumChildWindows(hwnd, collect, None)
+    target = min(
+        render_windows,
+        key=lambda child: (
+            win32gui.GetWindowRect(child)[2] - win32gui.GetWindowRect(child)[0]
+        ) * (
+            win32gui.GetWindowRect(child)[3] - win32gui.GetWindowRect(child)[1]
+        ),
+        default=hwnd,
+    )
+    client_x, client_y = win32gui.ScreenToClient(target, (screen_x, screen_y))
+    lparam = (client_y << 16) | (client_x & 0xFFFF)
+    win32gui.PostMessage(target, win32con.WM_MOUSEMOVE, 0, lparam)
+    win32gui.PostMessage(target, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, lparam)
+    win32gui.PostMessage(target, win32con.WM_LBUTTONUP, 0, lparam)
+
+
+def _post_background_key(hwnd: int, key: str) -> None:
+    """Post a key press to Chromium's renderer without taking focus."""
+    render_windows = []
+    win32gui.EnumChildWindows(
+        hwnd,
+        lambda child, _extra: render_windows.append(child)
+        if win32gui.GetClassName(child) == "Chrome_RenderWidgetHostHWND"
+        else None,
+        None,
+    )
+    target = max(
+        render_windows,
+        key=lambda child: (
+            win32gui.GetWindowRect(child)[2] - win32gui.GetWindowRect(child)[0]
+        ) * (
+            win32gui.GetWindowRect(child)[3] - win32gui.GetWindowRect(child)[1]
+        ),
+        default=hwnd,
+    )
+    normalized = key.lower()
+    virtual_key = {
+        "escape": win32con.VK_ESCAPE,
+        "enter": win32con.VK_RETURN,
+        "space": win32con.VK_SPACE,
+        "tab": win32con.VK_TAB,
+    }.get(normalized)
+    if virtual_key is None and len(key) == 1:
+        virtual_key = ord(key.upper())
+    if virtual_key is None:
+        raise ValueError(f"Unsupported background key: {key!r}")
+    win32gui.PostMessage(target, win32con.WM_KEYDOWN, virtual_key, 0)
+    win32gui.PostMessage(target, win32con.WM_KEYUP, virtual_key, 0)
 
 
 def _grab(rect: Rect) -> np.ndarray:
@@ -192,9 +263,23 @@ def attach_existing(cfg: Optional[dict] = None, title_hint: Optional[str] = None
     cfg = cfg or load_config()
     oi = cfg["game"]["os_input"]
     hint = title_hint or oi["window_title_hint"]
-    hwnd = _find_window(hint, process_exe=oi["browser_exe"], timeout=3.0)
-    session = OsGameSession(process=None, hwnd=hwnd)
-    session.focus()
+    browser_exes = [oi.get("browser_exe"), *oi.get("browser_exe_fallbacks", [])]
+    attempted = []
+    for browser_exe in dict.fromkeys(value for value in browser_exes if value):
+        attempted.append(pathlib.Path(browser_exe).name.lower())
+        try:
+            hwnd = _find_window(hint, process_exe=browser_exe, timeout=3.0)
+            break
+        except TimeoutError:
+            continue
+    else:
+        raise TimeoutError(
+            f"No browser window matching title={hint!r}; tried processes={attempted!r}"
+        )
+    background_clicks = bool(oi.get("background_clicks", False))
+    session = OsGameSession(process=None, hwnd=hwnd, background_clicks=background_clicks)
+    if not background_clicks:
+        session.focus()
     return session
 
 

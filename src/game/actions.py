@@ -204,6 +204,104 @@ class GameActions:
         self.gc.click(*_point(self.ui.get("active_quest"), (0.14, 0.23)))
         time.sleep(float(self.auto.get("path_start_delay_seconds", 2.0)))
 
+    def hud_quest_rows(self, image: Optional[np.ndarray] = None) -> list[tuple[int, str, float]]:
+        """Classify visible quest HUD rows as pending or completed."""
+        image = self.gc.capture().image if image is None else image
+        h, w = image.shape[:2]
+        x1, x2 = self.auto.get("hud_text_x_range", [0.04, 0.18])
+        radius = float(self.auto.get("hud_row_radius", 0.025))
+        row_points = self.auto.get("hud_row_points", [0.265, 0.330, 0.395, 0.460, 0.525])
+        green_threshold = int(self.auto.get("hud_green_pixel_threshold", 80))
+        white_threshold = int(self.auto.get("hud_white_pixel_threshold", 150))
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        rows = []
+        for index, row_y in enumerate(row_points):
+            y1 = max(0, int((float(row_y) - radius) * h))
+            y2 = min(h, int((float(row_y) + radius) * h))
+            crop = hsv[y1:y2, int(float(x1) * w):int(float(x2) * w)]
+            if crop.size == 0:
+                continue
+            green = cv2.inRange(crop, np.array([35, 90, 100]), np.array([95, 255, 255]))
+            white = cv2.inRange(crop, np.array([0, 0, 145]), np.array([179, 65, 255]))
+            if int(cv2.countNonZero(green)) >= green_threshold:
+                rows.append((index, "completed", float(row_y)))
+            elif int(cv2.countNonZero(white)) >= white_threshold:
+                rows.append((index, "pending", float(row_y)))
+        return rows
+
+    def activate_hud_quest(self, row_y: float) -> None:
+        """Let the game's built-in automation run the selected HUD quest."""
+        row_x = float(self.auto.get("hud_row_click_x", 0.10))
+        self.gc.click(row_x, row_y)
+        time.sleep(float(self.auto.get("path_start_delay_seconds", 2.0)))
+
+    def wait_for_hud_completion(self, timeout: Optional[float] = None) -> Optional[float]:
+        """Wait until a green completed row appears in the quest HUD."""
+        timeout = float(timeout or self.auto.get("auto_quest_timeout_seconds", 90.0))
+        interval = float(self.auto.get("hud_poll_seconds", 2.0))
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            completed = [row_y for _, status, row_y in self.hud_quest_rows() if status == "completed"]
+            if completed:
+                return completed[0]
+            time.sleep(interval)
+        return None
+
+    def find_dialog_quest_rows(self, image: Optional[np.ndarray] = None) -> list[tuple[float, float]]:
+        """Find the wide gold quest choices in an NPC dialog."""
+        image = self.gc.capture().image if image is None else image
+        h, w = image.shape[:2]
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, np.array([10, 80, 80]), np.array([40, 255, 255]))
+        mask[:int(0.30 * h), :] = 0
+        mask[int(0.85 * h):, :] = 0
+        mask[:, :int(0.12 * w)] = 0
+        mask[:, int(0.88 * w):] = 0
+        _, _, stats, centers = cv2.connectedComponentsWithStats(mask)
+        rows = []
+        for (x, y, width, height, _), (cx, cy) in zip(stats[1:], centers[1:]):
+            if width >= 0.50 * w and 0.04 * h <= height <= 0.10 * h:
+                rows.append((float(cx / w), float(cy / h)))
+        return sorted(rows, key=lambda point: point[1])
+
+    def find_tutorial_confirm(self, image: Optional[np.ndarray] = None) -> Optional[tuple[float, float]]:
+        """Find the large orange Xac nhan button in the level-one tutorial."""
+        image = self.gc.capture().image if image is None else image
+        h, w = image.shape[:2]
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, np.array([8, 70, 80]), np.array([40, 255, 255]))
+        _, _, stats, centers = cv2.connectedComponentsWithStats(mask)
+        for (_, _, width, height, area), (cx, cy) in zip(stats[1:], centers[1:]):
+            fx, fy = float(cx / w), float(cy / h)
+            if (
+                0.44 <= fx <= 0.56
+                and 0.53 <= fy <= 0.63
+                and 0.05 * w <= width <= 0.12 * w
+                and 0.04 * h <= height <= 0.10 * h
+                and area >= 0.0025 * w * h
+            ):
+                return fx, fy
+        return None
+
+    def find_dialog_accept_action(self, image: Optional[np.ndarray] = None) -> Optional[tuple[float, float]]:
+        """Find the bright green Nhan button in a quest detail dialog."""
+        image = self.gc.capture().image if image is None else image
+        h, w = image.shape[:2]
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, np.array([35, 80, 80]), np.array([90, 255, 255]))
+        _, _, stats, centers = cv2.connectedComponentsWithStats(mask)
+        for (_, _, width, height, area), (cx, cy) in zip(stats[1:], centers[1:]):
+            fx, fy = float(cx / w), float(cy / h)
+            if (
+                0.70 <= fx <= 0.86
+                and 0.68 <= fy <= 0.84
+                and 0.05 * w <= width <= 0.12 * w
+                and 0.04 * h <= height <= 0.10 * h
+                and area >= 0.0025 * w * h
+            ):
+                return fx, fy
+        return None
+
     def return_to_quest_giver(self) -> bool:
         """Click a completed tracked quest and wait for its automatic return path."""
         self.activate_tracked_quest()
@@ -288,12 +386,32 @@ class GameActions:
         return True
 
     def accept_all_map_quests(self) -> int:
-        """Collect several available quests before starting the action phase."""
+        """Accept every visible gold quest choice from the current NPC dialog."""
         accepted = 0
         limit = int(self.auto.get("max_map_quests_to_accept", 10))
-        self.close_any_panel()
-        while accepted < limit and self.accept_quest_from_map():
+        settle = float(self.auto.get("dialog_settle_seconds", 1.5))
+        tutorial_dismissals = 0
+        tutorial_limit = int(self.auto.get("max_tutorial_confirms", 5))
+        while accepted < limit:
+            rows = self.find_dialog_quest_rows()
+            if not rows:
+                if tutorial_dismissals < tutorial_limit:
+                    tutorial_confirm = self.find_tutorial_confirm()
+                    if tutorial_confirm is not None:
+                        self.gc.click(*tutorial_confirm)
+                        tutorial_dismissals += 1
+                        time.sleep(float(self.auto.get("tutorial_confirm_delay_seconds", 2.0)))
+                        continue
+                dialog_action = self.find_dialog_accept_action()
+                if dialog_action is not None:
+                    self.gc.click(*dialog_action)
+                    accepted += 1
+                    time.sleep(settle)
+                    continue
+                break
+            self.gc.click(*rows[0])
             accepted += 1
+            time.sleep(settle)
         return accepted
 
     def wait_for_arrival(self) -> bool:

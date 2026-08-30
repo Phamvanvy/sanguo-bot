@@ -150,46 +150,24 @@ class QuestExecutor:
         time.sleep(0.5)
 
     def execute_quest(self, quest: QuestState) -> bool:
-        """Track a quest, auto-path to it, fight/collect, and check completion."""
+        """Click a pending HUD quest and let the game's built-in automation run it."""
         if quest.is_done:
             print(f"  [executor] SKIP [{quest.index}] [{quest.tag}] {quest.title} (already done)")
             return True
 
         print(f"  [executor] START [{quest.index}] [{quest.tag}] {quest.title}")
-        self.actions.click_quest_row(quest.row_position)
-        self.actions.close_any_panel()
-        self.actions.activate_tracked_quest()
-        arrived = self.actions.wait_for_arrival()
-        print(f"  [executor] ARRIVAL {'detected' if arrived else 'timeout; continuing'}")
-
-        timeout = self.cfg.get("quests", {}).get("quest_timeout_seconds", 90)
-        start = time.time()
-        while time.time() - start < timeout:
-            self.actions.perform_action_round(quest.title)
-            self._check_hp_and_heal()
-            time.sleep(float(self.cfg.get("quests", {}).get("poll_interval_seconds", 1.0)))
-
-            self.actions.open_quest_panel()
-            panel = self.reader.read_panel(self.gc.capture())
-            for current in panel.quests:
-                same_quest = current.index == quest.index and current.tag == quest.tag
-                if same_quest and current.is_done:
-                    self.actions.close_any_panel()
-                    print(f"  [executor] OBJECTIVE DONE [{quest.index}] {quest.title}; returning to NPC")
-                    returned = self.actions.return_to_quest_giver()
-                    print(f"  [executor] RETURN {'arrived' if returned else 'timeout; pressing complete'}")
-                    self.actions.click_dialog_action()
-                    print(f"  [executor] COMPLETED [{quest.index}] {quest.title}")
-                    if self.cfg.get("quest_actions", {}).get("auto_accept_nearby", True):
-                        accepted = self.actions.accept_all_map_quests()
-                        print(f"  [executor] NEW QUESTS accepted={accepted}")
-                    return True
-
-            self.actions.close_any_panel()
-            self.actions.activate_tracked_quest()
-
-        print(f"  [executor] TIMEOUT [{quest.index}] {quest.title} after {timeout}s")
-        return False
+        pending = [row_y for _, status, row_y in self.actions.hud_quest_rows() if status == "pending"]
+        if not pending:
+            print("  [executor] No pending HUD row is visible")
+            return False
+        row_y = pending[min(quest.row_position, len(pending) - 1)]
+        self.actions.activate_hud_quest(row_y)
+        completed_y = self.actions.wait_for_hud_completion()
+        if completed_y is None:
+            print(f"  [executor] TIMEOUT [{quest.index}] {quest.title}")
+            return False
+        print(f"  [executor] OBJECTIVE DONE [{quest.index}] {quest.title}")
+        return True
 
     def _check_hp_and_heal(self) -> None:
         """Check HP bar color; if low, click HP potion slot."""
@@ -202,7 +180,7 @@ class QuestExecutor:
         self.actions.claim_reward()
 
     def run_all_incomplete(self, max_quests: int = 0) -> int:
-        """Run all incomplete quests in the current panel.
+        """Cycle HUD quests, using the game's built-in objective automation.
 
         Args:
             max_quests: max quests to attempt (0 = unlimited).
@@ -211,32 +189,42 @@ class QuestExecutor:
             Number of quests completed this session.
         """
         completed = 0
-        attempts: dict[tuple[int, str, str], int] = {}
-        max_attempts = int(self.cfg.get("quests", {}).get("max_attempts_per_quest", 3))
-        while not max_quests or completed < max_quests:
-            # Refresh every pass so a newly accepted NPC quest is picked up too.
-            self.actions.open_quest_panel()
-            panel = self.reader.read_panel(self.gc.capture())
-            eligible = []
-            for quest in panel.incomplete:
-                key = (quest.index, quest.tag, quest.title)
-                if attempts.get(key, 0) < max_attempts:
-                    eligible.append(quest)
+        pending_clicks = 0
+        next_pending = 0
+        auto = self.cfg.get("quest_actions", {})
+        click_limit = int(auto.get("max_hud_quest_clicks_per_run", 50))
+        while pending_clicks < click_limit and (not max_quests or completed < max_quests):
+            rows = self.actions.hud_quest_rows()
+            done_rows = [row_y for _, status, row_y in rows if status == "completed"]
+            if done_rows:
+                print(f"[executor] Returning completed HUD quest at y={done_rows[0]:.3f}")
+                self.actions.activate_hud_quest(done_rows[0])
+                self.actions.wait_for_arrival()
+                time.sleep(float(auto.get("return_settle_seconds", 2.0)))
+                completed += 1
+                accepted = self.actions.accept_all_map_quests()
+                print(f"[executor] COMPLETED total={completed}; accepted={accepted}")
+                next_pending = 0
+                continue
 
-            if not eligible:
-                print(f"[executor] No runnable quests ({panel.completed_count}/{panel.total_count} done)")
-                self.actions.close_any_panel()
+            pending_rows = [row_y for _, status, row_y in rows if status == "pending"]
+            if not pending_rows:
+                accepted = self.actions.accept_all_map_quests()
+                if accepted:
+                    print(f"[executor] Accepted {accepted} quest(s) from NPC dialog")
+                    next_pending = 0
+                    continue
+                print("[executor] No pending/completed HUD quest or NPC quest choice is visible")
                 break
 
-            quest = eligible[0]
-            key = (quest.index, quest.tag, quest.title)
-            if self.execute_quest(quest):
-                completed += 1
-                attempts.pop(key, None)
-            else:
-                attempts[key] = attempts.get(key, 0) + 1
-                self.actions.close_any_panel()
-            time.sleep(1.0)
+            row_y = pending_rows[next_pending % len(pending_rows)]
+            next_pending += 1
+            pending_clicks += 1
+            print(f"[executor] Starting pending HUD quest at y={row_y:.3f} ({pending_clicks}/{click_limit})")
+            self.actions.activate_hud_quest(row_y)
+            self.actions.wait_for_hud_completion(
+                float(auto.get("auto_quest_timeout_seconds", 90.0))
+            )
 
         print(f"[executor] Session done: {completed} quests completed")
         return completed

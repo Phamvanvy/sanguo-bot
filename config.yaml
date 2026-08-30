@@ -25,6 +25,13 @@ game:
     # not isolable, and not safe to keep automating against. Back to Brave,
     # which passed M0 cleanly with a fully separate profile dir.
     browser_exe: "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+    # Extension workers attach to the tab the user actually selected. Edge is
+    # allowed as a fallback while still requiring the exact game window title.
+    browser_exe_fallbacks:
+      - "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+    # Send clicks directly to Chromium's render window so automation does not
+    # move the user's real mouse cursor or steal foreground focus.
+    background_clicks: true
     # Separate profile dir so this doesn't collide with the user's main
     # Brave profile/history/bookmarks.
     user_data_dir: "./.brave-os-profile"
@@ -103,6 +110,18 @@ quest_actions:
   auto_accept_nearby: true
   accept_map_quests_before_run: true
   max_map_quests_to_accept: 10
+  # Built-in quest automation: white HUD rows are pending, green rows are ready to return.
+  hud_row_click_x: 0.10
+  hud_row_points: [0.265, 0.330, 0.395, 0.460, 0.525]
+  hud_text_x_range: [0.04, 0.18]
+  hud_row_radius: 0.025
+  hud_green_pixel_threshold: 80
+  hud_white_pixel_threshold: 150
+  hud_poll_seconds: 2.0
+  auto_quest_timeout_seconds: 90.0
+  max_hud_quest_clicks_per_run: 50
+  tutorial_confirm_delay_seconds: 2.0
+  max_tutorial_confirms: 5
   map_open_delay_seconds: 1.0
   quest_marker_hsv_lower: [18, 120, 150]
   quest_marker_hsv_upper: [42, 255, 255]
@@ -170,27 +189,6 @@ activity_macros:
     result_delay_seconds: 0.7
     rest_every_cycles: 10
     rest_delay_seconds: 1
-    # 0 = lặp đến khi bấm Stop trong extension.
-    max_cycles: 0
-  mch5exp_redeem:
-    label: "Nhập code MCH5EXP"
-    description: "Nhập MCH5EXP liên tục đến khi bấm Dừng"
-    icon: "券"
-    runner: "code_redeem_loop"
-    # Mỗi lượt mở Map rồi bấm marker "Nhân viên đổi mã kích hoạt" được khoanh trong ảnh.
-    map_point: [0.850, 0.070]
-    npc_point: [0.397, 0.490]
-    option_point: [0.50, 0.43]
-    input_point: [0.50, 0.51]
-    submit_point: [0.494, 0.556]
-    notification_point: [0.500, 0.518]
-    map_delay_seconds: 1.2
-    open_delay_seconds: 2.0
-    option_delay_seconds: 1.0
-    submit_delay_seconds: 1.2
-    dismiss_delay_seconds: 0.8
-    reopen_delay_seconds: 1.0
-    codes: ["MCH5EXP"]
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   star_reappraisal:

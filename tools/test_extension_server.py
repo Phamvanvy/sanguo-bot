@@ -80,6 +80,39 @@ class ExtensionServerTest(unittest.TestCase):
             timeout=3.0,
         )
 
+    @patch("src.os_input.OsGameSession.focus")
+    @patch("src.os_input._find_window", side_effect=[TimeoutError, 54321])
+    def test_attach_existing_falls_back_from_brave_to_edge(self, find_window, _focus):
+        brave = "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+        edge = "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+        cfg = {"game": {"os_input": {
+            "browser_exe": brave,
+            "browser_exe_fallbacks": [edge],
+            "window_title_hint": "fallback",
+        }}}
+
+        session = attach_existing(cfg, "Minh Châu H5")
+
+        self.assertEqual(54321, session.hwnd)
+        self.assertEqual([
+            call("Minh Châu H5", process_exe=brave, timeout=3.0),
+            call("Minh Châu H5", process_exe=edge, timeout=3.0),
+        ], find_window.call_args_list)
+
+    @patch("src.os_input.OsGameSession.focus")
+    @patch("src.os_input._find_window", return_value=12345)
+    def test_background_attach_does_not_take_foreground_focus(self, _find_window, focus):
+        cfg = {"game": {"os_input": {
+            "browser_exe": "edge.exe",
+            "background_clicks": True,
+            "window_title_hint": "Minh Chau H5",
+        }}}
+
+        session = attach_existing(cfg)
+
+        self.assertTrue(session.background_clicks)
+        focus.assert_not_called()
+
     def test_worker_forces_os_input_on_the_selected_game_window(self):
         cfg = {
             "runtime": {"dry_run": True},
@@ -147,32 +180,12 @@ class ExtensionServerTest(unittest.TestCase):
         flows = {flow["id"]: flow for flow in flow_catalog()}
         self.assertEqual("auto_attack_loop", flows["auto_attack"]["runner"])
 
-    def test_default_catalog_contains_looping_mch5exp_redeem(self):
+    def test_default_catalog_omits_code_redeem(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
-        self.assertEqual("code_redeem_loop", flows["mch5exp_redeem"]["runner"])
-        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
-        self.assertIn('flow === "mch5exp_redeem"', content)
-        self.assertIn('const maxCycles = Number(macro.max_cycles ?? 1)', content)
-        self.assertIn('maxCycles <= 0 || cycle < maxCycles', content)
-        redeem = content[
-            content.index("async function runCodeRedeem"):
-            content.index("async function runDiscardItems")
-        ]
-        self.assertIn('domHtmlClick(token, macro.submit_point || [0.494, 0.556])', redeem)
-        self.assertIn('macro.notification_point || [0.500, 0.518]', redeem)
-        self.assertIn('if (macro.map_point != null)', redeem)
-        self.assertLess(
-            redeem.index('domClick(token, macro.map_point)'),
-            redeem.index('domClick(token, macro.npc_point'),
-        )
-        self.assertNotIn('domPress(token, "Enter"', redeem)
-        self.assertNotIn('domPress(token, "Escape"', redeem)
-        self.assertIn('clickable.click();', content)
+        self.assertNotIn("mch5exp_redeem", flows)
         config = (PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8")
-        self.assertIn('codes: ["MCH5EXP"]', config)
-        self.assertIn('mch5exp_redeem:', config)
-        self.assertIn('map_point: [0.850, 0.070]', config)
-        self.assertIn('npc_point: [0.397, 0.490]', config)
+        self.assertNotIn("mch5exp_redeem:", config)
+        self.assertNotIn('codes: ["MCH5EXP"]', config)
 
     def test_default_catalog_contains_looping_star_reappraisal(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
