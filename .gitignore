@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .browser-profile/
+.browser-instances/
 .brave-os-profile/
 .brave-cdp-profile/
 .edge-os-profile/

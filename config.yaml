@@ -126,6 +126,7 @@ quest_actions:
   max_hud_quest_clicks_per_run: 50
   tutorial_confirm_delay_seconds: 2.0
   max_tutorial_confirms: 5
+  tutorial_mana_point: {x: 0.927, y: 0.653}
   map_open_delay_seconds: 1.0
   quest_marker_hsv_lower: [18, 120, 150]
   quest_marker_hsv_upper: [42, 255, 255]
@@ -173,8 +174,8 @@ activity_macros:
       - [0.845, 0.820]
     # Keep the renderer responsive so the site's debugger-latency guard does
     # not false-positive and close the game WebSocket under sustained load.
-    button_delay_seconds: 0.18
-    round_delay_seconds: 0.3
+    button_delay_seconds: 0.2
+    round_delay_seconds: 0.4
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   blessing:
@@ -221,30 +222,6 @@ activity_macros:
     detail_delay_seconds: 1.0
     confirm_delay_seconds: 0.8
     result_delay_seconds: 1.0
-  gem_upgrade:
-    label: "Nâng đá"
-    description: "Nâng lần lượt 6 viên, mỗi viên 4 lần"
-    icon: "◆"
-    runner: "gem_upgrade_sequence"
-    # Bắt đầu khi đang mở màn hình Luyện trang bị như ảnh mẫu.
-    gem_points:
-      - [0.109, 0.315]
-      - [0.168, 0.315]
-      - [0.227, 0.315]
-      - [0.285, 0.315]
-      - [0.344, 0.315]
-      - [0.402, 0.315]
-    upgrade_point: [0.365, 0.549]
-    confirm_point: [0.697, 0.630]
-    # Bấm mé trái banner; nếu banner đã tự tắt thì vùng bên dưới không chọn vật phẩm.
-    notification_point: [0.200, 0.518]
-    upgrades_per_gem: 4
-    menu_delay_seconds: 1.2
-    dialog_delay_seconds: 1.5
-    confirm_delay_seconds: 1.5
-    result_delay_seconds: 0.8
-    repeat_delay_seconds: 1.2
-    next_gem_delay_seconds: 1.0
   discard_items:
     label: "Vứt đồ"
     description: "Sắp xếp rồi vứt ô đầu tiên liên tục"

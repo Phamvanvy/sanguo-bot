@@ -78,11 +78,24 @@ kiểm tra lại bước 2.
 - Cài hoặc reload extension trong từng profile Edge/Brave/Chrome cần chạy.
 - Mỗi tài khoản game phải nằm trong một **cửa sổ trình duyệt riêng**. Nếu đang
   dùng nhiều tab trong cùng cửa sổ, kéo từng tab ra ngoài thành cửa sổ mới.
-- Có thể để các cửa sổ maximized và che lên nhau; controller chụp trực tiếp
-  từng HWND và mỗi panel chỉ điều khiển worker của cửa sổ đó.
+- Nên mở mỗi profile bằng `start-game-browser.ps1`. Launcher tắt cơ chế throttle
+  renderer của Chromium, vì vậy các cửa sổ maximized có thể che hoàn toàn lên
+  nhau; controller vẫn chụp trực tiếp từng HWND và mỗi panel chỉ điều khiển
+  worker của cửa sổ đó.
 - Không minimize cửa sổ game vì Chromium có thể ngừng render canvas/WebSocket.
 - Bấm **Full auto** trong từng cửa sổ. Nút **Dừng flow đang chạy** chỉ dừng
   worker thuộc cửa sổ chứa panel đó.
+
+Ví dụ mở hai process Brave độc lập:
+
+```powershell
+.\start-game-browser.ps1 -Browser Brave -Profile account-1
+.\start-game-browser.ps1 -Browser Brave -Profile account-2
+```
+
+Có thể thay `Brave` bằng `Edge` hoặc `Chrome`. Mỗi tên `Profile` lưu cookie/login
+riêng. Các flag chống throttle chỉ có hiệu lực với process được launcher mở;
+không áp dụng ngược cho trình duyệt đã chạy sẵn.
 
 ## 4. Các flow hiện có
 

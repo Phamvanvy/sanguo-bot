@@ -379,9 +379,12 @@ def attach_existing(
 
 
 def launch(cfg: Optional[dict] = None) -> OsGameSession:
-    """Start Brave as a normal process (no debugging/automation flags) and
-    navigate it to the game URL by passing the URL as a command-line arg,
-    exactly like a shortcut would."""
+    """Start a dedicated browser process without CDP/debugging enabled.
+
+    Chromium normally throttles fully covered windows. The game must keep its
+    renderer and timers active because workers capture and click those windows
+    directly even when another maximized game window is in front of them.
+    """
     cfg = cfg or load_config()
     oi = cfg["game"]["os_input"]
     window = cfg["game"]["window"]
@@ -393,6 +396,11 @@ def launch(cfg: Optional[dict] = None) -> OsGameSession:
         f"--user-data-dir={profile_dir}",
         f"--window-size={window['width']},{window['height']}",
         f"--window-position={window.get('pos_x', 0)},{window.get('pos_y', 0)}",
+        "--new-window",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding",
+        "--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling",
     ]
     if oi.get("load_extension", False):
         extension_dir = pathlib.Path(__file__).resolve().parents[1] / "extension"

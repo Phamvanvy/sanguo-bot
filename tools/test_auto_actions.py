@@ -116,6 +116,35 @@ class GameActionsTest(unittest.TestCase):
         self.assertEqual(0, accepted)
         self.assertEqual((0.5, 0.588), control.clicks[0])
 
+    def test_detects_and_clicks_mana_tutorial_before_quest_scan(self) -> None:
+        tutorial = np.zeros((600, 1000, 3), dtype=np.uint8)
+        orange = cv2.cvtColor(np.uint8([[[25, 220, 220]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()
+        cv2.rectangle(tutorial, (790, 290), (980, 330), orange, -1)
+        normal = np.zeros_like(tutorial)
+        control = FakeControl(images=[tutorial, tutorial, normal])
+
+        accepted = GameActions(control, self.cfg).accept_all_map_quests()
+
+        self.assertEqual(0, accepted)
+        self.assertEqual((0.927, 0.653), control.clicks[0])
+
+    def test_clicks_mana_tutorial_while_waiting_for_hud_completion(self) -> None:
+        tutorial = np.zeros((600, 1000, 3), dtype=np.uint8)
+        orange = cv2.cvtColor(np.uint8([[[25, 220, 220]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()
+        cv2.rectangle(tutorial, (790, 290), (980, 330), orange, -1)
+        normal = np.zeros_like(tutorial)
+        control = FakeControl(images=[tutorial, tutorial, normal])
+        self.cfg["quest_actions"].update({
+            "auto_quest_timeout_seconds": 0.01,
+            "hud_poll_seconds": 0.001,
+            "tutorial_confirm_delay_seconds": 0,
+        })
+
+        completed = GameActions(control, self.cfg).wait_for_hud_completion()
+
+        self.assertIsNone(completed)
+        self.assertEqual((0.927, 0.653), control.clicks[0])
+
     def test_dismisses_consecutive_tutorial_prompts(self) -> None:
         tutorial = np.zeros((600, 1000, 3), dtype=np.uint8)
         orange = cv2.cvtColor(np.uint8([[[25, 220, 220]]]), cv2.COLOR_HSV2BGR)[0, 0].tolist()

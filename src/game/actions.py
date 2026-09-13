@@ -240,10 +240,19 @@ class GameActions:
         timeout = float(timeout or self.auto.get("auto_quest_timeout_seconds", 90.0))
         interval = float(self.auto.get("hud_poll_seconds", 2.0))
         deadline = time.time() + timeout
+        tutorial_dismissals = 0
+        tutorial_limit = int(self.auto.get("max_tutorial_confirms", 5))
         while time.time() < deadline:
             completed = [row_y for _, status, row_y in self.hud_quest_rows() if status == "completed"]
             if completed:
                 return completed[0]
+            if tutorial_dismissals < tutorial_limit:
+                tutorial_action = self.find_tutorial_confirm()
+                if tutorial_action is not None:
+                    self.gc.click(*tutorial_action)
+                    tutorial_dismissals += 1
+                    time.sleep(float(self.auto.get("tutorial_confirm_delay_seconds", 2.0)))
+                    continue
             time.sleep(interval)
         return None
 
@@ -265,7 +274,7 @@ class GameActions:
         return sorted(rows, key=lambda point: point[1])
 
     def find_tutorial_confirm(self, image: Optional[np.ndarray] = None) -> Optional[tuple[float, float]]:
-        """Find the large orange Xac nhan button in the level-one tutorial."""
+        """Find the required click target for a blocking tutorial overlay."""
         image = self.gc.capture().image if image is None else image
         h, w = image.shape[:2]
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -281,6 +290,14 @@ class GameActions:
                 and area >= 0.0025 * w * h
             ):
                 return fx, fy
+            if (
+                0.78 <= fx <= 0.96
+                and 0.45 <= fy <= 0.60
+                and 0.12 * w <= width <= 0.28 * w
+                and 0.025 * h <= height <= 0.10 * h
+                and area >= 0.004 * w * h
+            ):
+                return _point(self.auto.get("tutorial_mana_point"), (0.927, 0.653))
         return None
 
     def find_dialog_accept_action(self, image: Optional[np.ndarray] = None) -> Optional[tuple[float, float]]:

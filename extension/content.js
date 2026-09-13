@@ -36,7 +36,6 @@
     "auto_attack_loop",
     "star_reappraisal_loop",
     "mount_skill_learn_once",
-    "gem_upgrade_sequence",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -44,7 +43,6 @@
   // the game WebSocket, and reload back to the server picker.
   const DOM_SPEED_FACTOR = 0.7;
   const BLESSING_SPEED_FACTOR = 1.0;
-  const GEM_UPGRADE_SPEED_FACTOR = 1.0;
   const NETWORK_EVENT_KEY = "sanguo-last-network-event";
   const NETWORK_QUEUE_KEY = "sanguo-network-event-queue";
   const FLOW_CONTEXT_KEY = "sanguo-flow-context";
@@ -545,43 +543,6 @@
     await domDelay(macro.result_delay_seconds || 1.0);
   }
 
-  async function runGemUpgradeSequence(token, macro) {
-    const gemPoints = macro.gem_points || [
-      [0.109, 0.315], [0.168, 0.315], [0.227, 0.315],
-      [0.285, 0.315], [0.344, 0.315], [0.402, 0.315],
-    ];
-    const confirmPoint = macro.confirm_point || [0.697, 0.630];
-    const upgradesPerGem = Math.max(1, Number(macro.upgrades_per_gem || 4));
-    for (const [index, gemPoint] of gemPoints.entries()) {
-      const gemNumber = index + 1;
-      for (let upgrade = 0; upgrade < upgradesPerGem; upgrade += 1) {
-        const upgradeNumber = upgrade + 1;
-        const completed = index * upgradesPerGem + upgradeNumber;
-        updateFlowContext("gem_upgrade", completed, "select_gem");
-        await domClick(token, gemPoint);
-        await domDelay(macro.menu_delay_seconds || 1.2, GEM_UPGRADE_SPEED_FACTOR);
-        updateFlowContext("gem_upgrade", completed, "upgrade_gem");
-        await domClick(token, macro.upgrade_point || [0.365, 0.549]);
-        await domDelay(macro.dialog_delay_seconds || 1.5, GEM_UPGRADE_SPEED_FACTOR);
-        updateFlowContext("gem_upgrade", completed, "confirm_material");
-        await domClick(token, confirmPoint);
-        await domDelay(macro.confirm_delay_seconds || 1.5, GEM_UPGRADE_SPEED_FACTOR);
-        updateFlowContext("gem_upgrade", completed, "confirm_cost");
-        await domClick(token, confirmPoint);
-        await domDelay(macro.result_delay_seconds || 0.8, GEM_UPGRADE_SPEED_FACTOR);
-        updateFlowContext("gem_upgrade", completed, "dismiss_notification");
-        await domClick(token, macro.notification_point || [0.200, 0.518]);
-        updateDomFlow(
-          "gem_upgrade",
-          `Đá ${gemNumber}/${gemPoints.length}: lần ${upgradeNumber}/${upgradesPerGem}`,
-          "upgrade_done",
-        );
-        await domDelay(macro.repeat_delay_seconds || 1.2, GEM_UPGRADE_SPEED_FACTOR);
-      }
-      await domDelay(macro.next_gem_delay_seconds || 1.0, GEM_UPGRADE_SPEED_FACTOR);
-    }
-  }
-
   async function runAutoAttack(token, macro) {
     const attackPoint = macro.attack_point || [0.927, 0.822];
     const skillPoints = macro.skill_points || [
@@ -629,7 +590,6 @@
         else if (flow === "auto_attack") await runAutoAttack(token, macro);
         else if (flow === "star_reappraisal") await runStarReappraisal(token, macro);
         else if (flow === "mount_skill_learn") await runMountSkillLearnOnce(token, macro);
-        else if (flow === "gem_upgrade") await runGemUpgradeSequence(token, macro);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {

@@ -34,6 +34,14 @@ class OsInputFocusTest(unittest.TestCase):
 
         args = popen.call_args.args[0]
         self.assertTrue(any(value.startswith("--load-extension=") for value in args))
+        self.assertIn("--new-window", args)
+        self.assertIn("--disable-background-timer-throttling", args)
+        self.assertIn("--disable-backgrounding-occluded-windows", args)
+        self.assertIn("--disable-renderer-backgrounding", args)
+        self.assertIn(
+            "--disable-features=CalculateNativeWinOcclusion,IntensiveWakeUpThrottling",
+            args,
+        )
 
     @patch("src.os_input._print_window_region")
     def test_window_capture_reads_the_selected_hwnd(self, print_window_region) -> None:

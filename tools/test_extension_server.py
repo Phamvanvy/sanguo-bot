@@ -303,34 +303,17 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('macro.confirm_point || [0.696, 0.628]', content)
         one_shot = content[
             content.index("async function runMountSkillLearnOnce"):
-            content.index("async function runGemUpgradeSequence")
+            content.index("async function runAutoAttack")
         ]
         self.assertNotIn("for (", one_shot)
         self.assertNotIn("while (", one_shot)
 
-    def test_default_catalog_contains_sequential_gem_upgrade(self):
+    def test_default_catalog_has_no_gem_upgrade(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
-        self.assertEqual("gem_upgrade_sequence", flows["gem_upgrade"]["runner"])
+        self.assertNotIn("gem_upgrade", flows)
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
-        self.assertIn('async function runGemUpgradeSequence', content)
-        self.assertIn('flow === "gem_upgrade"', content)
-        self.assertIn('for (const [index, gemPoint] of gemPoints.entries())', content)
-        self.assertIn('for (let upgrade = 0; upgrade < upgradesPerGem; upgrade += 1)', content)
-        self.assertIn('Number(macro.upgrades_per_gem || 4)', content)
-        self.assertIn('const GEM_UPGRADE_SPEED_FACTOR = 1.0', content)
-        self.assertIn('macro.upgrade_point || [0.365, 0.549]', content)
-        self.assertIn('macro.notification_point || [0.200, 0.518]', content)
-        sequence = content[
-            content.index("async function runGemUpgradeSequence"):
-            content.index("async function runAutoAttack")
-        ]
-        self.assertEqual(2, sequence.count("await domClick(token, confirmPoint)"))
-        self.assertNotIn("macro.enhance_point", sequence)
-        gem_defaults = sequence[
-            sequence.index("const gemPoints"):
-            sequence.index("const confirmPoint")
-        ]
-        self.assertEqual(6, gem_defaults.count("[0."))
+        self.assertNotIn("gem_upgrade", content)
+        self.assertNotIn("runGemUpgradeSequence", content)
 
     def test_inventory_left_batches_use_99_then_sort_forever(self):
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
