@@ -90,8 +90,6 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
     cfg = cfg or load_config()
     flows = [
         {"id": "full_auto", "label": "Full auto", "description": "Gom rồi làm toàn bộ nhiệm vụ", "icon": "⚡"},
-        {"id": "accept_quests", "label": "Gom nhiệm vụ", "description": "Nhận nhiều nhiệm vụ từ dấu !", "icon": "!"},
-        {"id": "do_quests", "label": "Làm nhiệm vụ", "description": "Làm các nhiệm vụ đã nhận", "icon": "✓"},
     ]
     for flow_id, macro in cfg.get("activity_macros", {}).items():
         flows.append({

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -269,7 +271,9 @@ class ExtensionServerTest(unittest.TestCase):
     def test_catalog_contains_core_and_configured_flows(self):
         cfg = {"activity_macros": {"blessing": {"label": "Cầu phúc", "steps": []}}}
         ids = {flow["id"] for flow in flow_catalog(cfg)}
-        self.assertTrue({"full_auto", "accept_quests", "do_quests", "blessing"} <= ids)
+        self.assertTrue({"full_auto", "blessing"} <= ids)
+        # The panel no longer offers the separate gather / do quest flows.
+        self.assertFalse({"accept_quests", "do_quests"} & ids)
 
     def test_default_catalog_contains_auto_attack(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
@@ -315,6 +319,283 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn("gem_upgrade", content)
         self.assertNotIn("runGemUpgradeSequence", content)
 
+    def test_default_catalog_contains_co_mo_hard_dungeon_route(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("dungeon_route", flows["co_mo_hard"]["runner"])
+        macros = extension_server.load_config()["activity_macros"]
+        macro = macros["co_mo_hard"]
+        self.assertEqual(macros["auto_attack"]["attack_point"], macro["attack_point"])
+        self.assertEqual(macros["auto_attack"]["skill_points"], macro["skill_points"])
+        self.assertEqual(2, len(macro["entry_steps"]))
+        route = macro["route_steps"]
+        # Three bosses in three rooms; each door stays shut while monsters attack.
+        self.assertEqual(
+            [[38, 12], [44, 10], [20, 18], [31, 24], [90, 30], [83, 34], [44, 34], [9, 10],
+             [99, 4], [93, 6], [69, 23]],
+            [step["goto"] for step in route],
+        )
+        self.assertEqual(5, sum(1 for step in route if "fight_seconds" in step))
+        self.assertEqual([[44, 10], [31, 24], [83, 34], [9, 10], [93, 6]],
+                         [step["goto"] for step in route if step.get("portal")])
+        self.assertTrue(all(step.get("ignore_ambush") for step in route[8:10]))
+        self.assertTrue(all(len(step["map_size"]) == 2 for step in route))
+        for step in macro["entry_steps"] + route:
+            self.assertTrue({"goto", "map_point", "click_point", "fight_seconds"} & step.keys(), step)
+        # Easy and hard are the same dungeon: one flow for both, started inside
+        # either (anything but the lobby map skips the entry).
+        self.assertNotIn("co_mo_easy", flows)
+        self.assertIn("(dễ/khó)", macro["label"])
+        self.assertEqual(768, macro["entry_map"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('"dungeon_route"', content)
+        self.assertIn('async function runDungeonRoute', content)
+        self.assertIn('macro.runner === "dungeon_route"', content)
+        route_runner = content[
+            content.index("async function runDungeonRoute"):
+            content.index("async function startDomFlow")
+        ]
+        for event_type in ("dungeon_start", "dungeon_step", "dungeon_step_done"):
+            self.assertIn(f'appendDiagnostic("{event_type}"', route_runner)
+        self.assertIn("return { target, x, y };", content)
+        # The Map panel does not close itself and the close key does not reach
+        # it: every map step must name its X button.
+        self.assertIn("step.map_close_point", route_runner)
+        self.assertIn("thiếu map_close_point", route_runner)
+        self.assertIn("thiếu map_size", route_runner)
+        self.assertIn("async function walkToCoord", route_runner)
+        self.assertNotIn("map_close_key", content)
+        self.assertNotIn("map_close_key", macro)
+        map_steps = [s for s in route if "map_point" in s]
+        self.assertTrue(all("map_close_point" in s for s in map_steps), map_steps)
+        # Fights end on the red-arrow check, read from game data.
+        self.assertTrue(macro["combat_check"])
+        # Walking never presses Đánh: the character would stop to fight.
+        self.assertIs(False, macro["fight_on_the_way"])
+        self.assertIn("macro.fight_on_the_way === true", route_runner)
+        # A portal counts as crossed only when the map id really changes.
+        self.assertIn("mapSwitchedAt > mapMark", route_runner)
+        self.assertIn("mapSwitchedAt > since", route_runner)
+        # Walks that keep ending on the same spot report where they are blocked.
+        self.assertIn('how: "blocked"', route_runner)
+        # A companion general fights beside us and must never count as a monster.
+        self.assertIn("Lữ Bố", macro["ignore_monster_names"])
+        # A boss stands idle until hit, so idle monsters close by count; the
+        # statues that never die are ignored by name instead.
+        self.assertIn("Tượng đá cơ quan", macro["ignore_monster_names"])
+        self.assertIn("macro.idle_monster_radius", route_runner)
+        # Monsters still at FULL health after 30 s of Đánh with nothing else
+        # dying (a statue that is no target, one out of sight) are left behind;
+        # anything we did hurt is fought to the end, weak damage or not.
+        self.assertEqual(30, macro["stall_giveup_seconds"])
+        self.assertEqual(20, macro["unseen_seconds"])
+        self.assertIn("macro.unseen_seconds", route_runner)
+        self.assertIn("monster.hp >= 200", route_runner)
+        self.assertIn("macro.stall_giveup_seconds", route_runner)
+        self.assertIn("latestWorld?.attackFails", route_runner)
+        # A bell rings when the whole route is done.
+        self.assertTrue(macro["finish_chime"])
+        self.assertIn("playChime()", route_runner)
+        # Clear-before-door steps end once nothing attacks us (our yellow name
+        # shows again); idle monsters are left standing. Boss steps still count them.
+        self.assertEqual(
+            ["Dọn quái trước cửa boss 1 (38,12)", "Dọn quái trước cửa boss 2 (90,30)"],
+            [step["label"] for step in macro["route_steps"] if step.get("ignore_idle_monsters")],
+        )
+        self.assertIn("idle: !step.ignore_idle_monsters", route_runner)
+        self.assertIn("(idle && monster.d <= idleRadius)", route_runner)
+        self.assertEqual(2.5, macro["goto_settle_seconds"])
+        # The walk ends on the coordinate the user gave (the game's own pixels / 8
+        # rounded down), give or take one tile (a boss on its altar).
+        self.assertEqual(1, macro["goto_tolerance"])
+        self.assertIn("Math.floor(point.x / unit)", route_runner)
+        # "Mục tiêu không nằm trong tầm nhìn" (ATTACK_FAIL reason 14): skip it,
+        # and never count one the walk grid puts behind walls.
+        self.assertIn("unhittable.has(fail.reason)", route_runner)
+        self.assertIn("Mật thư", macro["ignore_monster_names"])
+        # With no monster left the fight only waits out its checks, no Đánh.
+        self.assertIn('if (last.state === "clear") {', route_runner)
+        self.assertEqual(40, macro["monster_path_tiles"])
+        self.assertIn("walkDistances(grid", route_runner)
+        # A door is hit exactly (no tolerance), then the game data's exit next to it.
+        self.assertIn("const tolerance = step.portal ? 0", route_runner)
+        self.assertIn("function doorTiles", route_runner)
+        self.assertIn("settleSeconds || macro.arrive_settle_seconds", route_runner)
+        self.assertIn("Lữ Bố", macros["thien_long"]["ignore_monster_names"])
+        self.assertEqual(2, route_runner.count("macro.ignore_monster_names"))
+        # Starting inside the dungeon skips the entry; a portal already crossed is skipped.
+        self.assertEqual(768, macro["entry_map"])
+        self.assertIn("macro.entry_map", route_runner)
+        self.assertIn("const crossed = Boolean(step.portal)", route_runner)
+        self.assertIn('appendDiagnostic("dungeon_ambush"', route_runner)
+        self.assertIn("function combatState", route_runner)
+        self.assertIn("async function fightUntilClear", route_runner)
+        self.assertIn("async function waitForArrival", route_runner)
+        self.assertIn('event.data?.source !== "sanguo-world"', content)
+        # Monsters, position and map come from the game's own traffic, read-only.
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        self.assertNotIn("preserveDrawingBuffer", probe)
+        for constant in ("OP_MOVE_CLIENT = 105", "OP_GOMAP_ALLOW = 134", "OP_UNIT_REFRESH = 193",
+                         "OP_UNIT_MULTI_REFRESH = 194", "OP_UNIT_MOVE = 195", "STATE_DIE = 8",
+                         "OP_UNIT_INFO = 197", "OP_FORCE_GOMAP = 321", "OP_LOADING_FINISHED = 133",
+                         "OP_ATTACK_FAIL = 136"):
+            self.assertIn(constant, probe)
+        self.assertIn('source: "sanguo-world"', probe)
+        self.assertTrue(macro["entry_steps"][-1].get("portal"))
+        # Clicks map onto the (possibly letterboxed) game canvas, not the viewport.
+        self.assertIn('document.querySelector("#screen")?.getBoundingClientRect()', content)
+
+    def test_default_catalog_contains_ha_dong_dungeon_routes(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        macros = extension_server.load_config()["activity_macros"]
+        hard, easy = macros["ha_dong_hard"], macros["ha_dong_easy"]
+        for flow_id in ("ha_dong_hard", "ha_dong_easy"):
+            self.assertEqual("dungeon_route", flows[flow_id]["runner"])
+        self.assertEqual([[77, 16], [57, 114], [19, 25], [22, 8], [66, 22]],
+                         [step["goto"] for step in hard["route_steps"]])
+        self.assertEqual(4, sum(1 for step in hard["route_steps"] if "fight_seconds" in step))
+        self.assertTrue(hard["route_steps"][3]["portal"])
+        self.assertEqual([992, 992], hard["route_steps"][0]["map_size"])
+        self.assertEqual([hard["route_steps"][-1]], easy["route_steps"])
+        self.assertEqual([608, 464], easy["route_steps"][0]["map_size"])
+        for macro in (hard, easy):
+            self.assertIsNone(macro["entry_map"])
+            self.assertEqual([], macro["entry_steps"])
+            self.assertEqual(macros["auto_attack"]["attack_point"], macro["attack_point"])
+
+    def test_default_catalog_contains_thien_long_route(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("dungeon_route", flows["thien_long"]["runner"])
+        macro = extension_server.load_config()["activity_macros"]["thien_long"]
+        route = macro["route_steps"]
+        # Easy and hard are the same trận: one flow, five bosses.
+        self.assertEqual([[20, 31], [88, 10], [145, 45], [41, 117], [77, 64]],
+                         [step["goto"] for step in route])
+        self.assertTrue(all(step["map_size"] == [1280, 1024] for step in route), route)
+        self.assertTrue(all("fight_seconds" in step for step in route), route)
+        self.assertIsNone(macro["entry_map"])
+        self.assertEqual([], macro["entry_steps"])
+
+    def test_walk_grids_match_live_positions_and_reach_every_route_target(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is not installed")
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        grids = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
+        manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
+        scripts = [entry["js"] for entry in manifest["content_scripts"] if "content.js" in entry["js"]][0]
+        self.assertEqual(["walk_grids.js", "content.js"], scripts)
+        pieces = []
+        for name in ("walkGridFor", "findPath", "nearestOpen", "straightLine", "planRoute"):
+            start = content.index(f"  function {name}(")
+            pieces.append(content[start:content.index("\n  }\n", start) + 4])
+        # Tiles the character stood on in live runs (logs and screenshots).
+        stood = {
+            977: [[8, 89], [20, 78], [20, 27], [88, 9], [100, 10], [134, 47], [146, 50], [139, 61]],
+            978: [[10, 87], [16, 28], [53, 36], [87, 25], [77, 66], [47, 84]],
+            450: [[94, 100], [72, 12], [49, 50], [31, 75]], 432: [[24, 46]],
+            1137: [[16, 53], [35, 34], [20, 45], [83, 34]], 769: [[83, 34]], 768: [[33, 28], [31, 24], [24, 27]], 1141: [[21, 16]],
+        }
+        # Every route leg: map, where it starts (after a portal: by the exit we
+        # came in through), the target the user gave.
+        legs = [
+            [977, [8, 89], [20, 31]], [977, [20, 31], [88, 10]], [977, [88, 10], [145, 45]],
+            [977, [145, 45], [41, 117]], [977, [41, 117], [77, 64]],
+            [450, [94, 100], [77, 16]], [450, [77, 16], [57, 114]], [450, [57, 114], [19, 25]],
+            [450, [19, 25], [22, 8]], [432, [24, 46], [66, 22]],
+            [1137, [16, 53], [38, 12]], [1137, [38, 12], [44, 10]], [1141, [31, 24], [20, 18]],
+            [1141, [20, 18], [31, 24]], [1137, [45, 10], [90, 30]], [1137, [90, 30], [83, 34]],
+            [1139, [8, 8], [44, 34]], [1139, [44, 34], [9, 10]], [1137, [85, 33], [99, 4]],
+            [1137, [99, 4], [93, 6]], [1140, [21, 75], [69, 23]],
+        ]
+        script = grids + "const decodedGrids = new Map();\n" + "".join(pieces) + (
+            "const stood = " + json.dumps(stood) + ";\nconst legs = " + json.dumps(legs) + ";\n"
+            "console.log(JSON.stringify({\n"
+            "  blocked: Object.entries(stood).flatMap(([id, tiles]) =>\n"
+            "    tiles.filter(([x, y]) => !walkGridFor(id).open(x, y)).map((t) => [id, t])),\n"
+            "  exits450: walkGridFor(450).exits,\n"
+            "  ends: legs.map(([id, [fx, fy], [tx, ty]]) => {\n"
+            "    const path = planRoute(walkGridFor(id), { x: fx, y: fy }, { x: tx, y: ty }, 1);\n"
+            "    return path && path[path.length - 1];\n"
+            "  }),\n"
+            "}));\n"
+        )
+        # Through stdin: with the walk grids inlined, -e outgrows the Windows command line.
+        result = subprocess.run([node], input=script, capture_output=True, text=True,
+                                encoding="utf-8", check=True)
+        report = json.loads(result.stdout)
+        # The grid (ported from GameView.rebuildMapCollisionData) agrees with the game.
+        self.assertEqual([], report["blocked"])
+        # Hà Đông ngoài's door to the inner map, from the game data: pixel 196,67.
+        self.assertIn([24, 8], report["exits450"])
+        for (map_id, _start, target), end in zip(legs, report["ends"]):
+            self.assertIsNotNone(end, (map_id, target))
+            self.assertLessEqual(max(abs(end["x"] - target[0]), abs(end["y"] - target[1])), 1, (map_id, target))
+
+    def test_map_panel_model_matches_measured_map_panels(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is not installed")
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        start = content.index("  function mapPanel(")
+        source = content[start:content.index("\n  }\n", start) + 4]
+        # [map size, our position, map pixel to click or null] -> close X, click point.
+        cases = [
+            [[560, 432], [200, 200], [484, 67]],     # 768 lobby, easy portal clicked live
+            [[800, 608], [365, 150], [365, 84]],     # 1137, portal 2 clicked live
+            [[352, 256], [160, 144], None],          # 1141
+            [[832, 720], [172, 606], None],          # 1140
+            [[992, 992], [752, 800], [752, 800]],    # Hà Đông ngoài: us drawn in the screenshot
+            [[512, 512], [264, 280], [453, 120]],    # Thiên Long lobby at 33,35: portal to the trận
+            [[1280, 1024], [64, 712], [687, 472]],   # Thiên Long trận, Map opened at 8,89: centre portal
+        ]
+        script = source + (
+            "const cases = " + json.dumps(cases) + ";\n"
+            "console.log(JSON.stringify(cases.map(([size, me, at]) => {\n"
+            "  const panel = mapPanel({}, size, { x: me[0], y: me[1] });\n"
+            "  const spot = at || me;\n"
+            "  return [panel.closePoint, at && panel.toFraction({ x: at[0], y: at[1] }),\n"
+            "          panel.shows({ x: spot[0], y: spot[1] }), panel.shows({ x: 616, y: 128 })];\n"
+            "})));\n"
+        )
+        # Through stdin: with the walk grids inlined, -e outgrows the Windows command line.
+        result = subprocess.run([node], input=script, capture_output=True, text=True,
+                                encoding="utf-8", check=True)
+        panels = json.loads(result.stdout)
+        measured = [
+            ([0.745, 0.106], [0.658, 0.241]),
+            ([0.839, 0.066], [0.472, 0.228]),
+            ([0.663, 0.244], None),
+            ([0.851, 0.066], None),
+            # Screenshot, canvas at 57,137 1806x903: X at 1707,195; us at 1322,640.
+            ([(1707 - 57) / 1806, (195 - 137) / 903], [(1322 - 57) / 1806, (640 - 137) / 903]),
+            # Thiên Long screenshots, same canvas: lobby X 1367,195 and portal ring
+            # 1238,395; trận (1280 wide, so cut to 1124) X 1800,195 and ring 1135,300.
+            ([(1367 - 57) / 1806, (195 - 137) / 903], [(1238 - 57) / 1806, (395 - 137) / 903]),
+            ([(1800 - 57) / 1806, (195 - 137) / 903], [(1135 - 57) / 1806, (300 - 137) / 903]),
+        ]
+        for (close, click, *_), (want_close, want_click) in zip(panels, measured):
+            for got, want in zip(close, want_close):
+                self.assertAlmostEqual(want, got, delta=0.006)
+            for got, want in zip(click or [], want_click or []):
+                self.assertAlmostEqual(want, got, delta=0.01)
+        # 77,16 is off the Hà Đông panel from the entrance (its arrows do not
+        # scroll it), so that walk goes in legs; the 768 lobby shows whole.
+        self.assertIs(False, panels[4][3])
+        self.assertTrue(all(panel[2] for panel in panels))  # every measured spot shows
+
+    def test_dungeon_step_log_keeps_step_detail_message(self):
+        handle = MagicMock()
+        with patch.object(Path, "open") as open_file, patch.object(Path, "mkdir"):
+            open_file.return_value.__enter__.return_value = handle
+            event = log_network_event({
+                "type": "dungeon_step_done", "flow": "co_mo_hard", "cycle": 3, "step": "step_3",
+                "message": "Bước 3/19: Đi tới 1 xong sau 12.0s; click: canvas#screen@1592,200",
+            })
+        self.assertEqual("dungeon_step_done", event["type"])
+        self.assertEqual("co_mo_hard", event["flow"])
+        self.assertEqual(3, event["cycle"])
+        self.assertIn("canvas#screen@1592,200", event["message"])
+
     def test_inventory_left_batches_use_99_then_sort_forever(self):
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn('label: "Ô trái ×99 + sắp xếp"', content)
@@ -349,7 +630,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.5.0"', manifest)
+        self.assertIn('"version": "0.11.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

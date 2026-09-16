@@ -36,6 +36,7 @@
     "auto_attack_loop",
     "star_reappraisal_loop",
     "mount_skill_learn_once",
+    "dungeon_route",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -51,6 +52,22 @@
   let domToken = null;
   let domFlow = { state: "idle", message: "Sẵn sàng" };
   let timerKeepAlive = null;
+  // Live game state (map, our position, live monsters) decoded by
+  // network_probe.js from the game's own WebSocket traffic.
+  let latestWorld = null;
+  // When the map id last really changed. The probe also flags entering the
+  // same map again (the game re-sends it, e.g. in Hà Đông), which is no portal.
+  let mapSwitchedAt = 0;
+  let knownMapId = null;
+  window.addEventListener("message", (event) => {
+    if (event.source !== window || event.data?.source !== "sanguo-world") return;
+    latestWorld = event.data;
+    const mapId = latestWorld.mapId;
+    if (mapId != null && mapId !== knownMapId) {
+      if (knownMapId != null) mapSwitchedAt = Date.now();
+      knownMapId = mapId;
+    }
+  });
 
   function rememberGuardReload() {
     localStorage.setItem(NETWORK_EVENT_KEY, JSON.stringify({ type: "guard", at: Date.now() }));
@@ -285,9 +302,16 @@
     showStatus(domFlow);
   }
 
+  // Points are fractions of the game canvas. When the tab is wider than the
+  // canvas (e.g. Brave's info bar steals height) the game is letterboxed, so
+  // map onto #screen itself; when it fills the tab this equals the viewport.
   function eventTargetAt(point) {
-    const x = Number(point[0]) * innerWidth;
-    const y = Number(point[1]) * innerHeight;
+    const rect = document.querySelector("#screen")?.getBoundingClientRect();
+    const box = rect && rect.width > 0 && rect.height > 0
+      ? rect
+      : { left: 0, top: 0, width: innerWidth, height: innerHeight };
+    const x = box.left + Number(point[0]) * box.width;
+    const y = box.top + Number(point[1]) * box.height;
     const target = document.elementFromPoint(x, y);
     if (!target) throw new Error(`Không tìm thấy phần tử game tại (${x.toFixed(0)}, ${y.toFixed(0)})`);
     return { target, x, y };
@@ -325,6 +349,7 @@
     dispatchMouse(target, "mousedown", x, y, 1);
     await new Promise((resolve) => setTimeout(resolve, 40));
     dispatchMouse(target, "mouseup", x, y, 0);
+    return { target, x, y };
   }
 
   function dispatchKey(type, key, code, keyCode, modifiers = 0) {
@@ -544,22 +569,693 @@
   }
 
   async function runAutoAttack(token, macro) {
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      await attackRound(token, macro);
+      updateDomFlow("auto_attack", `Tự động đánh: ${cycle + 1} vòng`);
+      await domDelay(macro.round_delay_seconds || 0.3);
+    }
+  }
+
+  async function attackRound(token, macro) {
     const attackPoint = macro.attack_point || [0.927, 0.822];
     const skillPoints = macro.skill_points || [
       [0.927, 0.517], [0.853, 0.566], [0.799, 0.670], [0.875, 0.710],
       [0.927, 0.653], [0.774, 0.820], [0.845, 0.820],
     ];
-    const maxCycles = Number(macro.max_cycles || 0);
-    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
-      await domClick(token, attackPoint);
+    await domClick(token, attackPoint);
+    await domDelay(macro.button_delay_seconds || 0.18);
+    for (const point of skillPoints) {
+      await domClick(token, point);
       await domDelay(macro.button_delay_seconds || 0.18);
-      for (const point of skillPoints) {
-        await domClick(token, point);
-        await domDelay(macro.button_delay_seconds || 0.18);
-      }
-      updateDomFlow("auto_attack", `Tự động đánh: ${cycle + 1} vòng`);
-      await domDelay(macro.round_delay_seconds || 0.3);
     }
+  }
+
+  // Real-time wait that still honours Stop; walks and portal loads are timed.
+  async function domWait(token, seconds) {
+    const deadline = Date.now() + Number(seconds) * 1000;
+    while (Date.now() < deadline) {
+      ensureDomActive(token);
+      await new Promise((resolve) => setTimeout(resolve, Math.min(500, deadline - Date.now())));
+    }
+    ensureDomActive(token);
+  }
+
+  // A dungeon is a fixed route: walk by clicking the Map panel (the game
+  // auto-paths) - to a coordinate (goto) or a fixed panel point (map_point) -
+  // then fight until no monster is attacking. Portals stay locked while
+  // monsters attack us, so a portal that does not take us means: fight, retry.
+  // "canvas#screen@1592,200" - shows whether a click reached the game canvas
+  // or landed on something else, e.g. the flow panel covering that spot.
+  function describeClick({ target, x, y }) {
+    const name = `${target.tagName?.toLowerCase() || "?"}${target.id ? `#${target.id}` : ""}`;
+    return `${name}@${Math.round(x)},${Math.round(y)}`;
+  }
+
+  // Every step is logged to logs/extension-network.log (types dungeon_*),
+  // so a route that drifts can be traced to the step and click that missed.
+  async function runDungeonRoute(token, macro, flow) {
+    // Started inside the dungeon (e.g. after a stop): the entry is behind us.
+    const entryMap = macro.entry_map == null ? null : Number(macro.entry_map);
+    const inside = entryMap != null && latestWorld?.mapId != null && latestWorld.mapId !== entryMap;
+    const steps = [...(inside ? [] : macro.entry_steps || []), ...(macro.route_steps || [])];
+    if (!steps.length) throw new Error("Chưa cấu hình đường đi phó bản");
+    const unclosed = steps.find((step) => step.map_point && !step.map_close_point);
+    if (unclosed) {
+      throw new Error(`Bước "${unclosed.label}" mở Map nhưng thiếu map_close_point (nút X) để đóng lại`);
+    }
+    const unsized = steps.find((step) => step.goto && !step.map_size);
+    if (unsized) {
+      throw new Error(`Bước "${unsized.label}" đi theo tọa độ nhưng thiếu map_size (cỡ map, pixel)`);
+    }
+    const canvas = document.querySelector("#screen")?.getBoundingClientRect();
+    appendDiagnostic("dungeon_start", {
+      flow,
+      message: `${steps.length} bước; viewport ${innerWidth}x${innerHeight}; `
+        + (canvas
+          ? `canvas ${Math.round(canvas.left)},${Math.round(canvas.top)} ${Math.round(canvas.width)}x${Math.round(canvas.height)}`
+          : "không thấy canvas #screen")
+        + `; dữ liệu game: ${describeWorld()}`
+        + (inside ? "; đã ở trong phó bản nên bỏ qua bước vào cửa" : ""),
+    });
+    // Newest map switch the route has accounted for; a newer one before a
+    // portal step means that portal was already crossed.
+    let mapMark = mapSwitchedAt;
+    for (const [index, step] of steps.entries()) {
+      const title = `Bước ${index + 1}/${steps.length}: ${step.label || "đi tiếp"}`;
+      const { label: _label, ...plan } = step;
+      const stepStartedAt = Date.now();
+      const clicks = [];
+      const notes = [];
+      updateDomFlow(flow, title, `step_${index + 1}`);
+      appendDiagnostic("dungeon_step", { flow, message: `${title} ${JSON.stringify(plan)}; ${describeWorld()}` });
+      const crossed = Boolean(step.portal) && mapSwitchedAt > mapMark;
+      if (crossed) notes.push(`đã sang map ${latestWorld.mapId ?? "?"} từ trước nên bỏ qua`);
+      for (let attempt = 0; !crossed && (step.goto || step.map_point || step.click_point); attempt += 1) {
+        const since = Date.now();
+        let walk;
+        if (step.goto) {
+          walk = await walkToCoord(token, macro, step, clicks);
+        } else {
+          if (step.map_point) notes.push(`đóng map: ${await walkByMap(token, macro, step, clicks)}`);
+          else clicks.push(await domClick(token, step.click_point));
+          walk = await waitForArrival(token, macro, step, since);
+        }
+        notes.push(walk.note);
+        // A portal that did not change the map is still shut: monsters are
+        // attacking us. So is an ambush on the way. Clear them, then retry.
+        const shut = walk.how === "stuck"
+          || (step.portal && ["timeout", "blocked"].includes(walk.how) && latestWorld?.frames);
+        if (walk.how !== "ambush" && !shut) break;
+        notes.push(describeFight(await fightUntilClear(token, macro, macro.ambush_fight_seconds || 60)));
+        appendDiagnostic("dungeon_ambush", { flow, message: `${title}: ${notes.slice(-2).join(" → ")}` });
+        if (attempt >= Number(macro.max_rewalks ?? 3)) {
+          if (shut) throw new Error(`${title}: vẫn chưa qua được cổng sau ${attempt + 1} lần`);
+          break;
+        }
+      }
+      if (step.portal) mapMark = Math.max(mapMark, mapSwitchedAt);
+      if (step.fight_seconds) {
+        const until = step.ignore_idle_monsters ? "không còn quái đánh mình" : "hết quái";
+        updateDomFlow(flow, `${title} (đánh tới khi ${until})`, `step_${index + 1}`);
+        notes.push(describeFight(await fightUntilClear(token, macro, step.fight_seconds, {
+          idle: !step.ignore_idle_monsters,
+        })));
+      }
+      if (step.after_seconds) await domWait(token, step.after_seconds);
+      const seconds = ((Date.now() - stepStartedAt) / 1000).toFixed(1);
+      appendDiagnostic("dungeon_step_done", {
+        flow,
+        message: `${title} xong sau ${seconds}s; `
+          + notes.map((note) => `${note}; `).join("")
+          + `click: ${clicks.map(describeClick).join(" | ") || "không"}`,
+      });
+    }
+    updateDomFlow(flow, `Đã chạy xong ${steps.length} bước phó bản`, "done");
+    if (macro.finish_chime !== false) playChime();
+  }
+
+  // A bell when a dungeon is done, for a user away from the screen (user,
+  // 2026-09-14). Synthesised with Web Audio: no sound file to ship.
+  function playChime() {
+    try {
+      const audio = new AudioContext();
+      audio.resume();
+      const start = audio.currentTime + 0.05;
+      const notes = [[0, 880], [0.3, 1175], [0.6, 1568], [1.5, 880], [1.8, 1175], [2.1, 1568]];
+      for (const [at, hz] of notes) {
+        const tone = audio.createOscillator();
+        const gain = audio.createGain();
+        tone.frequency.value = hz;
+        gain.gain.setValueAtTime(0.0001, start + at);
+        gain.gain.exponentialRampToValueAtTime(0.35, start + at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + at + 1.2);
+        tone.connect(gain).connect(audio.destination);
+        tone.start(start + at);
+        tone.stop(start + at + 1.25);
+      }
+      setTimeout(() => audio.close(), 4500);
+    } catch (_) { /* No audio: the panel still shows the route as done. */ }
+  }
+
+  // Opens Map, picks the destination and closes Map again: the panel never
+  // closes by itself and would swallow every later click.
+  async function walkByMap(token, macro, step, clicks) {
+    clicks.push(await domClick(token, macro.map_button_point || [0.85, 0.07]));
+    await domWait(token, macro.map_open_delay_seconds || 1.2);
+    clicks.push(await domClick(token, step.map_point));
+    await domWait(token, macro.map_close_delay_seconds || 0.6);
+    // The game's close key does not reach the Map from here: always its X button.
+    clicks.push(await domClick(token, step.map_close_point));
+    return "nút X";
+  }
+
+  // Where the Map panel draws a map, in canvas fractions. It draws the map 1:1
+  // in the game's 1280x640 logical screen, centred on (640, 304) and at most
+  // 1124x484; a bigger map opens scrolled to show us about 50 below the middle
+  // (8 Thiên Long legs put us 292 +-16 px below its top edge), clamped at the
+  // map's edges. Its scroll arrows do not scroll it when clicked from here
+  // (Thiên Long, 2026-09-14), so only what shows as it opens can be clicked.
+  // Its X sits 34 right of and 20 above the drawn map. Fitted on the X buttons
+  // of maps 768, 1137, 1140, 1141, Hà Đông ngoài, Thiên Long trận and its
+  // lobby, and on portals / our marker in the user's screenshots.
+  function mapPanel(macro, size, me) {
+    const [screenW, screenH] = (macro.map_panel_screen || [1280, 640]).map(Number);
+    const [centerX, centerY] = (macro.map_panel_center || [640, 304]).map(Number);
+    const [maxW, maxH] = (macro.map_panel_max_size || [1124, 484]).map(Number);
+    const [followX, followY] = (macro.map_panel_follow_offset || [0, 50]).map(Number);
+    // Room kept off an edge the scroll cuts: the scroll rule is off by ~16 px.
+    const margin = Number(macro.map_panel_margin || 48);
+    const [mapW, mapH] = size.map(Number);
+    const view = { x: Math.min(mapW, maxW), y: Math.min(mapH, maxH) };
+    const map = { x: mapW, y: mapH };
+    const follow = { x: followX, y: followY };
+    const origin = { x: centerX - view.x / 2, y: centerY - view.y / 2 };
+    const scroll = {};
+    for (const axis of ["x", "y"]) {
+      const wanted = me[axis] - view[axis] / 2 - follow[axis];
+      scroll[axis] = Math.min(Math.max(wanted, 0), map[axis] - view[axis]);
+    }
+    const fraction = (x, y) => [x / screenW, y / screenH];
+    return {
+      scroll,
+      // Drawn on the Map as it opens, clear of any edge the scroll cuts off.
+      shows(point) {
+        return ["x", "y"].every((axis) => {
+          const low = scroll[axis] > 0 ? scroll[axis] + margin : 0;
+          const high = scroll[axis] + view[axis] < map[axis] ? scroll[axis] + view[axis] - margin : map[axis];
+          return point[axis] >= low && point[axis] <= high;
+        });
+      },
+      toFraction: (point) => fraction(origin.x + point.x - scroll.x, origin.y + point.y - scroll.y),
+      closePoint: fraction(origin.x + view.x + 34, origin.y - 20),
+    };
+  }
+
+  // Walkable path tiles per map id: walk_grids.js, generated from the game's
+  // own map data by tools/assets/walk_grid.mjs, loads before this script. One
+  // tile is one game coordinate.
+  const decodedGrids = new Map();
+  function walkGridFor(mapId) {
+    const source = globalThis.SANGUO_WALK_GRIDS?.[mapId];
+    if (!source) return null;
+    if (!decodedGrids.has(mapId)) {
+      const bits = Uint8Array.from(atob(source.blocked), (char) => char.charCodeAt(0));
+      const blocked = (index) => (bits[index >> 3] >> (index & 7)) & 1;
+      decodedGrids.set(mapId, {
+        ...source,
+        open: (x, y) => x >= 0 && y >= 0 && x < source.w && y < source.h && !blocked(y * source.w + x),
+      });
+    }
+    return decodedGrids.get(mapId);
+  }
+
+  // Shortest walkable path (8 directions, never cutting a blocked corner) from
+  // `start` to a tile within `within` of `goal`; tiles start to end, or null.
+  function findPath(grid, start, goal, within = 0) {
+    const { w, h } = grid;
+    const cost = new Float64Array(w * h).fill(Infinity);
+    const came = new Int32Array(w * h).fill(-1);
+    const heap = [];
+    const swap = (a, b) => { [heap[a], heap[b]] = [heap[b], heap[a]]; };
+    const push = (entry) => {
+      heap.push(entry);
+      for (let i = heap.length - 1; i > 0 && heap[(i - 1) >> 1][0] > heap[i][0]; i = (i - 1) >> 1) swap(i, (i - 1) >> 1);
+    };
+    const pop = () => {
+      const top = heap[0];
+      const last = heap.pop();
+      if (heap.length) {
+        heap[0] = last;
+        for (let i = 0; ;) {
+          const [left, right] = [2 * i + 1, 2 * i + 2];
+          let least = i;
+          if (left < heap.length && heap[left][0] < heap[least][0]) least = left;
+          if (right < heap.length && heap[right][0] < heap[least][0]) least = right;
+          if (least === i) break;
+          swap(i, least);
+          i = least;
+        }
+      }
+      return top;
+    };
+    const guess = (x, y) => Math.max(0, Math.hypot(goal.x - x, goal.y - y) - within);
+    cost[start.y * w + start.x] = 0;
+    push([guess(start.x, start.y), start.y * w + start.x]);
+    while (heap.length) {
+      const [, index] = pop();
+      const x = index % w;
+      const y = (index - x) / w;
+      if (Math.max(Math.abs(x - goal.x), Math.abs(y - goal.y)) <= within) {
+        const path = [];
+        for (let at = index; at !== -1; at = came[at]) path.push({ x: at % w, y: Math.floor(at / w) });
+        return path.reverse();
+      }
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if ((!dx && !dy) || !grid.open(x + dx, y + dy)) continue;
+          if (dx && dy && (!grid.open(x + dx, y) || !grid.open(x, y + dy))) continue;
+          const next = (y + dy) * w + x + dx;
+          const nextCost = cost[index] + (dx && dy ? Math.SQRT2 : 1);
+          if (nextCost >= cost[next]) continue;
+          cost[next] = nextCost;
+          came[next] = index;
+          push([nextCost + guess(x + dx, y + dy), next]);
+        }
+      }
+    }
+    return null;
+  }
+
+  // Steps on foot from `from` to every tile up to `limit` steps away (8
+  // directions, never cutting a blocked corner); Infinity past that.
+  function walkDistances(grid, from, limit) {
+    const steps = new Float64Array(grid.w * grid.h).fill(Infinity);
+    const start = grid.open(from.x, from.y) ? from : nearestOpen(grid, from, 2);
+    if (!start) return steps;
+    const queue = [start.y * grid.w + start.x];
+    steps[queue[0]] = 0;
+    for (let head = 0; head < queue.length; head += 1) {
+      const index = queue[head];
+      if (steps[index] >= limit) continue;
+      const x = index % grid.w;
+      const y = (index - x) / grid.w;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if ((!dx && !dy) || !grid.open(x + dx, y + dy)) continue;
+          if (dx && dy && (!grid.open(x + dx, y) || !grid.open(x, y + dy))) continue;
+          const next = (y + dy) * grid.w + x + dx;
+          if (steps[next] <= steps[index] + 1) continue;
+          steps[next] = steps[index] + 1;
+          queue.push(next);
+        }
+      }
+    }
+    return steps;
+  }
+
+  // Nearest open tile to `tile` (itself when open), within `radius` tiles.
+  function nearestOpen(grid, tile, radius) {
+    for (let ring = 0; ring <= radius; ring += 1) {
+      let best = null;
+      for (let dy = -ring; dy <= ring; dy += 1) {
+        for (let dx = -ring; dx <= ring; dx += 1) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring || !grid.open(tile.x + dx, tile.y + dy)) continue;
+          if (!best || Math.hypot(dx, dy) < best.d) best = { x: tile.x + dx, y: tile.y + dy, d: Math.hypot(dx, dy) };
+        }
+      }
+      if (best) return { x: best.x, y: best.y };
+    }
+    return null;
+  }
+
+  function straightLine(start, goal) {
+    const steps = Math.max(Math.abs(goal.x - start.x), Math.abs(goal.y - start.y), 1);
+    return Array.from({ length: steps + 1 }, (_, i) => ({
+      x: Math.round(start.x + ((goal.x - start.x) * i) / steps),
+      y: Math.round(start.y + ((goal.y - start.y) * i) / steps),
+    }));
+  }
+
+  // The way from `start` to `goal` in tiles: to the goal itself, else to the
+  // nearest tile within `tolerance` (a boss on an altar), else within 6.
+  // Without a grid for the map: a straight line, and the game finds the rest.
+  function planRoute(grid, start, goal, tolerance) {
+    if (!grid) return straightLine(start, goal);
+    const from = grid.open(start.x, start.y) ? start : nearestOpen(grid, start, 3);
+    if (!from) return null;
+    return findPath(grid, from, goal, 0) || findPath(grid, from, goal, tolerance) || findPath(grid, from, goal, 6);
+  }
+
+  async function currentPosition(token) {
+    for (let waited = 0; !latestWorld?.me && waited < 6; waited += 0.5) await domWait(token, 0.5);
+    if (!latestWorld?.me) {
+      throw new Error(`Chưa biết vị trí nhân vật (${describeWorld()}); đi 1 bước bằng tay rồi chạy lại`);
+    }
+    return { ...latestWorld.me };
+  }
+
+  // Door tiles to try for a portal step: the coordinate the user gave, exactly,
+  // then any exit the game data puts within 3 tiles of it.
+  function doorTiles(grid, goal) {
+    const tiles = [goal];
+    for (const [x, y] of grid?.exits || []) {
+      const near = Math.max(Math.abs(x - goal.x), Math.abs(y - goal.y)) <= 3;
+      if (near && (x !== goal.x || y !== goal.y)) tiles.push({ x, y });
+    }
+    return tiles;
+  }
+
+  // Per door, the tile we last walked in from: a door that did not take us is
+  // left back that way and walked into again (not round to its far side).
+  const doorApproach = new Map();
+
+  // Walks to a coordinate as the game prints it next to the map name (1 unit =
+  // coord_unit map pixels = one path tile). Plans the way on the map's walk
+  // grid, then each leg opens the Map and clicks the farthest tile of that way
+  // the Map shows, so the game's own pathfinder always gets a spot it can
+  // reach. A boss spot counts as reached within goto_tolerance tiles; a door
+  // only exactly (user, 2026-09-14). Every leg logs the tile it clicked and
+  // where we ended up.
+  async function walkToCoord(token, macro, step, clicks) {
+    const unit = Number(macro.coord_unit || 8);
+    const [cellX, cellY] = step.goto.map(Number);
+    const tolerance = step.portal ? 0 : Number(step.goto_tolerance ?? macro.goto_tolerance ?? 1);
+    // The game prints map pixels / unit rounded down.
+    const tileOf = (point) => ({ x: Math.floor(point.x / unit), y: Math.floor(point.y / unit) });
+    const center = (tile) => ({ x: (tile.x + 0.5) * unit, y: (tile.y + 0.5) * unit });
+    const same = (a, b) => a.x === b.x && a.y === b.y;
+    const reached = (point) => {
+      const tile = tileOf(point);
+      return Math.abs(tile.x - cellX) <= tolerance && Math.abs(tile.y - cellY) <= tolerance;
+    };
+    const where = (point) => `${tileOf(point).x},${tileOf(point).y}`;
+    const maxLegs = Number(macro.goto_max_legs || 12);
+    const cap = Number(macro.goto_max_correction || 32);
+    const bias = { x: 0, y: 0 };
+    const legs = [];
+    let lastEnd = null;
+    let stalls = 0;
+    let shrink = 1;
+    let doorIndex = 0;
+    const summary = () => `đi tới ${step.goto.join(",")}: ${legs.join(" → ") || "đã đứng sẵn ở đó"}`;
+    for (let leg = 0; leg < maxLegs; leg += 1) {
+      const me = await currentPosition(token);
+      if (!step.portal && reached(me)) {
+        return { how: "arrived", note: `${summary()}; đứng ở ${where(me)}` };
+      }
+      const grid = walkGridFor(latestWorld?.mapId);
+      const doors = step.portal ? doorTiles(grid, { x: cellX, y: cellY }) : null;
+      const goal = doors ? doors[Math.min(doorIndex, doors.length - 1)] : { x: cellX, y: cellY };
+      const doorKey = `${latestWorld?.mapId}:${goal.x},${goal.y}`;
+      const panel = mapPanel(macro, grid ? grid.size : step.map_size, me);
+      // Standing on the door and it did not take us: back out the way we came.
+      const backOff = Boolean(doors) && leg === 0 && same(tileOf(me), goal);
+      const route = backOff ? [tileOf(me)] : planRoute(grid, tileOf(me), goal, tolerance);
+      if (!route) {
+        return { how: "blocked", note: `không có đường tới ${goal.x},${goal.y} từ ${where(me)}; ${summary()}` };
+      }
+      let hop = route.length - 1;
+      while (hop > 0 && !panel.shows(center(route[hop]))) hop -= 1;
+      hop = Math.max(Math.min(1, route.length - 1), Math.floor(hop * shrink));
+      let tile = route[hop];
+      if (backOff) {
+        const below = { x: goal.x, y: goal.y + 3 };
+        tile = doorApproach.get(doorKey) || (grid && nearestOpen(grid, below, 2)) || below;
+      }
+      const final = hop === route.length - 1 && !backOff;
+      if (doors && final && route.length > 4) doorApproach.set(doorKey, route[route.length - 4]);
+      const point = backOff ? center(tile) : { x: center(tile).x + bias.x, y: center(tile).y + bias.y };
+      const since = Date.now();
+      await walkByMap(token, macro, {
+        map_point: panel.toFraction(point),
+        map_close_point: step.map_close_point || panel.closePoint,
+      }, clicks);
+      const walk = await waitForArrival(token, macro, {
+        ...step,
+        portal: Boolean(step.portal) && final,
+        wait_seconds: step.wait_seconds ?? macro.goto_leg_seconds ?? 60,
+      }, since, {
+        idleSeconds: Number(macro.goto_idle_seconds || 5),
+        settleSeconds: Number(macro.goto_settle_seconds || 2.5),
+      });
+      const after = latestWorld?.me || me;
+      legs.push(`${tile.x},${tile.y}${final ? "" : " chặng"} ${walk.how} @${where(after)}`);
+      if (walk.how === "map" || walk.how === "ambush") return { ...walk, note: `${walk.note}; ${summary()}` };
+      // Walks that keep ending on the same spot short of the target: something
+      // (a shut gate, monsters in the way) blocks it. Say so, stop clicking.
+      const stalled = lastEnd && Math.hypot(after.x - lastEnd.x, after.y - lastEnd.y) <= 1.5 * unit;
+      stalls = stalled && !["timeout", "idle"].includes(walk.how) ? stalls + 1 : 0;
+      lastEnd = { ...after };
+      const there = doors ? same(tileOf(after), goal) : reached(after);
+      if (stalls >= 2 && !there) {
+        return { how: "blocked", note: `bị chặn ở ${where(after)}; ${summary()}` };
+      }
+      // Still walking when the leg timed out: plan again from here.
+      if (backOff || walk.how === "timeout") continue;
+      // Nothing moved: the click missed the tile onto something blocked. Aim nearer.
+      if (walk.how === "idle") {
+        bias.x = 0;
+        bias.y = 0;
+        shrink *= 0.6;
+        if (shrink < 0.2) return { how: "blocked", note: `bấm mà không đi được; ${summary()}` };
+        continue;
+      }
+      shrink = 1;
+      const off = { x: center(tile).x - after.x, y: center(tile).y - after.y };
+      if (doors && final && walk.how === "stuck" && same(tileOf(after), goal)) {
+        // On this door tile and the map did not change: try the game data's
+        // exit next to it; past the last one the door is shut (monsters).
+        if (doorIndex + 1 < doors.length) {
+          doorIndex += 1;
+          bias.x = 0;
+          bias.y = 0;
+          continue;
+        }
+        return { ...walk, note: `${walk.note}; ${summary()}` };
+      }
+      // Not on the door tile yet: correct the click below and try it again.
+      // Landing a little off the clicked tile is the Map model's error: aim
+      // that much the other way next time. A big miss is a walk cut short.
+      if (Math.hypot(off.x, off.y) <= 3 * unit) {
+        bias.x = Math.max(-cap, Math.min(cap, bias.x + off.x));
+        bias.y = Math.max(-cap, Math.min(cap, bias.y + off.y));
+      }
+    }
+    return { how: "timeout", note: `chưa tới sau ${maxLegs} lượt; ${summary()}` };
+  }
+
+  // Attacks until no live monster is near us for a few checks in a row;
+  // maxSeconds only caps a fight whose state cannot be read.
+  async function fightUntilClear(token, macro, maxSeconds, { idle = true } = {}) {
+    const startedAt = Date.now();
+    const deadline = startedAt + Number(maxSeconds) * 1000;
+    const needed = Math.max(1, Number(macro.clear_checks_needed || 3));
+    let rounds = 0;
+    let streak = 0;
+    let last = null;
+    // Monsters the game refuses to hit (ATTACK_FAIL): 14 "Mục tiêu không nằm
+    // trong tầm nhìn", 8 "Mục tiêu không thể tấn công" (e.g. a Mật thư), 3/4
+    // dead or gone. Leave them and move on (user, 2026-09-14).
+    const unhittable = new Set([3, 4, 8, 14]);
+    // "Mục tiêu không nằm trong tầm nhìn" is often just the moment: the game
+    // aimed at something we had walked away from. So a failed target is set
+    // aside for unseen_seconds and then tried again, not dropped for the whole
+    // fight (user, 2026-09-16: steps moved on with monsters still alive).
+    const unseenMs = Number(macro.unseen_seconds ?? 20) * 1000;
+    const unseen = new Map();
+    // Nothing near loses health or dies for stall_giveup_seconds of Đánh: the
+    // game cannot hit what is left from here - an idle statue that is no
+    // target (Cổ Mộ 90,30, 103 rounds), one out of sight (Hà Đông 57,114, "Y
+    // quan phản quân" 100% after 137 rounds). Only ones still at full health
+    // are dropped: whatever we did hurt we can hit, weak damage just takes
+    // longer (user, 2026-09-16). A boss waiting idle loses health as soon as
+    // it is hit, so it stays in the fight too.
+    const stallMs = Number(macro.stall_giveup_seconds ?? 30) * 1000;
+    const untouched = new Set();
+    const joinedAt = new Map();
+    let health = new Map();
+    let progressAt = startedAt;
+    while (Date.now() < deadline) {
+      if (macro.combat_check !== false) {
+        for (const fail of latestWorld?.attackFails || []) {
+          if (fail.at > startedAt && unhittable.has(fail.reason) && !unseen.has(fail.target)) {
+            unseen.set(fail.target, fail.at);
+          }
+        }
+        last = combatState(macro, untouched, { idle });
+        const now = Date.now();
+        const near = last.near || [];
+        const alive = new Set((latestWorld?.creatures || []).map(([id]) => id));
+        const hurt = near.some((monster) => health.has(monster.id) && monster.hp < health.get(monster.id));
+        const gone = [...health.keys()].some((id) => !alive.has(id));
+        if (last.state !== "combat" || hurt || gone) progressAt = now;
+        for (const monster of near) if (!joinedAt.has(monster.id)) joinedAt.set(monster.id, now);
+        // Dropped for good only while still at FULL health: the game has been
+        // refusing it for unseen_seconds, or nothing near has lost health for
+        // stall_giveup_seconds. Until then it keeps the fight going - one that
+        // is merely set aside must never read as "cleared" (user, 2026-09-16:
+        // Thiên Long boss 5 was reported done with over half its health).
+        const stalled = now - progressAt >= stallMs;
+        const drop = near.filter((monster) => monster.hp >= 200
+          && ((unseen.has(monster.id) && now - unseen.get(monster.id) >= unseenMs)
+            || (stalled && now - joinedAt.get(monster.id) >= stallMs)));
+        if (drop.length) {
+          for (const monster of drop) untouched.add(monster.id);
+          last = combatState(macro, untouched, { idle });
+        }
+        health = new Map((last.near || []).map((monster) => [monster.id, monster.hp]));
+        streak = last.state === "clear" ? streak + 1 : 0;
+        if (streak >= needed) break;
+        // No monster left: only wait out the checks. Pressing Đánh now picks
+        // something that is no monster (the button turns into "Chat").
+        if (last.state === "clear") {
+          await domDelay(macro.round_delay_seconds || 0.4);
+          continue;
+        }
+      }
+      await attackRound(token, macro);
+      rounds += 1;
+      await domDelay(macro.round_delay_seconds || 0.4);
+    }
+    return {
+      cleared: streak >= needed,
+      rounds,
+      seconds: (Date.now() - startedAt) / 1000,
+      last,
+      unseen: unseen.size,
+      untouched: untouched.size,
+      // Everything the game data still shows around us, however far: a fight
+      // that ends with a boss alive says here whether the boss was in the data
+      // at all (user, 2026-09-16: boss 5 reported done at over half health).
+      seen: monstersNear(latestWorld, Infinity).slice(0, 5),
+    };
+  }
+
+  function describeFight(fight) {
+    return `${fight.cleared ? "hết quái" : "hết giờ"} sau ${fight.seconds.toFixed(1)}s, ${fight.rounds} vòng`
+      + (fight.unseen ? `, game báo không đánh được ${fight.unseen} con` : "")
+      + (fight.untouched ? `, bỏ hẳn ${fight.untouched} con còn đầy máu` : "")
+      + (fight.last ? ` [${fight.last.state}: ${fight.last.detail}]` : "")
+      + ` {quanh ta: ${fight.seen?.length
+        ? fight.seen.map((monster) => `${monster.name || `#${monster.id}`} ${Math.round(monster.d)}px `
+          + `máu ${Math.round(monster.hp / 2)}% tt ${monster.state}`).join(", ")
+        : "không thấy con nào"}}`;
+  }
+
+  // Ends a walk on the game's own signals: a map change for a portal, or our
+  // client reporting it stopped (MOVE_CLIENT moving bit cleared). A monster
+  // attacking close by interrupts it. Without decoded traffic it just waits.
+  // idleSeconds (coordinate walks): give up early when the click did not start
+  // a walk at all, e.g. it picked a spot the pathfinder refuses.
+  // settleSeconds (coordinate walks): how long we must stand still to count as
+  // arrived; a long auto-path pauses for a moment on the way.
+  async function waitForArrival(token, macro, step, since, { idleSeconds = 0, settleSeconds = 0 } = {}) {
+    const deadline = since + Number(step.wait_seconds ?? macro.step_delay_seconds ?? 1) * 1000;
+    const stillMs = Number(step.portal
+      ? macro.portal_settle_seconds || 2.5
+      : settleSeconds || macro.arrive_settle_seconds || 0.8) * 1000;
+    while (Date.now() < deadline) {
+      await domWait(token, 0.3);
+      const world = latestWorld;
+      if (!world?.frames) continue;
+      if (mapSwitchedAt > since) {
+        await domWait(token, macro.map_load_seconds || 1.5);
+        return { how: "map", note: `qua cổng sang map ${latestWorld.mapId}` };
+      }
+      // Only with fight_on_the_way: pressing Đánh makes the character stop to
+      // fight whatever is near instead of walking on (user, 2026-09-14).
+      if (macro.combat_check !== false && macro.fight_on_the_way === true && !step.ignore_ambush) {
+        const attackers = monstersNear(world, Number(macro.ambush_radius || 150), macro.ignore_monster_names)
+          .filter((monster) => monster.state & 2);
+        if (attackers.length) return { how: "ambush", note: `bị ${attackers.length} quái đánh khi đang đi` };
+      }
+      if (idleSeconds && !(world.meMovedAt > since) && Date.now() - since >= idleSeconds * 1000) {
+        return { how: "idle", note: `không nhúc nhích sau ${idleSeconds}s` };
+      }
+      if (world.meMovedAt > since && !world.meMoving && Date.now() - world.meMovedAt >= stillMs) {
+        const seconds = ((Date.now() - since) / 1000).toFixed(1);
+        return step.portal
+          ? { how: "stuck", note: `đứng ở cổng ${seconds}s mà chưa qua` }
+          : { how: "arrived", note: `tới nơi sau ${seconds}s` };
+      }
+    }
+    return {
+      how: "timeout",
+      note: latestWorld?.frames ? "hết giờ chờ đi" : "chờ theo giờ (chưa đọc được dữ liệu game)",
+    };
+  }
+
+  // ignoredNames: units that fight on our side, e.g. a companion general that
+  // follows us around, would otherwise read as a monster that never goes away.
+  function monstersNear(world, radius, ignoredNames = []) {
+    if (!world?.me) return [];
+    const ignored = new Set(ignoredNames);
+    return world.creatures
+      .map(([id, x, y, hp, state, name, npc]) => ({
+        id, x, y, hp, state, name, npc, d: Math.hypot(x - world.me.x, y - world.me.y),
+      }))
+      .filter((monster) => !monster.npc && !ignored.has(monster.name) && monster.d <= radius)
+      .sort((a, b) => a.d - b.d);
+  }
+
+  function describeWorld() {
+    const world = latestWorld;
+    if (!world) return "chưa nhận dữ liệu game (bấm F5 tab game sau khi reload extension)";
+    if (!world.frames) {
+      return `có ${world.messages} gói nhưng không giải mã được (byte đầu: ${world.firstBytes || "?"})`;
+    }
+    const npcs = world.creatures.filter((creature) => creature[6]).length;
+    return `map ${world.mapId ?? "?"}; ta ${world.me ? `${world.me.x},${world.me.y}` : "?"}; `
+      + `${world.creatures.length - npcs} quái + ${npcs} NPC đang thấy; `
+      + `${world.frames} gói, lỗi ${world.desync + world.badSegments}`;
+  }
+
+  // From the decoded game traffic (network_probe.js):
+  //   "clear"   no live monster within monster_radius of us - move on;
+  //   "combat"  at least one - keep fighting;
+  //   "unknown" traffic not decoded - callers fall back to the time caps.
+  function combatState(macro, skipped = new Set(), { idle = true } = {}) {
+    const world = latestWorld;
+    if (!world?.frames || !world.me) return { state: "unknown", detail: describeWorld() };
+    const radius = Number(macro.monster_radius || 250);
+    const around = monstersNear(world, radius, macro.ignore_monster_names);
+    // Monsters in the fight: attacking us (STATE_ATTACK) or wounded, and idle
+    // full-health ones close by - a boss waits idle until hit (Thiên Long
+    // trận). Ones that never die (e.g. "Tượng đá cơ quan") go on the ignore list.
+    // idle false (clear-before-door steps): only attackers and wounded ones -
+    // none left is our yellow name showing again, the door opens (user,
+    // 2026-09-14).
+    const idleRadius = Number(macro.idle_monster_radius ?? 160);
+    // One the walk grid puts behind walls - near in a straight line, a long way
+    // round on foot (Hà Đông ngoài: two rows of walls) - is out of this fight:
+    // the game cannot hit it from here. Leave it and move on (user, 2026-09-14).
+    const unit = Number(macro.coord_unit || 8);
+    const pathLimit = Number(macro.monster_path_tiles || 40);
+    const grid = walkGridFor(world.mapId);
+    const steps = grid && walkDistances(grid, { x: Math.floor(world.me.x / unit), y: Math.floor(world.me.y / unit) }, pathLimit);
+    const onFoot = (monster) => {
+      if (!steps) return true;
+      const [tx, ty] = [Math.floor(monster.x / unit), Math.floor(monster.y / unit)];
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const [x, y] = [tx + dx, ty + dy];
+          if (x >= 0 && y >= 0 && x < grid.w && y < grid.h && steps[y * grid.w + x] <= pathLimit) return true;
+        }
+      }
+      return false;
+    };
+    const walled = around.filter((monster) => !onFoot(monster));
+    const near = around.filter((monster) => onFoot(monster) && !skipped.has(monster.id) && ((monster.state & 2)
+      || (monster.hp > 0 && monster.hp < 200) || (idle && monster.d <= idleRadius)));
+    const standing = around.length - near.length - walled.length;
+    const detail = `${near.length} quái đang đánh trong ${radius}px`
+      + (walled.length ? ` (bỏ ${walled.length} con sau tường)` : "")
+      + (standing > 0 ? ` (bỏ qua ${standing} con đứng yên)` : "")
+      + (near.length
+        ? ` (gần nhất ${near[0].name || `#${near[0].id}`} ${Math.round(near[0].d)}px, máu ${Math.round(near[0].hp / 2)}%)`
+        : "");
+    return { state: near.length ? "combat" : "clear", detail, near };
   }
 
   async function startDomFlow(flow, macro) {
@@ -590,6 +1286,7 @@
         else if (flow === "auto_attack") await runAutoAttack(token, macro);
         else if (flow === "star_reappraisal") await runStarReappraisal(token, macro);
         else if (flow === "mount_skill_learn") await runMountSkillLearnOnce(token, macro);
+        else if (macro.runner === "dungeon_route") await runDungeonRoute(token, macro, flow);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {
