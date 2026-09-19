@@ -387,8 +387,24 @@ class ExtensionServerTest(unittest.TestCase):
         # dying (a statue that is no target, one out of sight) are left behind;
         # anything we did hurt is fought to the end, weak damage or not.
         self.assertEqual(30, macro["stall_giveup_seconds"])
-        self.assertEqual(20, macro["unseen_seconds"])
-        self.assertIn("macro.unseen_seconds", route_runner)
+        # A target the game refuses is left behind at once, hurt or not.
+        self.assertNotIn("unseen_seconds", macro)
+        self.assertIn("unhittable.has(fail.reason) && !unseen.has(fail.target)", route_runner)
+        # The refusal reasons go in the log, so a fight that ends early can be read back.
+        self.assertIn("refusals.set(fail.reason", route_runner)
+        # Damage we land keeps the fight on even with an empty creature list:
+        # Thiên Long bosses never show up in it.
+        self.assertEqual(15, macro["damage_grace_seconds"])
+        # The hard version's last boss (its room is map 1140) gets 2.5x the cap;
+        # the easy one, sharing this route, keeps the normal 180 s.
+        boss3 = macro["route_steps"][-1]
+        self.assertEqual({1140: 450}, boss3["fight_seconds_by_map"])
+        self.assertEqual(180, boss3["fight_seconds"])
+        self.assertIn("(step.fight_seconds_by_map || {})[latestWorld?.mapId]", route_runner)
+        self.assertIn("macro.damage_grace_seconds", route_runner)
+        self.assertIn("latestWorld?.hit", route_runner)
+        # The kill packet ends a boss fight at once; without it the fight waits.
+        self.assertIn("latestWorld?.kills", route_runner)
         self.assertIn("monster.hp >= 200", route_runner)
         self.assertIn("macro.stall_giveup_seconds", route_runner)
         self.assertIn("latestWorld?.attackFails", route_runner)
@@ -413,12 +429,15 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("unhittable.has(fail.reason)", route_runner)
         self.assertIn("Mật thư", macro["ignore_monster_names"])
         # With no monster left the fight only waits out its checks, no Đánh.
-        self.assertIn('if (last.state === "clear") {', route_runner)
+        self.assertIn('if (last.state === "clear" && !hitting) {', route_runner)
         self.assertEqual(40, macro["monster_path_tiles"])
         self.assertIn("walkDistances(grid", route_runner)
         # A door is hit exactly (no tolerance), then the game data's exit next to it.
         self.assertIn("const tolerance = step.portal ? 0", route_runner)
         self.assertIn("function doorTiles", route_runner)
+        # Blocked short of a door tile: try the map data's exit beside it, do
+        # not report the way blocked and restart on the same tile every retry.
+        self.assertIn("if (doors && doorIndex + 1 < doors.length) {", route_runner)
         self.assertIn("settleSeconds || macro.arrive_settle_seconds", route_runner)
         self.assertIn("Lữ Bố", macros["thien_long"]["ignore_monster_names"])
         self.assertEqual(2, route_runner.count("macro.ignore_monster_names"))
@@ -437,12 +456,30 @@ class ExtensionServerTest(unittest.TestCase):
         for constant in ("OP_MOVE_CLIENT = 105", "OP_GOMAP_ALLOW = 134", "OP_UNIT_REFRESH = 193",
                          "OP_UNIT_MULTI_REFRESH = 194", "OP_UNIT_MOVE = 195", "STATE_DIE = 8",
                          "OP_UNIT_INFO = 197", "OP_FORCE_GOMAP = 321", "OP_LOADING_FINISHED = 133",
-                         "OP_ATTACK_FAIL = 136"):
+                         "OP_ATTACK_FAIL = 136", "OP_SKILL_ATTACK = 185", "OP_SKILL_ATTACKED = 187"):
             self.assertIn(constant, probe)
         self.assertIn('source: "sanguo-world"', probe)
+        self.assertIn("world.kills = [...world.kills.slice(-19)", probe)
         self.assertTrue(macro["entry_steps"][-1].get("portal"))
         # Clicks map onto the (possibly letterboxed) game canvas, not the viewport.
         self.assertIn('document.querySelector("#screen")?.getBoundingClientRect()', content)
+
+    def test_default_catalog_contains_warehouse_take(self):
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        macros = extension_server.load_config()["activity_macros"]
+        macro = macros["warehouse_take"]
+        self.assertEqual("warehouse_take_loop", flows["warehouse_take"]["runner"])
+        # Kho panel, one item per round: first slot -> "Bỏ vào hành trang" ->
+        # "Đồng ý" on the amount box -> "Sắp xếp kho hàng" pulls the next item up.
+        for key in ("first_slot_point", "take_point", "amount_confirm_point", "sort_point"):
+            self.assertEqual(2, len(macro[key]), key)
+        # The detail panel's action button sits where "Sử dụng" does.
+        self.assertEqual(macros["use_inventory_item"]["use_point"], macro["take_point"])
+        # 0 = keep going until Stop.
+        self.assertEqual(0, macro["max_cycles"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("async function runWarehouseTake", content)
+        self.assertIn("macro.amount_confirm_point != null", content)
 
     def test_default_catalog_contains_ha_dong_dungeon_routes(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
@@ -453,6 +490,10 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual([[77, 16], [57, 114], [19, 25], [22, 8], [66, 22]],
                          [step["goto"] for step in hard["route_steps"]])
         self.assertEqual(4, sum(1 for step in hard["route_steps"] if "fight_seconds" in step))
+        # The three camps end once nothing attacks us: the camp's leader dead is
+        # enough, idle soldiers are left standing. The inner fight still clears.
+        self.assertEqual([True, True, True, None],
+                         [step.get("ignore_idle_monsters") for step in hard["route_steps"] if "fight_seconds" in step])
         self.assertTrue(hard["route_steps"][3]["portal"])
         self.assertEqual([992, 992], hard["route_steps"][0]["map_size"])
         self.assertEqual([hard["route_steps"][-1]], easy["route_steps"])
@@ -620,17 +661,18 @@ class ExtensionServerTest(unittest.TestCase):
         probe = (extension_dir / "network_probe.js").read_text(encoding="utf-8")
         for runner in (
             "blessing_loop", "code_redeem_loop", "discard_loop", "use_item_loop", "coin_shake_loop",
-            "auto_attack_loop",
+            "auto_attack_loop", "warehouse_take_loop",
         ):
             self.assertIn(f'"{runner}"', content)
         for flow in (
             "blessing", "code_redeem", "discard_items", "use_inventory_item", "coin_shake", "auto_attack",
+            "warehouse_take",
         ):
             self.assertIn(f'flow === "{flow}"', content)
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.11.0"', manifest)
+        self.assertIn('"version": "0.16.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
@@ -646,7 +688,10 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('"pointerdown"', dom_click)
         self.assertNotIn('"pointerup"', dom_click)
         self.assertNotIn('"mousemove"', dom_click)
-        self.assertNotIn('"click"', dom_click)
+        # The TeaVM canvas must never get a click event; the HTML dialogs the
+        # game lays over it (the amount box) act on nothing else.
+        self.assertIn('target.id !== "screen"', dom_click)
+        self.assertIn('dispatchMouse(target, "click"', dom_click)
         self.assertIn('document.getElementById("__mch5_guard")', content)
         self.assertIn('Rớt do guard: WebSocket 4001/guard', content)
         self.assertIn('"world": "MAIN"', manifest)

@@ -75,6 +75,13 @@
   const OP_FORCE_GOMAP = 321;          // server -> client: forced map change, same body as GOMAP_ALLOW
   const OP_LOADING_FINISHED = 133;     // client -> server: the new map finished loading
   const OP_ATTACK_FAIL = 136;          // server -> client: byte reason | int source | int target | int skill
+  // What we hit, straight from the fight. A boss can be a unit we do not track
+  // (Thiên Long trận: no boss ever showed up in the creature list), so landing
+  // damage is the one signal that says the fight is still on (user, 2026-09-16).
+  const OP_SKILL_ATTACK = 185;         // client -> server: int time | POINT | byte dir | int target | int skill
+  const OP_SKILL_ATTACKED = 187;       // server -> client: int target | int time | int source
+                                       //   | byte result (0 hit, 1 miss, 2 immune, 3 crit)
+                                       //   | byte kind (0 physical, 1 magic, 4 heal) | int damage
   const OP_LOADING_FINISHED1 = 2452;
   const TYPE_PLAYER = 1;
   const TYPE_CREATURE = 3;             // server TYPE_CREATURE (client SPRITE_TYPE_NPC)
@@ -90,6 +97,9 @@
     creatures: new Map(),              // instanceId -> { x, y, hp (0-200), state, name }
     npcIds: new Set(),                 // creatures the server flags as functional NPCs
     attackFails: [],                   // recent ATTACK_FAILs: { reason, target, at } (14 = target out of sight)
+    aim: null,                         // last target we pressed Đánh on: { target, at }
+    hit: null,                         // last damage we landed on it: { target, damage, at }
+    kills: [],                         // units we saw die, whatever their type: { id, at }
   };
 
   function hexBytes(buffer, count) {
@@ -241,6 +251,12 @@
       reader.u8();
     }
     if (head & 0x10) update.state = reader.i16();
+    // Deaths are noted for every unit type, not just the creatures we track:
+    // a dungeon boss is none of them, and its death is how a fight knows it is
+    // really over instead of waiting out the damage grace (user, 2026-09-19).
+    if ((((update.state ?? 0) & STATE_DIE) !== 0) || update.hp === 0) {
+      world.kills = [...world.kills.slice(-19), { id: instanceId, at: Date.now() }];
+    }
     if (type !== TYPE_CREATURE) return;
     if (head & 0x08) {                           // DETAIL: mask, then name / level / faction
       const mask = reader.u8();
@@ -262,6 +278,21 @@
       if (outgoing) {
         if (opcode === OP_MOVE_CLIENT) readOwnMove(reader);
         else if (opcode === OP_LOADING_FINISHED || opcode === OP_LOADING_FINISHED1) onMapLoaded();
+        else if (opcode === OP_SKILL_ATTACK) {
+          reader.skip(9);              // time, x, y, dir
+          world.aim = { target: reader.i32(), at: Date.now() };
+        }
+      } else if (opcode === OP_SKILL_ATTACKED) {
+        // Only what we aimed at: other players fight around us in the same map.
+        const target = reader.i32();
+        reader.i32();
+        reader.i32();
+        const result = reader.u8();
+        const kind = reader.u8();
+        const damage = reader.i32();
+        if ((result === 0 || result === 3) && kind <= 1 && damage > 0 && world.aim?.target === target) {
+          world.hit = { target, damage, at: Date.now() };
+        }
       } else if (opcode === OP_GOMAP_ALLOW || opcode === OP_FORCE_GOMAP) {
         readGoMap(reader);
       } else if (opcode === OP_UNIT_INFO) {

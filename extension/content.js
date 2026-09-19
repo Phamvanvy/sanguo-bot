@@ -33,6 +33,7 @@
     "discard_loop",
     "use_item_loop",
     "coin_shake_loop",
+    "warehouse_take_loop",
     "auto_attack_loop",
     "star_reappraisal_loop",
     "mount_skill_learn_once",
@@ -349,6 +350,11 @@
     dispatchMouse(target, "mousedown", x, y, 1);
     await new Promise((resolve) => setTimeout(resolve, 40));
     dispatchMouse(target, "mouseup", x, y, 0);
+    // Anything but the canvas is plain HTML the game lays over it - the
+    // "S.lượng nhập vào" box is a real dialog with a real input - and those
+    // buttons only act on a click event (user, 2026-09-18: "Đồng ý" never
+    // fired). The canvas still must not get one, see above.
+    if (target.id !== "screen") dispatchMouse(target, "click", x, y, 0);
     return { target, x, y };
   }
 
@@ -527,6 +533,25 @@
     }
   }
 
+  // Kho đang mở: lấy ô đầu tiên vào hành trang (hộp số lượng game điền sẵn tối
+  // đa), rồi "Sắp xếp kho hàng" để món kế dồn lên ô đầu, lặp tới khi Stop.
+  async function runWarehouseTake(token, macro) {
+    const maxCycles = Number(macro.max_cycles || 0);
+    for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
+      await domClick(token, macro.first_slot_point || [0.130, 0.270]);
+      await domDelay(macro.detail_delay_seconds || 0.7);
+      await domClick(token, macro.take_point || [0.724, 0.345]);
+      if (macro.amount_confirm_point != null) {
+        await domDelay(macro.amount_delay_seconds || 0.7);
+        await domClick(token, macro.amount_confirm_point);
+      }
+      await domDelay(macro.refresh_delay_seconds || 1);
+      await domClick(token, macro.sort_point || [0.421, 0.897]);
+      updateDomFlow("warehouse_take", `Đã lấy từ kho: ${cycle + 1} ô`);
+      await domDelay(macro.sort_delay_seconds || 1);
+    }
+  }
+
   async function runCoinShake(token, macro) {
     const maxCycles = Number(macro.max_cycles || 0);
     for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
@@ -678,7 +703,11 @@
       if (step.fight_seconds) {
         const until = step.ignore_idle_monsters ? "không còn quái đánh mình" : "hết quái";
         updateDomFlow(flow, `${title} (đánh tới khi ${until})`, `step_${index + 1}`);
-        notes.push(describeFight(await fightUntilClear(token, macro, step.fight_seconds, {
+        // One step can serve two versions of a dungeon (Cổ Mộ dễ and khó share
+        // this route), and the hard one's last boss simply has more health, so
+        // its cap is per map id (user, 2026-09-19).
+        const seconds = (step.fight_seconds_by_map || {})[latestWorld?.mapId] ?? step.fight_seconds;
+        notes.push(describeFight(await fightUntilClear(token, macro, seconds, {
           idle: !step.ignore_idle_monsters,
         })));
       }
@@ -1009,6 +1038,20 @@
       lastEnd = { ...after };
       const there = doors ? same(tileOf(after), goal) : reached(after);
       if (stalls >= 2 && !there) {
+        // A door tile we cannot even stand on - something parked on it, or the
+        // game refuses that last step - is not the end of it: the map data's
+        // exit next to it is another way in (user, 2026-09-19: Cổ Mộ boss 1
+        // kept stopping at 43,10, one tile short of 44,10, while the game's
+        // own exit is 45,10, and every retry started over on 44,10).
+        if (doors && doorIndex + 1 < doors.length) {
+          doorIndex += 1;
+          bias.x = 0;
+          bias.y = 0;
+          shrink = 1;
+          stalls = 0;
+          lastEnd = null;
+          continue;
+        }
         return { how: "blocked", note: `bị chặn ở ${where(after)}; ${summary()}` };
       }
       // Still walking when the leg timed out: plan again from here.
@@ -1058,12 +1101,12 @@
     // trong tầm nhìn", 8 "Mục tiêu không thể tấn công" (e.g. a Mật thư), 3/4
     // dead or gone. Leave them and move on (user, 2026-09-14).
     const unhittable = new Set([3, 4, 8, 14]);
-    // "Mục tiêu không nằm trong tầm nhìn" is often just the moment: the game
-    // aimed at something we had walked away from. So a failed target is set
-    // aside for unseen_seconds and then tried again, not dropped for the whole
-    // fight (user, 2026-09-16: steps moved on with monsters still alive).
-    const unseenMs = Number(macro.unseen_seconds ?? 20) * 1000;
-    const unseen = new Map();
+    // The game refuses it ("Mục tiêu không nằm trong tầm nhìn"): leave it for
+    // good and move on, hurt or not - a step is not worth grinding out (user,
+    // 2026-09-17: Hà Đông 57,114 fought on for 218 s over monsters it could
+    // not reach). Damage we land still holds the fight open, so a boss we ARE
+    // hitting is never dropped this way.
+    const unseen = new Set();
     // Nothing near loses health or dies for stall_giveup_seconds of Đánh: the
     // game cannot hit what is left from here - an idle statue that is no
     // target (Cổ Mộ 90,30, 103 rounds), one out of sight (Hà Đông 57,114, "Y
@@ -1072,44 +1115,59 @@
     // longer (user, 2026-09-16). A boss waiting idle loses health as soon as
     // it is hit, so it stays in the fight too.
     const stallMs = Number(macro.stall_giveup_seconds ?? 30) * 1000;
+    // Damage we land (network_probe.js reads it off the fight packets) keeps
+    // the fight going for damage_grace_seconds even when the creature list is
+    // empty: a Thiên Long boss never appears in it, so the step was calling
+    // itself done while we were hitting the boss (user, 2026-09-16).
+    const graceMs = Number(macro.damage_grace_seconds ?? 15) * 1000;
     const untouched = new Set();
     const joinedAt = new Map();
     let health = new Map();
     let progressAt = startedAt;
+    let hitting = false;
+    let landed = null;
+    const refusals = new Map();          // ATTACK_FAIL reason -> how many targets
+    const skipped = () => new Set([...untouched, ...unseen]);
     while (Date.now() < deadline) {
       if (macro.combat_check !== false) {
         for (const fail of latestWorld?.attackFails || []) {
           if (fail.at > startedAt && unhittable.has(fail.reason) && !unseen.has(fail.target)) {
-            unseen.set(fail.target, fail.at);
+            unseen.add(fail.target);
+            refusals.set(fail.reason, (refusals.get(fail.reason) || 0) + 1);
           }
         }
-        last = combatState(macro, untouched, { idle });
+        last = combatState(macro, skipped(), { idle });
         const now = Date.now();
         const near = last.near || [];
         const alive = new Set((latestWorld?.creatures || []).map(([id]) => id));
         const hurt = near.some((monster) => health.has(monster.id) && monster.hp < health.get(monster.id));
         const gone = [...health.keys()].some((id) => !alive.has(id));
-        if (last.state !== "combat" || hurt || gone) progressAt = now;
+        const blow = latestWorld?.hit;
+        // Seen it die: the fight is over now, no need to sit out the grace.
+        const killed = blow && (latestWorld?.kills || []).some((kill) => kill.id === blow.target
+          && kill.at >= blow.at - 1000);
+        hitting = Boolean(blow && !killed && blow.at > startedAt && now - blow.at <= graceMs);
+        if (hitting) landed = blow;
+        if (last.state !== "combat" || hurt || gone || hitting) progressAt = now;
         for (const monster of near) if (!joinedAt.has(monster.id)) joinedAt.set(monster.id, now);
-        // Dropped for good only while still at FULL health: the game has been
-        // refusing it for unseen_seconds, or nothing near has lost health for
-        // stall_giveup_seconds. Until then it keeps the fight going - one that
-        // is merely set aside must never read as "cleared" (user, 2026-09-16:
-        // Thiên Long boss 5 was reported done with over half its health).
+        // Nothing near has lost health for stall_giveup_seconds: drop what is
+        // still at FULL health (a statue that is no target, one behind a wall).
+        // Whatever we did hurt stays in the fight - weak damage only takes
+        // longer (user, 2026-09-16).
         const stalled = now - progressAt >= stallMs;
-        const drop = near.filter((monster) => monster.hp >= 200
-          && ((unseen.has(monster.id) && now - unseen.get(monster.id) >= unseenMs)
-            || (stalled && now - joinedAt.get(monster.id) >= stallMs)));
+        const drop = stalled
+          ? near.filter((monster) => monster.hp >= 200 && now - joinedAt.get(monster.id) >= stallMs)
+          : [];
         if (drop.length) {
           for (const monster of drop) untouched.add(monster.id);
-          last = combatState(macro, untouched, { idle });
+          last = combatState(macro, skipped(), { idle });
         }
         health = new Map((last.near || []).map((monster) => [monster.id, monster.hp]));
-        streak = last.state === "clear" ? streak + 1 : 0;
+        streak = last.state === "clear" && !hitting ? streak + 1 : 0;
         if (streak >= needed) break;
         // No monster left: only wait out the checks. Pressing Đánh now picks
         // something that is no monster (the button turns into "Chat").
-        if (last.state === "clear") {
+        if (last.state === "clear" && !hitting) {
           await domDelay(macro.round_delay_seconds || 0.4);
           continue;
         }
@@ -1124,19 +1182,25 @@
       seconds: (Date.now() - startedAt) / 1000,
       last,
       unseen: unseen.size,
+      refusals: [...refusals].map(([reason, count]) => `${reason}×${count}`).join(" "),
       untouched: untouched.size,
       // Everything the game data still shows around us, however far: a fight
       // that ends with a boss alive says here whether the boss was in the data
       // at all (user, 2026-09-16: boss 5 reported done at over half health).
       seen: monstersNear(latestWorld, Infinity).slice(0, 5),
+      landed,
     };
   }
 
   function describeFight(fight) {
     return `${fight.cleared ? "hết quái" : "hết giờ"} sau ${fight.seconds.toFixed(1)}s, ${fight.rounds} vòng`
-      + (fight.unseen ? `, game báo không đánh được ${fight.unseen} con` : "")
+      + (fight.unseen ? `, game báo không đánh được ${fight.unseen} con (lý do ${fight.refusals})` : "")
       + (fight.untouched ? `, bỏ hẳn ${fight.untouched} con còn đầy máu` : "")
       + (fight.last ? ` [${fight.last.state}: ${fight.last.detail}]` : "")
+      + (fight.landed
+        ? `, đòn cuối trúng #${fight.landed.target} -${fight.landed.damage} `
+          + `(${((Date.now() - fight.landed.at) / 1000).toFixed(1)}s trước)`
+        : ", không đánh trúng gì")
       + ` {quanh ta: ${fight.seen?.length
         ? fight.seen.map((monster) => `${monster.name || `#${monster.id}`} ${Math.round(monster.d)}px `
           + `máu ${Math.round(monster.hp / 2)}% tt ${monster.state}`).join(", ")
@@ -1282,6 +1346,7 @@
         }
         else if (flow === "discard_items") await runDiscardItems(token, macro);
         else if (flow === "use_inventory_item") await runUseInventoryItem(token, macro);
+        else if (flow === "warehouse_take") await runWarehouseTake(token, macro);
         else if (flow === "coin_shake") await runCoinShake(token, macro);
         else if (flow === "auto_attack") await runAutoAttack(token, macro);
         else if (flow === "star_reappraisal") await runStarReappraisal(token, macro);

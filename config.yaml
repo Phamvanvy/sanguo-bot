@@ -272,9 +272,13 @@ activity_macros:
     # quân" 137 vòng vẫn 100%). CHỈ bỏ con còn đầy máu: con đã mất máu là đánh
     # được, dame yếu thì lâu chứ không bỏ. Boss đứng yên bị đánh là mất máu.
     stall_giveup_seconds: 30
-    # Game báo "Mục tiêu không nằm trong tầm nhìn" thì bỏ con đó ngần này giây rồi
-    # đánh lại (nhiều lúc chỉ là tạm thời, bỏ hẳn sẽ sót quái còn sống).
-    unseen_seconds: 20
+    # Còn đánh trúng (đọc số sát thương từ gói tin) trong ngần này giây thì chưa
+    # coi là hết quái: boss phó bản không nằm trong danh sách quái mà probe theo
+    # dõi, nên chỉ có số sát thương mới biết boss còn sống. Để 6 giây thì hụt đòn
+    # vài giây là flow bỏ đi trong khi boss còn máu (user, 2026-09-19).
+    damage_grace_seconds: 15
+    # Game báo không đánh được ("Mục tiêu không nằm trong tầm nhìn") thì bỏ hẳn
+    # con đó rồi đi tiếp, khỏi treo bước (Hà Đông 57,114 từng đánh 218 giây).
     # Quái gần nhưng phải đi vòng quá ngần này ô mới tới (sau tường, như Hà Đông
     # ngoài) thì không tính: game báo "Mục tiêu không nằm trong tầm nhìn", bỏ qua.
     monster_path_tiles: 40
@@ -323,7 +327,9 @@ activity_macros:
       # Cửa boss 3: vòng lên 99,4 rồi xuống cửa, né quái chứ không dừng lại đánh.
       - {label: "Vòng lên 99,4 (né quái)", goto: [99, 4], map_size: *co_mo_main, ignore_ambush: true}
       - {label: "Vào cửa boss 3 (93,6)", goto: [93, 6], map_size: *co_mo_main, portal: true, ignore_ambush: true}
-      - {label: "Đánh boss 3 (69,23)", goto: [69, 23], map_size: [832, 720], fight_seconds: 180}
+      # Boss cuối bản KHÓ (phòng boss 3 = map 1140) trâu máu nên cho gấp 2.5 lần;
+      # bản dễ (map 772) giữ 180 giây (user, 2026-09-19).
+      - {label: "Đánh boss 3 (69,23)", goto: [69, 23], map_size: [832, 720], fight_seconds: 180, fight_seconds_by_map: {1140: 450}}
   ha_dong_hard:
     # Dùng chung cài đặt đánh / đi Map của Cổ Mộ; chỉ khác lộ trình.
     <<: *co_mo_hard
@@ -336,9 +342,10 @@ activity_macros:
     # Cỡ map theo dữ liệu gốc: ngoài = Hà đông phế thành 992x992 (cửa vào trong ở
     # pixel 196,67), trong = quan nha 608x464.
     route_steps:
-      - {label: "Dọn quái ở 77,16", goto: [77, 16], map_size: &ha_dong_outer [992, 992], fight_seconds: 240}
-      - {label: "Dọn quái ở 57,114", goto: [57, 114], map_size: *ha_dong_outer, fight_seconds: 240}
-      - {label: "Dọn quái ở 19,25", goto: [19, 25], map_size: *ha_dong_outer, fight_seconds: 240}
+      # Boss bãi chết là xong, không cần dọn nốt lính đứng yên (user, 2026-09-17).
+      - {label: "Dọn quái ở 77,16", goto: [77, 16], map_size: &ha_dong_outer [992, 992], fight_seconds: 240, ignore_idle_monsters: true}
+      - {label: "Dọn quái ở 57,114", goto: [57, 114], map_size: *ha_dong_outer, fight_seconds: 240, ignore_idle_monsters: true}
+      - {label: "Dọn quái ở 19,25", goto: [19, 25], map_size: *ha_dong_outer, fight_seconds: 240, ignore_idle_monsters: true}
       - {label: "Vào phó bản trong (22,8)", goto: [22, 8], map_size: *ha_dong_outer, portal: true}
       - &ha_dong_inner_fight {label: "Đánh ở 66,22", goto: [66, 22], map_size: [608, 464], fight_seconds: 240}
   ha_dong_easy:
@@ -406,6 +413,26 @@ activity_macros:
     max_batches: 0
     # Tự kết thúc sau tối đa 99 lượt.
     max_cycles: 99
+  warehouse_take:
+    label: "Lấy đồ từ kho"
+    description: "Lấy ô đầu kho vào hành trang rồi sắp xếp, lặp lại"
+    icon: "📦"
+    runner: "warehouse_take_loop"
+    # Bấm chạy khi bảng Kho đang mở. Mỗi vòng: ô đầu tiên của kho (bên trái) ->
+    # nút "Bỏ vào hành trang" trong bảng chi tiết -> "Đồng ý" ở hộp nhập số lượng
+    # (game điền sẵn tối đa) -> "Sắp xếp kho hàng" để món kế dồn lên ô đầu.
+    first_slot_point: [0.130, 0.270]
+    # Cùng chỗ với nút "Sử dụng" của bảng chi tiết vật phẩm.
+    take_point: [0.724, 0.345]
+    # Đặt null nếu món không hỏi số lượng.
+    amount_confirm_point: [0.490, 0.551]
+    sort_point: [0.421, 0.897]
+    detail_delay_seconds: 0.7
+    amount_delay_seconds: 0.7
+    refresh_delay_seconds: 1.0
+    sort_delay_seconds: 1.0
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
   coin_shake:
     label: "Rung xu"
     description: "Rung cây bằng xu rồi xác nhận liên tục"
