@@ -92,13 +92,19 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
         {"id": "full_auto", "label": "Full auto", "description": "Gom rồi làm toàn bộ nhiệm vụ", "icon": "⚡"},
     ]
     for flow_id, macro in cfg.get("activity_macros", {}).items():
-        flows.append({
+        flow = {
             "id": flow_id,
             "label": str(macro.get("label", flow_id)),
             "description": str(macro.get("description", "Hoạt động nhanh")),
             "icon": str(macro.get("icon", "◆")),
             "runner": str(macro.get("runner", "macro")),
-        })
+        }
+        # How many times to run, offered as a button each; the first is the
+        # default. The panel needs these to draw the buttons, so they ride
+        # along with the catalogue rather than only living in the macro.
+        if macro.get("run_options"):
+            flow["run_options"] = [int(times) for times in macro["run_options"]]
+        flows.append(flow)
     return flows
 
 

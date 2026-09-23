@@ -159,11 +159,13 @@ quest_actions:
 activity_macros:
   auto_attack:
     label: "Tự động đánh"
-    description: "Bấm Đánh và 7 nút kỹ năng liên tục đến khi Stop"
+    description: "Bấm 7 nút kỹ năng liên tục đến khi Stop"
     icon: "⚔"
     runner: "auto_attack_loop"
+    # KHÔNG bấm nút Đánh nữa (user, 2026-09-21) - chỉ bấm các nút kỹ năng. Muốn
+    # bật lại thì thêm attack_point: [0.927, 0.822] vào macro, content.js chỉ
+    # bấm Đánh khi macro có khóa này.
     # Tọa độ theo viewport của tab game, đo từ cụm nút được khoanh trong ảnh.
-    attack_point: &combat_attack_point [0.927, 0.822]
     skill_points: &combat_skill_points
       - [0.927, 0.517]
       - [0.853, 0.566]
@@ -178,50 +180,6 @@ activity_macros:
     round_delay_seconds: 0.4
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
-  blessing:
-    label: "Cầu phúc"
-    description: "Cầu phúc 10 lần liên tục đến khi Stop"
-    icon: "福"
-    runner: "blessing_loop"
-    open_point: [0.73, 0.07]
-    ten_times_point: [0.66, 0.84]
-    ok_point: [0.70, 0.64]
-    # Let each animation/result settle before sending the next interaction.
-    # This avoids starving the renderer and tripping the site's guard.
-    open_delay_seconds: 0.3
-    click_delay_seconds: 0.2
-    confirm_delay_seconds: 0.3
-    result_delay_seconds: 0.7
-    rest_every_cycles: 10
-    rest_delay_seconds: 1
-    # 0 = lặp đến khi bấm Stop trong extension.
-    max_cycles: 0
-  star_reappraisal:
-    label: "Giám định lại cấp sao"
-    description: "Lặp Cấp sao → Giám định lại → Xác nhận đến khi Stop"
-    icon: "★"
-    runner: "star_reappraisal_loop"
-    # Bắt đầu flow khi đang mở màn hình Luyện trang bị và đã chọn trang bị.
-    star_button_point: [0.227, 0.869]
-    reappraise_point: [0.498, 0.756]
-    confirm_point: [0.499, 0.693]
-    menu_delay_seconds: 1.2
-    result_delay_seconds: 1.8
-    next_cycle_delay_seconds: 1.2
-    # 0 = lặp đến khi bấm Stop trong extension.
-    max_cycles: 0
-  mount_skill_learn:
-    label: "Học kỹ năng thú cưỡi"
-    description: "Chọn sách thứ 3 → Lĩnh ngộ → OK đúng 1 lần"
-    icon: "🐎"
-    runner: "mount_skill_learn_once"
-    # Bắt đầu khi đang mở tab Thú cưỡi như ảnh mẫu.
-    book_point: [0.289, 0.807]
-    learn_point: [0.703, 0.224]
-    confirm_point: [0.696, 0.628]
-    detail_delay_seconds: 1.0
-    confirm_delay_seconds: 0.8
-    result_delay_seconds: 1.0
   co_mo_hard: &co_mo_hard
     label: "Phó bản Cổ Mộ (dễ/khó)"
     description: "Đứng trong Cổ Mộ dễ hoặc khó rồi bấm: đánh 3 boss ở 3 phòng"
@@ -231,7 +189,6 @@ activity_macros:
     # trí nhân vật, quái còn sống và lúc qua cổng -> hết quái thì đi tiếp ngay, tới
     # nơi thì làm bước sau luôn. fight_seconds / wait_seconds chỉ là giới hạn tối đa
     # (dùng khi không đọc được dữ liệu game). Tọa độ click đo trên canvas game.
-    attack_point: *combat_attack_point
     skill_points: *combat_skill_points
     button_delay_seconds: 0.2
     round_delay_seconds: 0.4
@@ -283,8 +240,9 @@ activity_macros:
     # ngoài) thì không tính: game báo "Mục tiêu không nằm trong tầm nhìn", bỏ qua.
     monster_path_tiles: 40
     # Không bao giờ tính vào "còn quái": tướng đi theo mình (Lữ Bố), tượng không
-    # chết được (Tượng đá cơ quan ở Cổ Mộ), vật không đánh được (Mật thư ở Hà Đông).
-    ignore_monster_names: ["Lữ Bố", "Tượng đá cơ quan", "Mật thư"]
+    # chết được (Tượng đá cơ quan, Tượng khắc thanh ngọc cơ quan ở Cổ Mộ - tên đọc
+    # từ gói tin, đứng yên 100% máu mãi), vật không đánh được (Mật thư ở Hà Đông).
+    ignore_monster_names: ["Lữ Bố", "Tượng đá cơ quan", "Tượng khắc thanh ngọc cơ quan", "Mật thư"]
     # Đang đi thì KHÔNG bấm Đánh: bấm là nhân vật đứng lại đánh quái quanh đó thay
     # vì đi tiếp. Tới nơi mới đánh; cổng còn khóa thì vẫn đánh rồi vào lại. Đặt
     # fight_on_the_way: true thì gặp quái đang đánh mình trong ambush_radius sẽ
@@ -312,14 +270,29 @@ activity_macros:
     # Mục tiêu là 3 boss ở 3 phòng riêng. Cửa phòng boss khóa khi còn quái đánh
     # mình: dọn quái trước cửa rồi mới vào; kẹt ở cửa thì flow đánh hết rồi vào lại.
     # Cỡ map theo dữ liệu gốc: khó 1137/1141/1139/1140, dễ 769/773/771/772 (cùng cỡ).
-    # ignore_idle_monsters: bước dọn trước cửa xong khi không còn quái đánh mình
-    # (chữ vàng tên nhân vật hiện lại): quái đứng yên đầy máu thì bỏ qua, đi tiếp.
+    # Bước dọn trước cửa KHÔNG đặt ignore_idle_monsters: quái con ở Cổ Mộ ("Xe đâm
+    # húc", "Kẻ thăm dò cổ mộ") đứng yên đầy máu lúc mình tới, bỏ qua thì nó xông
+    # vào đánh trên đường ra cửa và game chặn cửa (user, 2026-09-21: bản khó boss 1
+    # báo không thông qua được vì còn quái con đánh; log 12:01 bước 1 xong sau 0.6s,
+    # 0 vòng, "bỏ qua 3 con đứng yên"). Tượng không đánh được thì lọc bằng
+    # ignore_monster_names, còn lại stall_giveup_seconds cắt sau 30 giây.
     route_steps:
-      - {label: "Dọn quái trước cửa boss 1 (38,12)", goto: [38, 12], map_size: &co_mo_main [800, 608], fight_seconds: 180, ignore_idle_monsters: true}
+      - {label: "Dọn quái trước cửa boss 1 (38,12)", goto: [38, 12], map_size: &co_mo_main [800, 608], fight_seconds: 180}
       - {label: "Vào cửa boss 1 (44,10)", goto: [44, 10], map_size: *co_mo_main, portal: true}
-      - {label: "Đánh boss 1 (20,18)", goto: [20, 18], map_size: &co_mo_boss1 [352, 256], fight_seconds: 180}
+      # Phòng boss 1: PHẢI phá hết xe và tượng thì boss mới xuất hiện (user,
+      # 2026-09-21) - trước đây flow không thấy gì để đánh nên đi luôn, chưa kịp ra
+      # boss. Nên bước này:
+      #   clear_room: true         bỏ mọi đường tắt "thôi bỏ con này": không bỏ con
+      #                            game báo không đánh được (ATTACK_FAIL 8/14 - xe,
+      #                            tượng bị từ chối một lúc rồi mới đánh được), không
+      #                            bỏ con mãi không mất máu. Chỉ fight_seconds chặn.
+      #   ignore_monster_names     chỉ bỏ tướng đi theo mình; tượng ở ĐÂY là mục tiêu
+      #                            thật, khác với tượng cảnh ngoài map chính.
+      #   idle_monster_radius: 250 phòng 352x256 px, đứng ở 20,18 góc xa nhất ~221 px
+      #                            nên phải bằng monster_radius mới quét hết phòng.
+      - {label: "Đánh boss 1 (20,18)", goto: [20, 18], map_size: &co_mo_boss1 [352, 256], fight_seconds: 180, idle_monster_radius: 250, clear_room: true, ignore_monster_names: ["Lữ Bố"]}
       - {label: "Ra cửa 31,24", goto: [31, 24], map_size: *co_mo_boss1, portal: true}
-      - {label: "Dọn quái trước cửa boss 2 (90,30)", goto: [90, 30], map_size: *co_mo_main, fight_seconds: 180, ignore_idle_monsters: true}
+      - {label: "Dọn quái trước cửa boss 2 (90,30)", goto: [90, 30], map_size: *co_mo_main, fight_seconds: 180}
       # Cửa boss 2 đúng ô 83,34 (user, 2026-09-14): 84,32 và 85,33 đứng mãi không vào.
       - {label: "Vào cửa boss 2 (83,34)", goto: [83, 34], map_size: *co_mo_main, portal: true}
       - {label: "Đánh boss 2 (44,34)", goto: [44, 34], map_size: &co_mo_boss2 [560, 432], fight_seconds: 180}
@@ -358,22 +331,113 @@ activity_macros:
     # Giống phần trong của bản khó (giả định cùng map 608x464).
     route_steps:
       - *ha_dong_inner_fight
-  thien_long:
+  thien_long_hard:
     # Dùng chung cài đặt đánh / đi Map của Cổ Mộ; chỉ khác lộ trình.
     <<: *co_mo_hard
-    label: "Thiên Long trận (dễ/khó)"
-    description: "Đánh 5 boss: 20,31 → 88,10 → 145,45 → 41,117 → 77,64"
+    label: "Thiên Long trận (khó)"
+    description: "Vào bản khó qua NPC rồi đánh 5 boss, xong ra cửa"
     icon: "龍"
-    # Bản dễ và khó giống nhau. Bấm chạy khi đã đứng trong trận: Ngũ hành thiên
-    # long trận, 1280x1024 theo dữ liệu gốc (977 / 978 "trong trận" cùng cỡ).
-    entry_map: null
-    entry_steps: []
-    route_steps:
+    # Bản dễ và khó giống nhau. Đứng sẵn trong trận thì bấm chạy là đi luôn:
+    # Ngũ hành thiên long trận, 1280x1024 theo dữ liệu gốc (977 / 978 "trong
+    # trận" cùng cỡ). Đứng ở sảnh (map 976 "Của vào Thiên Long Trận", 512x512)
+    # thì bước vào cửa chạy trước.
+    entry_map: 976
+    # Cửa vào bản DỄ ở 55,16 (user, 2026-09-23); dữ liệu map ghi exit 56,15 ngay
+    # cạnh nên bước portal tự thử nốt ô đó.
+    # Bản KHÓ vào bằng NPC "Thái Trường Trị" rồi chọn "1. Vào Thiên Long Trận
+    # chế độ Khó." - chưa làm, xem ghi chú ở dưới route_steps.
+    entry_steps:
+      # Bấm NPC bằng gói tin của game (TOUCHNPC = 120) chứ không bấm vào chỗ NPC
+      # trên màn hình: flow tìm NPC theo TÊN trong dữ liệu game nên không phụ
+      # thuộc camera. Game chỉ cho bấm trong 80px nên phải đi tới sát đã.
+      # questId -2 = mục đầu trong danh sách hành động của NPC
+      # (Player.touchNpc: touchAction[-2 - questId]).
+      - {label: "Tới chỗ NPC Thái Trường Trị (53,16)", goto: [53, 16], map_size: &thien_long_lobby [512, 512], touch_npc: "Thái Trường Trị", touch_quest_id: -2, after_seconds: 2}
+      # Popup "Bạn chắc chắn muốn vào Thiên Long Trận (chế độ Khó)?" - chọn mục 1.
+      # Trả lời bằng gói tin (NOTIFY_CLIENT = 174) với notifyId lấy từ chính gói
+      # QUESTION của game, KHÔNG bấm toạ độ: bấm toạ độ còn phụ thuộc client
+      # đang chọn mục tiêu nào, mà chọn mục tiêu là việc thuần client - server
+      # không có opcode nào cho nó (user, 2026-09-23: mục tiêu đang ở nhân vật
+      # khác nên bấm không ra popup).
+      # answer_question: số thứ tự lựa chọn. CHƯA XÁC NHẬN 1 hay 0 là mục đầu -
+      # bấm tay một lần, log "npc_answer_sent" sẽ ghi đúng số client gửi.
+      - {label: "Chọn 1. Vào Thiên Long Trận chế độ Khó", answer_question: 1, answer_quest_id: 0, portal: true, wait_seconds: 15}
+    route_steps: &thien_long_route
       - {label: "Boss 1 (20,31)", goto: [20, 31], map_size: &thien_long_map [1280, 1024], fight_seconds: 300}
       - {label: "Boss 2 (88,10)", goto: [88, 10], map_size: *thien_long_map, fight_seconds: 300}
       - {label: "Boss 3 (145,45)", goto: [145, 45], map_size: *thien_long_map, fight_seconds: 300}
       - {label: "Boss 4 (41,117)", goto: [41, 117], map_size: *thien_long_map, fight_seconds: 300}
       - {label: "Boss 5 (77,64)", goto: [77, 64], map_size: *thien_long_map, fight_seconds: 300}
+      # Lối ra ở 84,60 (user, 2026-09-23); dữ liệu map ghi exit 85,59 ngay cạnh.
+      - {label: "Ra cửa 84,60", goto: [84, 60], map_size: *thien_long_map, portal: true}
+  thien_long_easy:
+    # Y hệt bản khó, chỉ khác lối vào: bản dễ đi thẳng vào cửa, không qua NPC.
+    <<: *co_mo_hard
+    label: "Thiên Long trận (dễ)"
+    description: "Vào cửa 55,16 rồi đánh 5 boss, xong ra cửa"
+    icon: "龍"
+    entry_map: 976
+    entry_steps:
+      - {label: "Vào Thiên Long Trận dễ (55,16)", goto: [55, 16], map_size: *thien_long_lobby, portal: true}
+    route_steps: *thien_long_route
+  thien_long_pipeline:
+    label: "TLT khó + dễ"
+    description: "Chạy liền n lượt khó rồi n lượt dễ trên cùng nhân vật"
+    icon: "龍"
+    runner: "dungeon_pipeline"
+    stages:
+      - {macro: "thien_long_hard"}
+      - {macro: "thien_long_easy"}
+    # Số lượt cho MỖI bản. Panel hiện một nút cho mỗi số trong run_options và
+    # đè lên times khi bấm; số đầu là mặc định. Muốn khóa riêng một bản thì đặt
+    # times ngay trong stage đó.
+    times: 5
+    run_options: [5, 3, 1]
+    # Chạy xong một lượt thì game vẫn báo "đang bị quái tấn công" và chỉ đổi
+    # nhân vật mới hết; user vẫn làm tay đúng đường này giữa mỗi lượt (2026-09-23).
+    # Bấm UI chứ không gửi gói ACTOR_LOGIN: mục đích là để CHÍNH client dựng lại
+    # trạng thái, gửi lén sau lưng nó thì màn hình vẫn là nhân vật cũ.
+    # Đường bấm: H.Trang -> (mũi tên cuộn menu trái) H.Thống -> Đổi nhân vật -> ô NV.
+    actor_switch:
+      hanh_trang_point: [0.780, 0.07]
+      menu_scroll_point: [0.063, 0.985]
+      he_thong_point: [0.063, 0.909]
+      doi_nhan_vat_point: [0.762, 0.288]
+      # 4 ô trong màn "Chọn NV", trái sang phải.
+      actor_slot_points:
+        - [0.117, 0.438]
+        - [0.372, 0.438]
+        - [0.626, 0.438]
+        - [0.881, 0.438]
+      # Ô nhân vật nào là ô nào thì TỰ DÒ, không cần khai: mở màn Chọn NV là
+      # client hỏi danh sách nhân vật (ACTOR_LIST_SERVER) đúng thứ tự các ô, còn
+      # gói đăng nhập (ACTOR_LOGIN_SERVER) nói mình đang là nhân vật nào -
+      # network_probe.js đọc cả hai. Log "actor_switch" ghi rõ tên + cấp của ô
+      # nó chọn để đối chiếu.
+      # Chỉ đặt hai khóa dưới đây khi muốn ĐÈ lên kết quả tự dò (1-4); để null
+      # là tự dò. Nếu probe không kịp thấy lúc đăng nhập (F5 tab game là thấy)
+      # thì flow báo lỗi và bảo đặt actor_slot.
+      actor_slot: null
+      spare_actor_slot: null
+      # Chờ game gửi danh sách nhân vật sau khi mở màn Chọn NV.
+      list_seconds: 6
+      panel_seconds: 1.5
+      picker_seconds: 3
+      login_seconds: 12
+    finish_chime: true
+  instance_reset:
+    label: "Reset phó bản"
+    description: "Xóa tiến độ phó bản bằng lệnh game, không bấm UI"
+    icon: "↺"
+    runner: "instance_reset_once"
+    # Không đi đường UI (H.Trang -> Đội -> Reset p.bản): gửi thẳng đúng gói tin
+    # mà nút đó gửi, OpCode.INSTANCE_CLEAR_CLIENT = 534, thân gói chỉ có int
+    # serial (Game/sangobuildVn/server/src/peony/game/OpCode.java:3389 và
+    # PlayerPacketHandler.instanceClear). Server trả 535 là xong, trả ERROR (-1)
+    # kèm lời nhắn của game nếu không xóa được.
+    # LƯU Ý: server chỉ xóa khi mình KHÔNG đứng trong phó bản
+    # (player.getVMap().instance == null) - đứng ở thành/sảnh rồi hãy bấm.
+    reply_seconds: 8
   discard_items:
     label: "Vứt đồ"
     description: "Sắp xếp rồi vứt ô đầu tiên liên tục"
@@ -444,6 +508,50 @@ activity_macros:
     result_delay_seconds: 1.2
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
+  blessing:
+    label: "Cầu phúc"
+    description: "Cầu phúc 10 lần liên tục đến khi Stop"
+    icon: "福"
+    runner: "blessing_loop"
+    open_point: [0.73, 0.07]
+    ten_times_point: [0.66, 0.84]
+    ok_point: [0.70, 0.64]
+    # Let each animation/result settle before sending the next interaction.
+    # This avoids starving the renderer and tripping the site's guard.
+    open_delay_seconds: 0.3
+    click_delay_seconds: 0.2
+    confirm_delay_seconds: 0.3
+    result_delay_seconds: 0.7
+    rest_every_cycles: 10
+    rest_delay_seconds: 1
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
+  star_reappraisal:
+    label: "Giám định lại cấp sao"
+    description: "Lặp Cấp sao → Giám định lại → Xác nhận đến khi Stop"
+    icon: "★"
+    runner: "star_reappraisal_loop"
+    # Bắt đầu flow khi đang mở màn hình Luyện trang bị và đã chọn trang bị.
+    star_button_point: [0.227, 0.869]
+    reappraise_point: [0.498, 0.756]
+    confirm_point: [0.499, 0.693]
+    menu_delay_seconds: 1.2
+    result_delay_seconds: 1.8
+    next_cycle_delay_seconds: 1.2
+    # 0 = lặp đến khi bấm Stop trong extension.
+    max_cycles: 0
+  mount_skill_learn:
+    label: "Học kỹ năng thú cưỡi"
+    description: "Chọn sách thứ 3 → Lĩnh ngộ → OK đúng 1 lần"
+    icon: "🐎"
+    runner: "mount_skill_learn_once"
+    # Bắt đầu khi đang mở tab Thú cưỡi như ảnh mẫu.
+    book_point: [0.289, 0.807]
+    learn_point: [0.703, 0.224]
+    confirm_point: [0.696, 0.628]
+    detail_delay_seconds: 1.0
+    confirm_delay_seconds: 0.8
+    result_delay_seconds: 1.0
 
 combat:
   hp_low_threshold_pct: 40

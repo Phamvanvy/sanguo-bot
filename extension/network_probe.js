@@ -83,6 +83,24 @@
                                        //   | byte result (0 hit, 1 miss, 2 immune, 3 crit)
                                        //   | byte kind (0 physical, 1 magic, 4 heal) | int damage
   const OP_LOADING_FINISHED1 = 2452;
+  // Answers to a command we send ourselves (see sendGamePacket below).
+  const OP_INSTANCE_CLEAR_SERVER = 535;  // 清除所有副本进度 done: int serial
+  const OP_ERROR = 0xffff;               // OpCode.ERROR (-1): int serial | short type | UTF message
+  // Who we are and who else is on the account, so a flow never has to be told
+  // which card in "Chọn NV" to click. Both shapes are the ones already ported
+  // in web/client/src/net/protocol.js (decodeActorLogin / decodeActorList).
+  const OP_ACTOR_LOGIN_SERVER = 104;     // int serial | int blobLen | int id | STR name | ...
+  const OP_ACTOR_LIST_SERVER = 169;      // int serial | byte count | n * actor
+  // What an NPC says back when we touch it, so a flow can see the popup
+  // instead of clicking where it hopes the popup is.
+  const OP_NPC_CHAT_SERVER = 121;        // int npcId | STR message | int notifyId
+  const OP_MESSAGE_SERVER = 122;         // STR message | int timeout | int notifyId
+  const OP_QUESTION_SERVER = 123;        // STR message | STR options | int notifyId
+  // What the real client sends when a person clicks an NPC and picks an option.
+  // Logged as-is: the values are decided by the map's script, not by anything
+  // we can read off the server source, so they are copied from a real click.
+  const OP_TOUCHNPC_CLIENT = 120;        // int npc instanceId | int questId
+  const OP_NOTIFY_CLIENT = 174;          // int questId | byte notifyId | byte type (3 = question) | byte answer
   const TYPE_PLAYER = 1;
   const TYPE_CREATURE = 3;             // server TYPE_CREATURE (client SPRITE_TYPE_NPC)
   const TYPES_WITH_IMAGE = new Set([3, 5, 6]);  // Tool.recvUnitView reads an imageId for these
@@ -100,7 +118,62 @@
     aim: null,                         // last target we pressed Đánh on: { target, at }
     hit: null,                         // last damage we landed on it: { target, damage, at }
     kills: [],                         // units we saw die, whatever their type: { id, at }
+    replies: [],                       // answers to our own commands: { serial, ok, type, message, at }
+    actorId: null,                     // the character we are logged in as
+    actorName: "",
+    actors: [],                        // every character on the account, in the order Chọn NV draws them
+    dialogs: [],                       // recent NPC popups: { kind, message, options, notifyId, at }
+    touches: [],                       // NPC touches sent (ours and the client's own)
+    answers: [],                       // popup answers sent (ours and the client's own)
   };
+
+  // The game's own socket, so a flow can send exactly what a UI button sends.
+  // Only one we have really decoded a frame from counts: the page opens others.
+  let gameSocket = null;
+
+  // One UA frame (web/client/src/net/ua-framing.js frameSegment + ua-codec.js
+  // UASegmentWriter): 'U' | 'A' | int32 total | int16 opcode | body.
+  // fields: ["i32", n], ["u8", n] and ["str", s] - the shapes our commands need.
+  function packField(kind, value) {
+    if (kind === "u8") return new Uint8Array([Number(value) & 0xff]);
+    if (kind === "i32") {
+      const bytes = new Uint8Array(4);
+      let rest = Number(value);
+      for (let i = 3; i >= 0; i -= 1) { bytes[i] = rest & 0xff; rest = Math.floor(rest / 256); }
+      return bytes;
+    }
+    // Packet.putString: int16 byte count, then the bytes.
+    const text = new TextEncoder().encode(String(value));
+    const bytes = new Uint8Array(2 + text.length);
+    bytes[0] = (text.length >> 8) & 0xff;
+    bytes[1] = text.length & 0xff;
+    bytes.set(text, 2);
+    return bytes;
+  }
+
+  function sendGamePacket(opcode, fields) {
+    if (!gameSocket || gameSocket.readyState !== 1) return "chưa có kết nối game (mở lại tab game)";
+    const body = (fields || []).map(([kind, value]) => packField(kind, value));
+    const total = 8 + body.reduce((sum, part) => sum + part.length, 0);
+    const frame = new Uint8Array(total);
+    let rest = total;
+    for (let i = 5; i >= 2; i -= 1) { frame[i] = rest & 0xff; rest = Math.floor(rest / 256); }
+    frame[0] = 0x55;                   // 'U'
+    frame[1] = 0x41;                   // variant 'A': the length is an int32
+    frame[6] = (opcode >> 8) & 0xff;
+    frame[7] = opcode & 0xff;
+    let at = 8;
+    for (const part of body) { frame.set(part, at); at += part.length; }
+    gameSocket.send(frame);
+    return "";
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== window || event.origin !== location.origin) return;
+    if (event.data?.source !== "sanguo-send") return;
+    const error = sendGamePacket(Number(event.data.opcode), event.data.fields);
+    window.postMessage({ source: "sanguo-sent", id: event.data.id, error }, location.origin);
+  });
 
   function hexBytes(buffer, count) {
     return Array.from(new Uint8Array(buffer, 0, Math.min(count, buffer.byteLength)),
@@ -281,6 +354,22 @@
         else if (opcode === OP_SKILL_ATTACK) {
           reader.skip(9);              // time, x, y, dir
           world.aim = { target: reader.i32(), at: Date.now() };
+        } else if (opcode === OP_TOUCHNPC_CLIENT) {
+          const target = reader.i32();
+          const questId = reader.i32();
+          world.touches = [...(world.touches || []).slice(-9), { target, questId, at: Date.now() }];
+          remember({ type: "npc_touch_sent", message: `instanceId ${target} questId ${questId}` });
+        } else if (opcode === OP_NOTIFY_CLIENT) {
+          const questId = reader.i32();
+          const notifyId = reader.u8();
+          const kind = reader.u8();
+          const answer = reader.u8();
+          world.answers = [...(world.answers || []).slice(-9),
+            { questId, notifyId, kind, answer, at: Date.now() }];
+          remember({
+            type: "npc_answer_sent",
+            message: `questId ${questId} notifyId ${notifyId} type ${kind} answer ${answer}`,
+          });
         }
       } else if (opcode === OP_SKILL_ATTACKED) {
         // Only what we aimed at: other players fight around us in the same map.
@@ -302,6 +391,53 @@
         reader.i32();
         // Keep a few: several targets can fail between two fight checks.
         world.attackFails = [...world.attackFails.slice(-19), { reason, target: reader.i32(), at: Date.now() }];
+      } else if (opcode === OP_INSTANCE_CLEAR_SERVER) {
+        world.replies = [...world.replies.slice(-9),
+          { serial: reader.i32(), ok: true, type: opcode, message: "", at: Date.now() }];
+      } else if (opcode === OP_ERROR) {
+        // The game's own words for why it said no; the flow shows them as is.
+        const serial = reader.i32();
+        const type = reader.i16();
+        world.replies = [...world.replies.slice(-9),
+          { serial, ok: false, type, message: reader.str(), at: Date.now() }];
+      } else if (opcode === OP_QUESTION_SERVER || opcode === OP_MESSAGE_SERVER
+        || opcode === OP_NPC_CHAT_SERVER) {
+        if (opcode === OP_NPC_CHAT_SERVER) reader.i32();   // npcId
+        const message = reader.str();
+        const options = opcode === OP_QUESTION_SERVER ? reader.str() : "";
+        if (opcode === OP_MESSAGE_SERVER) reader.i32();    // timeout
+        const kind = opcode === OP_QUESTION_SERVER ? "question"
+          : (opcode === OP_MESSAGE_SERVER ? "message" : "chat");
+        const notifyId = reader.i32();
+        world.dialogs = [...world.dialogs.slice(-9),
+          { kind, message, options, notifyId, at: Date.now() }];
+        // Logged as well as kept: a popup that the SERVER sends proves the
+        // packet route can drive this NPC. One that never shows up here while
+        // the client still draws it means the client's own quest VM made it,
+        // and then only a real click on the NPC will do.
+        remember({
+          type: "npc_dialog",
+          message: `${kind} notifyId ${notifyId}: ${message}${options ? ` [${options}]` : ""}`,
+        });
+      } else if (opcode === OP_ACTOR_LOGIN_SERVER) {
+        reader.i32();                  // serial
+        reader.i32();                  // Packet.put(byte[]) writes the blob length first
+        world.actorId = reader.i32();
+        world.actorName = reader.str();
+      } else if (opcode === OP_ACTOR_LIST_SERVER) {
+        reader.i32();                  // serial
+        const actors = [];
+        for (let count = reader.u8(); count > 0; count -= 1) {
+          const id = reader.i32();
+          const name = reader.str();
+          reader.u8();                 // sex
+          const level = reader.u8();
+          reader.skip(2);              // clazz, faction
+          reader.skip(13);             // head / body / weapon score, flashLevel
+          reader.str();                // map name
+          actors.push({ id, name, level });
+        }
+        world.actors = actors;
       } else if (opcode === OP_UNIT_REFRESH) {
         readUnitRefresh(reader);
       } else if (opcode === OP_UNIT_MULTI_REFRESH) {
@@ -348,7 +484,9 @@
         world.messages += 1;
         if (!world.firstBytes) world.firstBytes = hexBytes(buffer, 8);
       }
+      const before = world.frames;
       reader(buffer, (segment) => readSegment(segment, outgoing));
+      if (!outgoing && world.frames > before) gameSocket = socket;
       publishWorld();
     };
     socket.addEventListener("message", (event) => {

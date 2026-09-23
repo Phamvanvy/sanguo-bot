@@ -278,6 +278,44 @@ class ExtensionServerTest(unittest.TestCase):
     def test_default_catalog_contains_auto_attack(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
         self.assertEqual("auto_attack_loop", flows["auto_attack"]["runner"])
+        # The Đánh button is no longer pressed (user, 2026-09-21): a round is
+        # the skill buttons only, and content.js presses Đánh solely for a
+        # macro that still carries an attack_point.
+        macros = extension_server.load_config()["activity_macros"]
+        for flow_id in ("auto_attack", "co_mo_hard", "ha_dong_hard", "ha_dong_easy",
+                        "thien_long_hard", "thien_long_easy"):
+            self.assertNotIn("attack_point", macros[flow_id])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("if (macro.attack_point) {", content)
+        self.assertNotIn("macro.attack_point || [0.927, 0.822]", content)
+
+    def test_default_catalog_contains_instance_reset_command(self):
+        """Reset p.bản goes out as the game's own packet, not a click path."""
+        flows = {flow["id"]: flow for flow in flow_catalog()}
+        self.assertEqual("instance_reset_once", flows["instance_reset"]["runner"])
+        macro = extension_server.load_config()["activity_macros"]["instance_reset"]
+        self.assertEqual(8, macro["reply_seconds"])
+        # Nothing about this flow touches the UI: no points to click at all.
+        self.assertFalse([key for key in macro if key.endswith("_point")])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        # OpCode.INSTANCE_CLEAR_CLIENT, body = one int serial.
+        self.assertIn("const OP_INSTANCE_CLEAR = 534;", content)
+        self.assertIn("instance_reset_once", content)
+        # Only the page can reach the game socket, so the packet goes through
+        # the probe and the flow waits for the answer to its own serial.
+        self.assertIn('source: "sanguo-send"', content)
+        self.assertIn('event.data?.source !== "sanguo-send"', probe)
+        self.assertIn("item.serial === serial", content)
+        # UA frame: 'U' | 'A' | int32 total | int16 opcode | int32 serial.
+        self.assertIn("frame[0] = 0x55;", probe)
+        self.assertIn("frame[1] = 0x41;", probe)
+        self.assertIn("const total = 8 + body.reduce(", probe)
+        self.assertIn('[["i32", serial]]', content)
+        # The game's answers: 535 done, ERROR (-1) carries the refusal text.
+        self.assertIn("const OP_INSTANCE_CLEAR_SERVER = 535;", probe)
+        self.assertIn("const OP_ERROR = 0xffff;", probe)
+        self.assertIn("Game từ chối:", content)
 
     def test_default_catalog_omits_code_redeem(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
@@ -324,7 +362,6 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual("dungeon_route", flows["co_mo_hard"]["runner"])
         macros = extension_server.load_config()["activity_macros"]
         macro = macros["co_mo_hard"]
-        self.assertEqual(macros["auto_attack"]["attack_point"], macro["attack_point"])
         self.assertEqual(macros["auto_attack"]["skill_points"], macro["skill_points"])
         self.assertEqual(2, len(macro["entry_steps"]))
         route = macro["route_steps"]
@@ -379,9 +416,15 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('how: "blocked"', route_runner)
         # A companion general fights beside us and must never count as a monster.
         self.assertIn("Lữ Bố", macro["ignore_monster_names"])
+        # A monster attacking us is never written off as "behind a wall": it has
+        # plainly reached us, and dropping it leaves a door shut (user,
+        # 2026-09-23, Thiên Long's exit).
+        self.assertIn("const reachable = (monster) => engaged(monster) || onFoot(monster);", route_runner)
+        self.assertIn("const walled = around.filter((monster) => !reachable(monster));", route_runner)
         # A boss stands idle until hit, so idle monsters close by count; the
         # statues that never die are ignored by name instead.
         self.assertIn("Tượng đá cơ quan", macro["ignore_monster_names"])
+        self.assertIn("Tượng khắc thanh ngọc cơ quan", macro["ignore_monster_names"])
         self.assertIn("macro.idle_monster_radius", route_runner)
         # Monsters still at FULL health after 30 s of Đánh with nothing else
         # dying (a statue that is no target, one out of sight) are left behind;
@@ -411,14 +454,45 @@ class ExtensionServerTest(unittest.TestCase):
         # A bell rings when the whole route is done.
         self.assertTrue(macro["finish_chime"])
         self.assertIn("playChime()", route_runner)
-        # Clear-before-door steps end once nothing attacks us (our yellow name
-        # shows again); idle monsters are left standing. Boss steps still count them.
-        self.assertEqual(
-            ["Dọn quái trước cửa boss 1 (38,12)", "Dọn quái trước cửa boss 2 (90,30)"],
-            [step["label"] for step in macro["route_steps"] if step.get("ignore_idle_monsters")],
-        )
+        # No Cổ Mộ step leaves idle monsters standing: an add that sits still
+        # while we clear ("Xe đâm húc") charges us on the way to the door and the
+        # game then refuses the door (user, 2026-09-21). The statues that cannot
+        # be killed are filtered by name, so this costs no extra rounds.
+        self.assertEqual([], [step["label"] for step in macro["route_steps"]
+                              if step.get("ignore_idle_monsters")])
         self.assertIn("idle: !step.ignore_idle_monsters", route_runner)
         self.assertIn("(idle && monster.d <= idleRadius)", route_runner)
+        # Boss 1 only appears once every cart and statue in its room is dead
+        # (user, 2026-09-21), so that step must not take any give-up shortcut.
+        boss1 = macro["route_steps"][2]
+        self.assertEqual("Đánh boss 1 (20,18)", boss1["label"])
+        self.assertTrue(boss1["clear_room"])
+        # The statues in the room are real targets, unlike the scenery statues
+        # out on the main map that the macro ignores by name.
+        self.assertEqual(["Lữ Bố"], boss1["ignore_monster_names"])
+        self.assertIn("Tượng khắc thanh ngọc cơ quan", macro["ignore_monster_names"])
+        # The room is 352x256 px: from 20,18 the farthest corner is ~221 px, so
+        # the idle radius has to match monster_radius to sweep all of it.
+        self.assertEqual(250, boss1["idle_monster_radius"])
+        self.assertEqual(250, macro["monster_radius"])
+        self.assertEqual(160, macro["idle_monster_radius"])
+        # A step's radii and ignore list override the macro defaults all the way
+        # into combatState.
+        self.assertIn("radius: step.monster_radius", route_runner)
+        self.assertIn("idleRadius: step.idle_monster_radius", route_runner)
+        self.assertIn("ignoreNames: step.ignore_monster_names", route_runner)
+        self.assertIn("Number(over ?? macro.monster_radius ?? 250)", route_runner)
+        self.assertIn("Number(idleOver ?? macro.idle_monster_radius ?? 160)", route_runner)
+        self.assertIn("ignoreNames ?? macro.ignore_monster_names", route_runner)
+        # clear_room: only "already dead" (3/4) still drops a target; the game
+        # refusing a cart or statue (8/14) no longer ends the room, and neither
+        # does a target that stays at full health.
+        self.assertIn("clearRoom: Boolean(step.clear_room)", route_runner)
+        self.assertIn("clearRoom ? new Set([3, 4]) : new Set([3, 4, 8, 14])", route_runner)
+        self.assertIn("const stalled = !clearRoom &&", route_runner)
+        # The refusal log names the targets, so a room that ends with no boss
+        # says what the game would not let us hit.
+        self.assertIn("nameOf(fail.target)", route_runner)
         self.assertEqual(2.5, macro["goto_settle_seconds"])
         # The walk ends on the coordinate the user gave (the game's own pixels / 8
         # rounded down), give or take one tile (a boss on its altar).
@@ -439,8 +513,10 @@ class ExtensionServerTest(unittest.TestCase):
         # not report the way blocked and restart on the same tile every retry.
         self.assertIn("if (doors && doorIndex + 1 < doors.length) {", route_runner)
         self.assertIn("settleSeconds || macro.arrive_settle_seconds", route_runner)
-        self.assertIn("Lữ Bố", macros["thien_long"]["ignore_monster_names"])
-        self.assertEqual(2, route_runner.count("macro.ignore_monster_names"))
+        self.assertIn("Lữ Bố", macros["thien_long_hard"]["ignore_monster_names"])
+        # Both places that read monsters (the ambush check and the fight) apply
+        # the ignore list; only the fight lets a step replace it.
+        self.assertEqual(2, route_runner.count("macro.ignore_monster_names)"))
         # Starting inside the dungeon skips the entry; a portal already crossed is skipped.
         self.assertEqual(768, macro["entry_map"])
         self.assertIn("macro.entry_map", route_runner)
@@ -501,20 +577,109 @@ class ExtensionServerTest(unittest.TestCase):
         for macro in (hard, easy):
             self.assertIsNone(macro["entry_map"])
             self.assertEqual([], macro["entry_steps"])
-            self.assertEqual(macros["auto_attack"]["attack_point"], macro["attack_point"])
+            self.assertEqual(macros["auto_attack"]["skill_points"], macro["skill_points"])
 
-    def test_default_catalog_contains_thien_long_route(self):
+    def test_default_catalog_contains_thien_long_routes_and_pipeline(self):
+        """Easy and hard are separate buttons; a third runs 5 hard + 5 easy."""
         flows = {flow["id"]: flow for flow in flow_catalog()}
-        self.assertEqual("dungeon_route", flows["thien_long"]["runner"])
-        macro = extension_server.load_config()["activity_macros"]["thien_long"]
-        route = macro["route_steps"]
-        # Easy and hard are the same trận: one flow, five bosses.
-        self.assertEqual([[20, 31], [88, 10], [145, 45], [41, 117], [77, 64]],
-                         [step["goto"] for step in route])
-        self.assertTrue(all(step["map_size"] == [1280, 1024] for step in route), route)
-        self.assertTrue(all("fight_seconds" in step for step in route), route)
-        self.assertIsNone(macro["entry_map"])
-        self.assertEqual([], macro["entry_steps"])
+        macros = extension_server.load_config()["activity_macros"]
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        for flow_id in ("thien_long_hard", "thien_long_easy"):
+            self.assertEqual("dungeon_route", flows[flow_id]["runner"])
+            macro = macros[flow_id]
+            route = macro["route_steps"]
+            # Five bosses, then the way out at 84,60 (map data's exit is 85,59).
+            self.assertEqual([[20, 31], [88, 10], [145, 45], [41, 117], [77, 64], [84, 60]],
+                             [step["goto"] for step in route])
+            self.assertTrue(all(step["map_size"] == [1280, 1024] for step in route), route)
+            self.assertTrue(all("fight_seconds" in step for step in route[:-1]), route)
+            self.assertTrue(route[-1]["portal"])
+            self.assertNotIn("fight_seconds", route[-1])
+            # Both start from the lobby, map 976 "Của vào Thiên Long Trận".
+            self.assertEqual(976, macro["entry_map"])
+        # The two share one route list, so a fix lands on both.
+        self.assertEqual(macros["thien_long_hard"]["route_steps"],
+                         macros["thien_long_easy"]["route_steps"])
+        # Easy walks straight into the door at 55,16.
+        easy_entry = macros["thien_long_easy"]["entry_steps"]
+        self.assertEqual([[55, 16]], [step["goto"] for step in easy_entry])
+        self.assertEqual([512, 512], easy_entry[0]["map_size"])
+        self.assertTrue(easy_entry[0]["portal"])
+        # Hard goes through the NPC: the flow finds it by NAME in the game's own
+        # unit list and sends TOUCHNPC, so no guessing where it is on screen.
+        hard_entry = macros["thien_long_hard"]["entry_steps"]
+        self.assertEqual("Thái Trường Trị", hard_entry[0]["touch_npc"])
+        self.assertEqual(-2, hard_entry[0]["touch_quest_id"])
+        self.assertEqual([53, 16], hard_entry[0]["goto"])
+        # The popup is answered with a packet carrying the game's own notifyId,
+        # not a click: which unit the client has selected is a client-only
+        # notion the server has no opcode for, so a click can miss entirely.
+        self.assertEqual(1, hard_entry[1]["answer_question"])
+        self.assertNotIn("click_point", hard_entry[1])
+        self.assertTrue(hard_entry[1]["portal"])
+        self.assertIn("const OP_NOTIFY_CLIENT = 174;", content)
+        self.assertIn("asked.notifyId", content)
+        # Both directions of the NPC conversation are logged, so one real click
+        # by hand pins down the values the map's script expects.
+        self.assertIn('type: "npc_touch_sent"', probe)
+        self.assertIn('type: "npc_answer_sent"', probe)
+        # And the popup the server sends back, so one real click shows whether
+        # the popup comes over the wire at all.
+        self.assertIn('type: "npc_dialog"', probe)
+        self.assertIn("const OP_TOUCH_NPC = 120;", content)
+        self.assertIn("step.touch_npc", content)
+        # The server refuses a touch past 80 px, so the flow says so itself.
+        self.assertIn("near.d >= 80", content)
+        # The NPC's answer is read off the wire, so the log carries the popup's
+        # own words and a touch that opens nothing fails loudly instead of the
+        # next step clicking at an empty screen.
+        self.assertIn("const OP_QUESTION_SERVER = 123;", probe)
+        self.assertIn("world.dialogs = [", probe)
+        self.assertIn("latestWorld?.dialogs", content)
+        self.assertIn("game không mở thoại nào", content)
+
+        # The pipeline: 5 hard then 5 easy on the one character, switching
+        # characters between runs because that is the only thing that clears
+        # the trận's "monsters attacking" state (user, 2026-09-23).
+        self.assertEqual("dungeon_pipeline", flows["thien_long_pipeline"]["runner"])
+        pipeline = macros["thien_long_pipeline"]
+        self.assertEqual([{"macro": "thien_long_hard"}, {"macro": "thien_long_easy"}],
+                         pipeline["stages"])
+        # How many of each: 5 by default, and the panel offers 5 / 3 / 1.
+        self.assertEqual(5, pipeline["times"])
+        self.assertEqual([5, 3, 1], pipeline["run_options"])
+        self.assertEqual([5, 3, 1], flows["thien_long_pipeline"]["run_options"])
+        self.assertNotIn("run_options", flows["thien_long_hard"])
+        self.assertIn("Number(stage.times ?? macro.times ?? 1)", content)
+        # One button per count, and pressing it overrides times for that run.
+        self.assertIn("flow.run_options?.length", content)
+        self.assertIn("runFlow(flow, { times })", content)
+        # Only a flow that declares them gets the buttons.
+        self.assertNotIn("run_options", flows["thien_long_easy"])
+        switcher = pipeline["actor_switch"]
+
+        self.assertEqual(4, len(switcher["actor_slot_points"]))
+        for key in ("hanh_trang_point", "menu_scroll_point", "he_thong_point", "doi_nhan_vat_point"):
+            self.assertEqual(2, len(switcher[key]), key)
+        # The slots are read from the game, not configured: these stay null and
+        # exist only to override the detection.
+        for key in ("actor_slot", "spare_actor_slot"):
+            self.assertIsNone(switcher[key], key)
+        # Who we are (login packet) and the card order (character list packet).
+        self.assertIn("const OP_ACTOR_LOGIN_SERVER = 104;", probe)
+        self.assertIn("const OP_ACTOR_LIST_SERVER = 169;", probe)
+        self.assertIn("world.actorId = reader.i32();", probe)
+        self.assertIn("actors.push({ id, name, level });", probe)
+        self.assertIn("actor.id === latestWorld?.actorId", content)
+        # An override wins over the detection when it is set.
+        self.assertIn("forced > 0 ? forced - 1 :", content)
+        self.assertIn("dungeon_pipeline", content)
+        self.assertIn("async function switchActorAndBack", content)
+        # Never before the first run: the character is only stuck after one.
+        self.assertIn("if (index > 0) {", content)
+        # One bell at the end, not after every run in the pipeline.
+        self.assertIn("finish_chime: false", content)
 
     def test_walk_grids_match_live_positions_and_reach_every_route_target(self):
         node = shutil.which("node")
@@ -535,6 +700,9 @@ class ExtensionServerTest(unittest.TestCase):
             978: [[10, 87], [16, 28], [53, 36], [87, 25], [77, 66], [47, 84]],
             450: [[94, 100], [72, 12], [49, 50], [31, 75]], 432: [[24, 46]],
             1137: [[16, 53], [35, 34], [20, 45], [83, 34]], 769: [[83, 34]], 768: [[33, 28], [31, 24], [24, 27]], 1141: [[21, 16]],
+            # Thiên Long lobby, from the user's screenshots (2026-09-23): the
+            # map title read (53,16) by the NPC and (52,14) with its popup open.
+            976: [[53, 16], [52, 14]],
         }
         # Every route leg: map, where it starts (after a portal: by the exit we
         # came in through), the target the user gave.
@@ -547,6 +715,10 @@ class ExtensionServerTest(unittest.TestCase):
             [1141, [20, 18], [31, 24]], [1137, [45, 10], [90, 30]], [1137, [90, 30], [83, 34]],
             [1139, [8, 8], [44, 34]], [1139, [44, 34], [9, 10]], [1137, [85, 33], [99, 4]],
             [1137, [99, 4], [93, 6]], [1140, [21, 75], [69, 23]],
+            # Thiên Long: the lobby walk to the hard NPC and to the easy door,
+            # and the way out of the trận at 84,60 (map data's exit is 85,59).
+            [976, [56, 15], [53, 16]], [976, [53, 16], [55, 16]],
+            [977, [77, 64], [84, 60]], [978, [77, 66], [84, 60]],
         ]
         script = grids + "const decodedGrids = new Map();\n" + "".join(pieces) + (
             "const stood = " + json.dumps(stood) + ";\nconst legs = " + json.dumps(legs) + ";\n"
@@ -678,7 +850,9 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
         self.assertIn('label: "Ô phải", overrides: { item_slot: "right" }', content)
         self.assertIn('(macro.item_points || {})[itemSlot]', content)
-        self.assertIn('await domClick(token, attackPoint)', content)
+        # An attack round is the skill buttons; Đánh only for a macro that
+        # still sets attack_point (see test_default_catalog_contains_auto_attack).
+        self.assertIn('for (const point of skillPoints)', content)
         self.assertIn('const BLESSING_SPEED_FACTOR = 1.0', content)
         self.assertIn('async function runBlessing', content)
         self.assertIn('flow === "blessing"', content)
