@@ -41,15 +41,22 @@
       const socket = protocols === undefined
         ? new NativeWebSocket(url)
         : new NativeWebSocket(url, protocols);
-      socket.addEventListener("open", () => remember({ type: "ws_open", url: String(url) }));
+      socket.addEventListener("open", () => {
+        remember({ type: "ws_open", url: String(url) });
+        const openedAt = Date.now();
+        setTimeout(() => dumpTraceNow("10s đầu sau khi mở kết nối mới", openedAt), 10000);
+      });
       socket.addEventListener("error", () => remember({ type: "ws_error", url: String(url) }));
-      socket.addEventListener("close", (event) => remember({
-        type: "ws_close",
-        url: String(url),
-        code: Number(event.code),
-        reason: String(event.reason || ""),
-        clean: Boolean(event.wasClean),
-      }));
+      socket.addEventListener("close", (event) => {
+        remember({
+          type: "ws_close",
+          url: String(url),
+          code: Number(event.code),
+          reason: String(event.reason || ""),
+          clean: Boolean(event.wasClean),
+        });
+        dumpTraceNow("20s trước khi đóng kết nối", Date.now() - 20000);
+      });
       tapGameTraffic(socket);
       return socket;
     }
@@ -93,9 +100,11 @@
   const OP_ACTOR_LIST_SERVER = 169;      // int serial | byte count | n * actor
   // What an NPC says back when we touch it, so a flow can see the popup
   // instead of clicking where it hopes the popup is.
-  const OP_NPC_CHAT_SERVER = 121;        // int npcId | STR message | int notifyId
-  const OP_MESSAGE_SERVER = 122;         // STR message | int timeout | int notifyId
-  const OP_QUESTION_SERVER = 123;        // STR message | STR options | int notifyId
+  // All three open with the quest that asks (Player.chat / message / question;
+  // game_world.gtl handleNpcChat / handleMessage / handleQuestion).
+  const OP_NPC_CHAT_SERVER = 121;        // int questId | int npcId | STR message | int notifyId
+  const OP_MESSAGE_SERVER = 122;         // int questId | STR message | int timeout | int notifyId
+  const OP_QUESTION_SERVER = 123;        // int questId | STR message | STR options | int notifyId
   // What the real client sends when a person clicks an NPC and picks an option.
   // Logged as-is: the values are decided by the map's script, not by anything
   // we can read off the server source, so they are copied from a real click.
@@ -122,7 +131,7 @@
     actorId: null,                     // the character we are logged in as
     actorName: "",
     actors: [],                        // every character on the account, in the order Chọn NV draws them
-    dialogs: [],                       // recent NPC popups: { kind, message, options, notifyId, at }
+    dialogs: [],                       // recent NPC popups: { kind, questId, message, options, notifyId, at }
     touches: [],                       // NPC touches sent (ours and the client's own)
     answers: [],                       // popup answers sent (ours and the client's own)
   };
@@ -344,9 +353,54 @@
     world.creatures.set(instanceId, { ...(world.creatures.get(instanceId) || { hp: 200, state: 0 }), ...update });
   }
 
+  // Every segment either way for the last few seconds, so what the client
+  // sends around an NPC click can be read off the log instead of guessed:
+  // the touch and the answer alone did not take us into Thiên Long trận
+  // (2026-09-23), so something else the client sends must count.
+  const TRACE_SKIP_IN = new Set([OP_UNIT_MOVE, OP_UNIT_REFRESH, OP_UNIT_MULTI_REFRESH]);
+  // Never copied into the log: account / session / password bodies.
+  // SYSTEM_NEWSESSION 10, ACCOUNT_LOGIN_CLIENT 166, CHANGE_PASSWORD_CLIENT 334,
+  // ADMIN_LOGIN_CLIENT 1001, PROXY_LOGIN 30001 (web/client/src/net/opcodes.js).
+  const TRACE_SECRET = new Set([10, 166, 334, 1001, 30001]);
+  let trace = [];
+  let traceDumpAt = 0;
+  function traceSegment(segment, outgoing, opcode) {
+    const now = Date.now();
+    trace = trace.filter((item) => now - item.at < 30000);
+    if (!outgoing && TRACE_SKIP_IN.has(opcode)) return;
+    trace.push({
+      at: now, out: outgoing, opcode, length: segment.length,
+      hex: TRACE_SECRET.has(opcode) ? "(ẩn)"
+        : Array.from(segment.subarray(2, 26), (byte) => byte.toString(16).padStart(2, "0")).join(""),
+    });
+  }
+  // A character switch shows up only as the socket closing and a new one
+  // opening (user, 2026-09-23 16:29): the client logs in again from scratch.
+  // So both ends are traced - what went out before the close, and what the
+  // client says on the new socket - to see which packets make the switch.
+  function dumpTraceNow(reason, from, to = Date.now()) {
+    const lines = trace.filter((item) => item.at >= from && item.at <= to)
+      .map((item) => `${item.at - from}ms ${item.out ? ">" : "<"}${item.opcode}(${item.length})`
+        + (item.out ? ` ${item.hex}` : ""))
+      .slice(0, 200);
+    remember({ type: "switch_trace", message: `${reason}: ${lines.join(" | ")}` });
+  }
+
+  function dumpTraceLater(reason) {
+    const from = Date.now() - 4000;
+    if (traceDumpAt > from) return;       // one dump already covers this click
+    traceDumpAt = Date.now();
+    setTimeout(() => {
+      const lines = trace.filter((item) => item.at >= from)
+        .map((item) => `${item.at - from}ms ${item.out ? ">" : "<"}${item.opcode}(${item.length}) ${item.hex}`);
+      remember({ type: "npc_trace", message: `${reason}: ${lines.join(" | ")}` });
+    }, 6000);
+  }
+
   function readSegment(segment, outgoing) {
     const opcode = (segment[0] << 8) | segment[1];
     const reader = segmentReader(segment);
+    traceSegment(segment, outgoing, opcode);
     try {
       if (outgoing) {
         if (opcode === OP_MOVE_CLIENT) readOwnMove(reader);
@@ -359,6 +413,7 @@
           const questId = reader.i32();
           world.touches = [...(world.touches || []).slice(-9), { target, questId, at: Date.now() }];
           remember({ type: "npc_touch_sent", message: `instanceId ${target} questId ${questId}` });
+          dumpTraceLater(`quanh lúc bấm NPC ${target}`);
         } else if (opcode === OP_NOTIFY_CLIENT) {
           const questId = reader.i32();
           const notifyId = reader.u8();
@@ -370,6 +425,7 @@
             type: "npc_answer_sent",
             message: `questId ${questId} notifyId ${notifyId} type ${kind} answer ${answer}`,
           });
+          dumpTraceLater(`quanh lúc trả lời quest ${questId}`);
         }
       } else if (opcode === OP_SKILL_ATTACKED) {
         // Only what we aimed at: other players fight around us in the same map.
@@ -402,6 +458,7 @@
           { serial, ok: false, type, message: reader.str(), at: Date.now() }];
       } else if (opcode === OP_QUESTION_SERVER || opcode === OP_MESSAGE_SERVER
         || opcode === OP_NPC_CHAT_SERVER) {
+        const questId = reader.i32();
         if (opcode === OP_NPC_CHAT_SERVER) reader.i32();   // npcId
         const message = reader.str();
         const options = opcode === OP_QUESTION_SERVER ? reader.str() : "";
@@ -410,14 +467,14 @@
           : (opcode === OP_MESSAGE_SERVER ? "message" : "chat");
         const notifyId = reader.i32();
         world.dialogs = [...world.dialogs.slice(-9),
-          { kind, message, options, notifyId, at: Date.now() }];
+          { kind, questId, message, options, notifyId, at: Date.now() }];
         // Logged as well as kept: a popup that the SERVER sends proves the
         // packet route can drive this NPC. One that never shows up here while
         // the client still draws it means the client's own quest VM made it,
         // and then only a real click on the NPC will do.
         remember({
           type: "npc_dialog",
-          message: `${kind} notifyId ${notifyId}: ${message}${options ? ` [${options}]` : ""}`,
+          message: `${kind} questId ${questId} notifyId ${notifyId}: ${message}${options ? ` [${options}]` : ""}`,
         });
       } else if (opcode === OP_ACTOR_LOGIN_SERVER) {
         reader.i32();                  // serial
@@ -438,6 +495,7 @@
           actors.push({ id, name, level });
         }
         world.actors = actors;
+        world.actorsAt = Date.now();     // when Chọn NV last opened
       } else if (opcode === OP_UNIT_REFRESH) {
         readUnitRefresh(reader);
       } else if (opcode === OP_UNIT_MULTI_REFRESH) {

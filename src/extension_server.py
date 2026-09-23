@@ -104,6 +104,18 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
         # along with the catalogue rather than only living in the macro.
         if macro.get("run_options"):
             flow["run_options"] = [int(times) for times in macro["run_options"]]
+        # A pipeline's stages each get their own count box on the panel (0 skips
+        # that stage), so one card runs hard only, easy only, or n + m of both.
+        if macro.get("runner") == "dungeon_pipeline":
+            macros = cfg.get("activity_macros", {})
+            flow["stages"] = [
+                {
+                    "macro": str(stage["macro"]),
+                    "label": str(stage.get("label") or macros.get(stage["macro"], {}).get("label", stage["macro"])),
+                    "times": int(stage.get("times", macro.get("times", 1))),
+                }
+                for stage in macro.get("stages", [])
+            ]
         flows.append(flow)
     return flows
 

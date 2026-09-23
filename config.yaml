@@ -344,64 +344,24 @@ activity_macros:
     entry_map: 976
     # Cửa vào bản DỄ ở 55,16 (user, 2026-09-23); dữ liệu map ghi exit 56,15 ngay
     # cạnh nên bước portal tự thử nốt ô đó.
-    # Bản KHÓ vào bằng NPC "Thái Trường Trị" rồi chọn "1. Vào Thiên Long Trận
-    # chế độ Khó." - chưa làm, xem ghi chú ở dưới route_steps.
-    entry_steps:
-      # Bấm NPC bằng gói tin của game (TOUCHNPC = 120) chứ không bấm vào chỗ NPC
-      # trên màn hình: flow tìm NPC theo TÊN trong dữ liệu game nên không phụ
-      # thuộc camera. Game chỉ cho bấm trong 80px nên phải đi tới sát đã.
-      # questId -2 = mục đầu trong danh sách hành động của NPC
-      # (Player.touchNpc: touchAction[-2 - questId]).
-      - {label: "Tới chỗ NPC Thái Trường Trị (53,16)", goto: [53, 16], map_size: &thien_long_lobby [512, 512], touch_npc: "Thái Trường Trị", touch_quest_id: -2, after_seconds: 2}
-      # Popup "Bạn chắc chắn muốn vào Thiên Long Trận (chế độ Khó)?" - chọn mục 1.
-      # Trả lời bằng gói tin (NOTIFY_CLIENT = 174) với notifyId lấy từ chính gói
-      # QUESTION của game, KHÔNG bấm toạ độ: bấm toạ độ còn phụ thuộc client
-      # đang chọn mục tiêu nào, mà chọn mục tiêu là việc thuần client - server
-      # không có opcode nào cho nó (user, 2026-09-23: mục tiêu đang ở nhân vật
-      # khác nên bấm không ra popup).
-      # answer_question: số thứ tự lựa chọn. CHƯA XÁC NHẬN 1 hay 0 là mục đầu -
-      # bấm tay một lần, log "npc_answer_sent" sẽ ghi đúng số client gửi.
-      - {label: "Chọn 1. Vào Thiên Long Trận chế độ Khó", answer_question: 1, answer_quest_id: 0, portal: true, wait_seconds: 15}
-    route_steps: &thien_long_route
-      - {label: "Boss 1 (20,31)", goto: [20, 31], map_size: &thien_long_map [1280, 1024], fight_seconds: 300}
-      - {label: "Boss 2 (88,10)", goto: [88, 10], map_size: *thien_long_map, fight_seconds: 300}
-      - {label: "Boss 3 (145,45)", goto: [145, 45], map_size: *thien_long_map, fight_seconds: 300}
-      - {label: "Boss 4 (41,117)", goto: [41, 117], map_size: *thien_long_map, fight_seconds: 300}
-      - {label: "Boss 5 (77,64)", goto: [77, 64], map_size: *thien_long_map, fight_seconds: 300}
-      # Lối ra ở 84,60 (user, 2026-09-23); dữ liệu map ghi exit 85,59 ngay cạnh.
-      - {label: "Ra cửa 84,60", goto: [84, 60], map_size: *thien_long_map, portal: true}
-  thien_long_easy:
-    # Y hệt bản khó, chỉ khác lối vào: bản dễ đi thẳng vào cửa, không qua NPC.
-    <<: *co_mo_hard
-    label: "Thiên Long trận (dễ)"
-    description: "Vào cửa 55,16 rồi đánh 5 boss, xong ra cửa"
-    icon: "龍"
-    entry_map: 976
-    entry_steps:
-      - {label: "Vào Thiên Long Trận dễ (55,16)", goto: [55, 16], map_size: *thien_long_lobby, portal: true}
-    route_steps: *thien_long_route
-  thien_long_pipeline:
-    label: "TLT khó + dễ"
-    description: "Chạy liền n lượt khó rồi n lượt dễ trên cùng nhân vật"
-    icon: "龍"
-    runner: "dungeon_pipeline"
-    stages:
-      - {macro: "thien_long_hard"}
-      - {macro: "thien_long_easy"}
-    # Số lượt cho MỖI bản. Panel hiện một nút cho mỗi số trong run_options và
-    # đè lên times khi bấm; số đầu là mặc định. Muốn khóa riêng một bản thì đặt
-    # times ngay trong stage đó.
-    times: 5
-    run_options: [5, 3, 1]
     # Chạy xong một lượt thì game vẫn báo "đang bị quái tấn công" và chỉ đổi
-    # nhân vật mới hết; user vẫn làm tay đúng đường này giữa mỗi lượt (2026-09-23).
+    # nhân vật mới hết; user vẫn làm tay đúng đường này giữa mỗi lượt (2026-09-23), nên
+    # bước ra cửa (switch_actor_before) đổi nhân vật trước rồi mới đi ra.
     # Bấm UI chứ không gửi gói ACTOR_LOGIN: mục đích là để CHÍNH client dựng lại
     # trạng thái, gửi lén sau lưng nó thì màn hình vẫn là nhân vật cũ.
     # Đường bấm: H.Trang -> (mũi tên cuộn menu trái) H.Thống -> Đổi nhân vật -> ô NV.
-    actor_switch:
+    actor_switch: &actor_switch
       hanh_trang_point: [0.780, 0.07]
-      menu_scroll_point: [0.063, 0.985]
-      he_thong_point: [0.063, 0.909]
+      # H.Thống chỉ hiện khi KÉO menu trái xuống tận cuối (user, 2026-09-23);
+      # bấm mũi tên ▼ không cuộn được. Kéo từ from lên to (cùng cột menu), làm
+      # menu_drag_times lần - kéo quá cuối thì menu đứng yên nên kéo thừa không sao.
+      menu_drag_from: [0.064, 0.86]
+      menu_drag_to: [0.064, 0.40]
+      menu_drag_times: 2
+      scroll_seconds: 0.8
+      # Vị trí H.Thống khi menu đã ở cuối (ảnh user: tâm nút ở 122,965 trên màn
+      # 1920x1080, canvas bắt đầu ở y 81 -> 0.064, 0.922).
+      he_thong_point: [0.064, 0.92]
       doi_nhan_vat_point: [0.762, 0.288]
       # 4 ô trong màn "Chọn NV", trái sang phải.
       actor_slot_points:
@@ -424,6 +384,57 @@ activity_macros:
       panel_seconds: 1.5
       picker_seconds: 3
       login_seconds: 12
+    # Bản KHÓ vào bằng NPC "Thái Trường Trị" rồi chọn "1. Vào Thiên Long Trận
+    # chế độ Khó.". Gửi gói TOUCHNPC questId -1 + NOTIFY quest 1649 notifyId 1
+    # KHÔNG vào được (2026-09-23 15:20; bấm mục 1 thật thì client gửi answer 0,
+    # các số 16 trong log trước là lựa chọn khác), popup do
+    # chính client vẽ, nên bấm như người: mở Map, bấm vào NPC trên Map (user:
+    # cách này cũng ra popup), bấm mục 1, đóng Map. Gói client tự gửi sau mỗi
+    # cú bấm (npc_touch_sent / npc_answer_sent) cho biết bấm có trúng không.
+    entry_steps:
+      # Game chỉ cho bấm NPC trong 80px nên đi tới sát trước.
+      - {label: "Tới chỗ NPC Thái Trường Trị (53,16)", goto: [53, 16], map_size: &thien_long_lobby [512, 512]}
+      # option_point: mục 1 của popup, giữa màn hình (ảnh user 2026-09-23:
+      # 960,568 trên màn 1920x1080, canvas bắt đầu ở y 81).
+      # portal: chờ đổi map, không đổi thì dừng flow báo lỗi.
+      - {label: "Bấm NPC trên Map, chọn 1. Vào Thiên Long Trận chế độ Khó", touch_npc_by_map: "Thái Trường Trị", map_size: *thien_long_lobby, option_point: [0.5, 0.508], portal: true, wait_seconds: 15}
+    route_steps: &thien_long_route
+      - {label: "Boss 1 (20,31)", goto: [20, 31], map_size: &thien_long_map [1280, 1024], fight_seconds: 300}
+      - {label: "Boss 2 (88,10)", goto: [88, 10], map_size: *thien_long_map, fight_seconds: 300}
+      - {label: "Boss 3 (145,45)", goto: [145, 45], map_size: *thien_long_map, fight_seconds: 300}
+      - {label: "Boss 4 (41,117)", goto: [41, 117], map_size: *thien_long_map, fight_seconds: 300}
+      - {label: "Boss 5 (77,64)", goto: [77, 64], map_size: *thien_long_map, fight_seconds: 300}
+      # Lối ra ở 84,60 (user, 2026-09-23); dữ liệu map ghi exit 85,59 ngay cạnh.
+      # Đánh xong game vẫn báo bị quái tấn công và cửa không cho ra, chỉ đổi
+      # nhân vật qua lại mới hết (user, 2026-09-23) - nên đổi trước khi ra.
+      - {label: "Ra cửa 84,60", goto: [84, 60], map_size: *thien_long_map, portal: true, switch_actor_before: true}
+  thien_long_easy:
+    # Y hệt bản khó, chỉ khác lối vào: bản dễ đi thẳng vào cửa, không qua NPC.
+    <<: *co_mo_hard
+    label: "Thiên Long trận (dễ)"
+    description: "Vào cửa 55,16 rồi đánh 5 boss, xong ra cửa"
+    icon: "龍"
+    actor_switch: *actor_switch
+    entry_map: 976
+    entry_steps:
+      - {label: "Vào Thiên Long Trận dễ (55,16)", goto: [55, 16], map_size: *thien_long_lobby, portal: true}
+    route_steps: *thien_long_route
+  thien_long_pipeline:
+    label: "Thiên Long trận"
+    description: "Chọn số lượt khó / dễ (0 = bỏ qua); chạy hết khó rồi tới dễ"
+    icon: "龍"
+    runner: "dungeon_pipeline"
+    # Panel hiện một ô số cho MỖI stage (label + times là số mặc định), nên một
+    # nút chạy được: chỉ khó (dễ = 0), chỉ dễ (khó = 0), hay n khó + m dễ khác
+    # số nhau (user, 2026-09-23). Số đã chọn được nhớ lại trên trình duyệt đó.
+    stages:
+      - {macro: "thien_long_hard", label: "Khó", times: 5}
+      - {macro: "thien_long_easy", label: "Dễ", times: 5}
+    # Mỗi lượt tự đổi nhân vật trước khi ra cửa (switch_actor_before trong
+    # route); giữa hai lượt pipeline gửi lệnh reset phó bản (OpCode 534) lúc
+    # đã ra sảnh, như user làm tay: đổi NV -> ra khỏi map -> reset -> chạy lại.
+    actor_switch: *actor_switch
+    reply_seconds: 8
     finish_chime: true
   instance_reset:
     label: "Reset phó bản"

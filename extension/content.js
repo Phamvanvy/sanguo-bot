@@ -222,8 +222,71 @@
     dot.classList.toggle("sg-offline", !connected);
   }
 
+  // Chosen run counts per pipeline stage ("flowId:macro" -> n), kept in this
+  // browser so the panel opens with the last numbers used.
+  const STAGE_COUNTS_KEY = "sanguo-stage-counts";
+  let stageCounts = {};
+  try { stageCounts = JSON.parse(localStorage.getItem(STAGE_COUNTS_KEY) || "{}") || {}; } catch (_) { stageCounts = {}; }
+  function saveStageCounts() {
+    try { localStorage.setItem(STAGE_COUNTS_KEY, JSON.stringify(stageCounts)); } catch (_) { /* private window */ }
+  }
+
+  // A pipeline card: one count box per stage (0 skips it) and a run button, so
+  // one card runs hard only, easy only, or n hard + m easy (user, 2026-09-23).
+  function renderPipelineCard(flow, running) {
+    const card = document.createElement("div");
+    card.className = "sg-flow sg-item-flow";
+    card.innerHTML = `<span></span><strong></strong><small></small><div class="sg-stage-counts"></div>`;
+    card.querySelector("span").textContent = flow.icon;
+    card.querySelector("strong").textContent = flow.label;
+    card.querySelector("small").textContent = flow.description;
+    const box = card.querySelector(".sg-stage-counts");
+    const countOf = (stage) => {
+      const saved = Number(stageCounts[`${flow.id}:${stage.macro}`]);
+      return Number.isInteger(saved) && saved >= 0 ? saved : stage.times;
+    };
+    for (const stage of flow.stages) {
+      const label = document.createElement("label");
+      label.textContent = stage.label;
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.max = "50";
+      input.step = "1";
+      input.value = String(countOf(stage));
+      input.disabled = running;
+      input.addEventListener("change", () => {
+        const times = Math.max(0, Math.min(50, Math.floor(Number(input.value) || 0)));
+        input.value = String(times);
+        stageCounts[`${flow.id}:${stage.macro}`] = times;
+        saveStageCounts();
+      });
+      label.append(input);
+      box.append(label);
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.disabled = running;
+    button.textContent = "Chạy";
+    button.addEventListener("click", () => {
+      // Read the boxes as they are now, in case one was typed into without
+      // leaving it (no change event yet).
+      box.querySelectorAll("input").forEach((input) => input.dispatchEvent(new Event("change")));
+      runFlow(flow, { stages: flow.stages.map((stage) => ({ macro: stage.macro, times: countOf(stage) })) });
+    });
+    box.append(button);
+    return card;
+  }
+
+  // Redrawn only when something it shows changes: the status refresh runs
+  // every 1.2 s and a redraw would throw away a count box being typed into.
+  let renderedKey = "";
   function renderFlows(running) {
+    const key = `${running}|${flows.map((flow) => flow.id).join(",")}`;
+    if (key === renderedKey) return;
+    renderedKey = key;
     flowsNode.replaceChildren(...flows.map((flow) => {
+      if (flow.stages?.length) return renderPipelineCard(flow, running);
       // A flow that can run a chosen number of times gets a button per count
       // (the first is the default), e.g. the Thiên Long pipeline: 5 / 3 / 1.
       if (flow.run_options?.length) {
@@ -309,10 +372,13 @@
     const socketEvent = events
       .filter((event) => (
         ["ws_open", "ws_close"].includes(event.type)
-        && Number(event.at || 0) >= Number(token.startedAt || 0)
+        && Number(event.at || 0) >= Number(token.socketCheckFrom || token.startedAt || 0)
       ))
       .sort((left, right) => Number(right.at || 0) - Number(left.at || 0))[0];
-    if (socketEvent?.type === "ws_close") {
+    // Opening Chọn NV makes the client close its own socket (code 1005) and
+    // log in again on a new one a second later (2026-09-23 16:45), so while a
+    // character switch runs a closed socket is expected, not a failure.
+    if (socketEvent?.type === "ws_close" && !token.reconnecting) {
       const reason = socketEvent.reason ? ` (${socketEvent.reason})` : "";
       throw new Error(`WebSocket bị đóng: code ${socketEvent.code}${reason}. Flow đã tự dừng.`);
     }
@@ -335,7 +401,10 @@
       : { left: 0, top: 0, width: innerWidth, height: innerHeight };
     const x = box.left + Number(point[0]) * box.width;
     const y = box.top + Number(point[1]) * box.height;
-    const target = document.elementFromPoint(x, y);
+    // Our own panel can sit over the game wherever the user dragged it: a
+    // click meant for the game under it still goes to the game's canvas.
+    const hit = document.elementFromPoint(x, y);
+    const target = hit && panel.contains(hit) ? document.querySelector("#screen") || hit : hit;
     if (!target) throw new Error(`Không tìm thấy phần tử game tại (${x.toFixed(0)}, ${y.toFixed(0)})`);
     return { target, x, y };
   }
@@ -360,6 +429,29 @@
       pointerType: "mouse",
       isPrimary: true,
     }));
+  }
+
+  // Press, slide, release - the way a person scrolls the game's lists: their
+  // arrow buttons do not scroll them when clicked from here (Map panel,
+  // 2026-09-14; left menu, 2026-09-23). Every event goes to the element under
+  // the start point, so our panel over the path does not get in the way.
+  async function domDrag(token, from, to, { steps = 12, stepMs = 30 } = {}) {
+    ensureDomActive(token);
+    const start = eventTargetAt(from);
+    const end = eventTargetAt(to);
+    const { target } = start;
+    if (typeof target.focus === "function") target.focus({ preventScroll: true });
+    dispatchMouse(target, "mousedown", start.x, start.y, 1);
+    for (let i = 1; i <= steps; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
+      const x = start.x + ((end.x - start.x) * i) / steps;
+      const y = start.y + ((end.y - start.y) * i) / steps;
+      dispatchMouse(target, "mousemove", x, y, 1);
+    }
+    // Held still a moment first, so it ends as a drag and not a fling or a tap.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    dispatchMouse(target, "mouseup", end.x, end.y, 0);
+    return { target, x: start.x, y: start.y, toX: end.x, toY: end.y };
   }
 
   async function domClick(token, point) {
@@ -657,9 +749,10 @@
   // monsters attack us, so a portal that does not take us means: fight, retry.
   // "canvas#screen@1592,200" - shows whether a click reached the game canvas
   // or landed on something else, e.g. the flow panel covering that spot.
-  function describeClick({ target, x, y }) {
+  function describeClick({ target, x, y, toX, toY }) {
     const name = `${target.tagName?.toLowerCase() || "?"}${target.id ? `#${target.id}` : ""}`;
-    return `${name}@${Math.round(x)},${Math.round(y)}`;
+    const drag = toX == null ? "" : `→${Math.round(toX)},${Math.round(toY)}`;
+    return `${name}@${Math.round(x)},${Math.round(y)}${drag}`;
   }
 
   // Every step is logged to logs/extension-network.log (types dungeon_*),
@@ -699,6 +792,18 @@
       const notes = [];
       updateDomFlow(flow, title, `step_${index + 1}`);
       appendDiagnostic("dungeon_step", { flow, message: `${title} ${JSON.stringify(plan)}; ${describeWorld()}` });
+      // Thiên Long's exit stays shut after the last boss: the game keeps saying
+      // monsters are attacking until the character is switched and back (user,
+      // 2026-09-23), so that happens right before walking out.
+      if (step.switch_actor_before) {
+        updateDomFlow(flow, `${title} (đổi nhân vật cho hết kẹt)`, `step_${index + 1}`);
+        const mapBefore = latestWorld?.mapId;
+        await switchActorAndBack(token, macro, flow);
+        // Logging back in reloads the map; that is not this portal being
+        // crossed - unless it put us somewhere else.
+        if (latestWorld?.mapId === mapBefore) mapMark = mapSwitchedAt;
+        notes.push(`đổi nhân vật xong, đang ở map ${latestWorld?.mapId ?? "?"}`);
+      }
       const crossed = Boolean(step.portal) && mapSwitchedAt > mapMark;
       if (crossed) notes.push(`đã sang map ${latestWorld.mapId ?? "?"} từ trước nên bỏ qua`);
       for (let attempt = 0; !crossed && (step.goto || step.map_point || step.click_point); attempt += 1) {
@@ -725,7 +830,8 @@
         }
       }
       if (step.touch_npc) notes.push(await touchNpcByName(token, step));
-      if (step.answer_question != null) notes.push(await answerQuestion(token, step));
+      if (step.touch_npc_by_map) notes.push(await touchNpcByMap(token, macro, step, clicks));
+      if (step.answer_question != null) notes.push(await answerQuestion(token, macro, step));
       if (step.portal) mapMark = Math.max(mapMark, mapSwitchedAt);
       if (step.fight_seconds) {
         const until = step.clear_room
@@ -804,61 +910,155 @@
 
   // "Bấm vào NPC": OpCode.TOUCHNPC_CLIENT (120), int npc instanceId | int
   // questId. The NPC is found by name in the game's own unit list, so there is
-  // no guessing where it sits on screen. questId <= -2 picks the NPC's touch
-  // action list (Player.touchNpc: touchAction[-2 - questId]), which is what a
-  // dungeon-entry NPC answers to. The server refuses past 80 px ("Cự li quá xa").
+  // no guessing where it sits on screen. The server refuses past 80 px ("Cự li
+  // quá xa"). questId -1 is what the real client sends for a dungeon-entry NPC
+  // (log 2026-09-23, Thái Trường Trị by hand): Player.touchNpc files it in
+  // touchedNpc, where an area quest's E_TouchNPC looks (ASMGameVM.e_TouchNPC:
+  // hasTouchNpc(npcId, -1)). questId <= -2 instead runs the NPC's touch action
+  // list and never reaches the quest, so no popup ever came.
   const OP_TOUCH_NPC = 120;
-  async function touchNpcByName(token, step) {
+  let touchedAt = 0;                   // the answer step only takes a popup newer than this
+  function nearestNpc(name) {
     const world = latestWorld;
     if (!world?.me) throw new Error("Chưa đọc được dữ liệu game để tìm NPC");
     const near = world.creatures
-      .map(([id, x, y, hp, state, name]) => ({ id, x, y, name }))
-      .filter((unit) => unit.name === step.touch_npc)
+      .map(([id, x, y, hp, state, unitName]) => ({ id, x, y, name: unitName }))
+      .filter((unit) => unit.name === name)
       .map((unit) => ({ ...unit, d: Math.hypot(unit.x - world.me.x, unit.y - world.me.y) }))
       .sort((a, b) => a.d - b.d)[0];
     if (!near) {
-      throw new Error(`Không thấy NPC "${step.touch_npc}" trong dữ liệu game (đang ở map ${world.mapId ?? "?"})`);
+      throw new Error(`Không thấy NPC "${name}" trong dữ liệu game (đang ở map ${world.mapId ?? "?"})`);
     }
     if (near.d >= 80) {
-      throw new Error(`NPC "${step.touch_npc}" cách ${Math.round(near.d)}px, game chỉ cho bấm trong 80px`);
+      throw new Error(`NPC "${name}" cách ${Math.round(near.d)}px, game chỉ cho bấm trong 80px`);
     }
-    const questId = Number(step.touch_quest_id ?? -2);
+    return near;
+  }
+
+  async function touchNpcByName(token, step) {
+    const near = nearestNpc(step.touch_npc);
+    const questId = Number(step.touch_quest_id ?? -1);
     const since = Date.now();
+    touchedAt = since;
     const error = await postGamePacket(OP_TOUCH_NPC, [["i32", near.id], ["i32", questId]]);
     if (error) throw new Error(error);
     const said = `bấm NPC ${step.touch_npc} #${near.id} cách ${Math.round(near.d)}px (questId ${questId})`;
-    // The NPC's answer comes back as its own packet, so the log says what the
-    // game actually asked instead of us clicking where we hope the popup is.
-    const deadline = Date.now() + Number(step.dialog_seconds ?? 6) * 1000;
+    // The NPC's answer comes back as its own packet when the server's quest
+    // asks. The client's own quest VM can also draw the popup without one, so
+    // a silent server is not an error here: the answer step checks the map.
+    const deadline = Date.now() + Number(step.dialog_seconds ?? 3) * 1000;
     while (Date.now() < deadline) {
       const popup = (latestWorld?.dialogs || []).find((dialog) => dialog.at >= since);
       if (popup) {
-        return `${said}; game ${popup.kind} "${popup.message}"`
+        return `${said}; game ${popup.kind} quest ${popup.questId} "${popup.message}"`
           + (popup.options ? ` [${popup.options}]` : "") + ` notifyId ${popup.notifyId}`;
       }
       await domWait(token, 0.2);
     }
-    throw new Error(`${said}; nhưng game không mở thoại nào - questId ${questId} có thể sai`);
+    return `${said}; server không gửi thoại nào`;
   }
-
-  // Answers the popup the NPC opened, with the notifyId the game itself put in
-  // the QUESTION packet - no clicking where the buttons are hoped to be, and
-  // no dependence on which unit the client has selected. NOTIFY_CLIENT (174):
+  // Answers the NPC's popup with the packet the client sends when the option
+  // is clicked - no clicking where the buttons are hoped to be, and no
+  // dependence on which unit the client has selected. NOTIFY_CLIENT (174):
   // int questId | byte notifyId | byte type (3 = question) | byte answer.
+  // questId / notifyId come from the server's QUESTION packet when it sent
+  // one, else from the step (copied from a real click). The answer is the
+  // step's number as is: the live client sends 16 for "1. Vào Thiên Long Trận
+  // chế độ Khó" (log 2026-09-23), not the 0 the original data would suggest.
   const OP_NOTIFY_CLIENT = 174;
   const NOTIFY_QUESTION = 3;
-  async function answerQuestion(token, step) {
+  async function answerQuestion(token, macro, step) {
     const asked = [...(latestWorld?.dialogs || [])].reverse()
-      .find((dialog) => dialog.kind === "question");
-    if (!asked) throw new Error("Chưa thấy game hỏi gì để trả lời");
+      .find((dialog) => dialog.kind === "question" && dialog.at >= touchedAt);
+    const questId = Number(asked?.questId ?? step.answer_quest_id);
+    const notifyId = Number(asked?.notifyId ?? step.answer_notify_id);
+    if (!Number.isFinite(questId) || !Number.isFinite(notifyId)) {
+      throw new Error("Chưa thấy game hỏi gì, mà bước cũng không ghi answer_quest_id / answer_notify_id");
+    }
     const answer = Number(step.answer_question);
-    const questId = Number(step.answer_quest_id ?? 0);
+    const since = Date.now();
     const error = await postGamePacket(OP_NOTIFY_CLIENT, [
-      ["i32", questId], ["u8", asked.notifyId], ["u8", NOTIFY_QUESTION], ["u8", answer],
+      ["i32", questId], ["u8", notifyId], ["u8", NOTIFY_QUESTION], ["u8", answer],
     ]);
     if (error) throw new Error(error);
-    return `trả lời "${asked.message}" [${asked.options}] chọn ${answer}`
-      + ` (questId ${questId}, notifyId ${asked.notifyId})`;
+    const said = (asked ? `trả lời "${asked.message}" [${asked.options}]` : "trả lời (server không gửi câu hỏi)")
+      + ` chọn ${answer} (questId ${questId}, notifyId ${notifyId})`;
+    if (!step.portal) return said;
+    // The answer is only right if it takes us somewhere: wait for the map.
+    const deadline = since + Number(step.wait_seconds ?? 15) * 1000;
+    while (Date.now() < deadline) {
+      if (mapSwitchedAt > since) {
+        await domWait(token, macro.map_load_seconds || 1.5);
+        return `${said}; sang map ${latestWorld?.mapId ?? "?"}`;
+      }
+      await domWait(token, 0.3);
+    }
+    throw new Error(`${said}; nhưng vẫn ở map ${latestWorld?.mapId ?? "?"} sau ${step.wait_seconds ?? 15}s`);
+  }
+
+  // Touches an NPC the way a person does when the packet alone is not enough
+  // (Thiên Long khó, 2026-09-23: the same TOUCHNPC + NOTIFY the client sends
+  // did not take us in, and the popup is drawn by the client's own quest VM).
+  // Opens Map, clicks the NPC on it (user: that opens the popup too), clicks
+  // the popup's option, closes Map. The client's own packets prove each click:
+  // a TOUCHNPC for that NPC after the Map click, a NOTIFY after the option.
+  async function touchNpcByMap(token, macro, step, clicks) {
+    const near = nearestNpc(step.touch_npc_by_map);
+    const me = latestWorld.me;
+    const panel = mapPanel(macro, step.map_size, me);
+    // The sprite stands on its point; its body is drawn above it.
+    const aim = { x: near.x, y: near.y - Number(step.npc_click_lift ?? 20) };
+    if (!panel.shows(aim)) {
+      throw new Error(`NPC "${near.name}" ở ${Math.round(near.x)},${Math.round(near.y)} không nằm trong Map lúc mở`);
+    }
+    const said = `bấm NPC ${near.name} #${near.id} trên Map`;
+    clicks.push(await domClick(token, macro.map_button_point || [0.85, 0.07]));
+    await domWait(token, macro.map_open_delay_seconds || 1.2);
+    const touchedSince = Date.now();
+    clicks.push(await domClick(token, panel.toFraction(aim)));
+    let touch = null;
+    for (let deadline = Date.now() + Number(step.dialog_seconds ?? 4) * 1000; !touch && Date.now() < deadline;) {
+      await domWait(token, 0.2);
+      touch = (latestWorld?.touches || []).find((item) => item.at >= touchedSince && item.target === near.id);
+    }
+    if (!touch) {
+      clicks.push(await domClick(token, panel.closePoint));
+      throw new Error(`${said}: client không gửi lệnh bấm NPC nào - bấm trượt NPC trên Map`);
+    }
+    // Let the popup draw before clicking its option.
+    await domWait(token, step.popup_delay_seconds ?? 1);
+    const answeredSince = Date.now();
+    clicks.push(await domClick(token, step.option_point));
+    let answer = null;
+    for (let deadline = Date.now() + 3000; !answer && Date.now() < deadline;) {
+      await domWait(token, 0.2);
+      answer = (latestWorld?.answers || []).find((item) => item.at >= answeredSince);
+    }
+    // The option closes the popup but not the Map: close it before the new map
+    // loads, while its X is still where the lobby's Map put it.
+    clicks.push(await domClick(token, panel.closePoint));
+    const note = `${said} (client gửi questId ${touch.questId}); `
+      + (answer ? `chọn mục: client gửi quest ${answer.questId} notifyId ${answer.notifyId} answer ${answer.answer}`
+        : "bấm mục trong popup nhưng client không gửi trả lời nào");
+    if (!answer) throw new Error(note);
+    if (!step.portal) return note;
+    for (let deadline = answeredSince + Number(step.wait_seconds ?? 15) * 1000; Date.now() < deadline;) {
+      if (mapSwitchedAt > answeredSince) {
+        await domWait(token, macro.map_load_seconds || 1.5);
+        return `${note}; sang map ${latestWorld?.mapId ?? "?"}`;
+      }
+      // The game says no in its own words, e.g. "Bản đồ phụ này mỗi ngày chỉ
+      // có thể đi 5 lần" (Thiên Long khó, 2026-09-23 16:47).
+      const refusal = (latestWorld?.dialogs || [])
+        .find((dialog) => dialog.kind === "message" && dialog.at >= answeredSince);
+      if (refusal) {
+        const error = new Error(`${note}; game báo: ${refusal.message}`);
+        error.dailyLimit = /mỗi ngày/i.test(refusal.message);
+        throw error;
+      }
+      await domWait(token, 0.3);
+    }
+    throw new Error(`${note}; nhưng vẫn ở map ${latestWorld?.mapId ?? "?"} sau ${step.wait_seconds ?? 15}s`);
   }
 
   async function runInstanceReset(token, macro, flow) {
@@ -881,16 +1081,23 @@
   // point is to make the CLIENT rebuild its state, and a packet behind its back
   // would leave the page showing the old character.
   async function openActorPicker(token, switcher, clicks) {
-    for (const [point, wait] of [
-      [switcher.hanh_trang_point, switcher.panel_seconds],
-      [switcher.menu_scroll_point, switcher.panel_seconds],
-      [switcher.he_thong_point, switcher.panel_seconds],
-      [switcher.doi_nhan_vat_point, switcher.picker_seconds],
-    ]) {
+    const need = (point) => {
       if (!point) throw new Error("Thiếu tọa độ trong actor_switch (xem config.yaml)");
-      clicks.push(await domClick(token, point));
-      await domWait(token, Number(wait ?? 1.5));
+      return point;
+    };
+    clicks.push(await domClick(token, need(switcher.hanh_trang_point)));
+    await domWait(token, Number(switcher.panel_seconds ?? 1.5));
+    // H.Thống only shows once the left menu is dragged to its end; its ▼ arrow
+    // does nothing when clicked from here (user, 2026-09-23). Dragging past
+    // the end leaves it at the end, so a spare drag is harmless.
+    for (let n = 0; n < Math.max(1, Number(switcher.menu_drag_times ?? 2)); n += 1) {
+      clicks.push(await domDrag(token, need(switcher.menu_drag_from), need(switcher.menu_drag_to)));
+      await domWait(token, Number(switcher.scroll_seconds ?? 0.8));
     }
+    clicks.push(await domClick(token, need(switcher.he_thong_point)));
+    await domWait(token, Number(switcher.panel_seconds ?? 1.5));
+    clicks.push(await domClick(token, need(switcher.doi_nhan_vat_point)));
+    await domWait(token, Number(switcher.picker_seconds ?? 3));
   }
 
   // Which card in Chọn NV is which: the game says so itself. Opening the screen
@@ -898,9 +1105,15 @@
   // arrives in the same order the cards are drawn, and the login packet says
   // which of them we are (network_probe.js). So the slots are read, not
   // configured; actor_slot / spare_actor_slot in config.yaml only override it.
-  async function readActorSlots(token, switcher) {
+  // listedBefore: only a list that arrived after our clicks proves Chọn NV is
+  // really open (an older one says nothing about what is on screen now).
+  async function readActorSlots(token, switcher, listedBefore = 0) {
     const deadline = Date.now() + Number(switcher.list_seconds ?? 6) * 1000;
-    while (Date.now() < deadline && !(latestWorld?.actors || []).length) await domWait(token, 0.2);
+    const fresh = () => (latestWorld?.actorsAt || 0) > listedBefore && (latestWorld?.actors || []).length;
+    while (Date.now() < deadline && !fresh()) await domWait(token, 0.2);
+    if (!fresh()) {
+      throw new Error("Màn Chọn NV không mở (game không gửi danh sách nhân vật) - menu trái chưa bấm trúng H.Thống / Đổi nhân vật");
+    }
     const actors = latestWorld?.actors || [];
     const forced = Number(switcher.actor_slot || 0);
     const spareForced = Number(switcher.spare_actor_slot || 0);
@@ -931,14 +1144,45 @@
   // character switch lets go of it - the user does this by hand between every
   // run (2026-09-23). Away to the spare character, then straight back.
   async function switchActorAndBack(token, macro, flow) {
+    const switchedAt = Date.now();
+    token.reconnecting = true;
+    try {
+      await switchActorAndBackOnce(token, macro, flow);
+    } finally {
+      token.reconnecting = false;
+      // From here on only a socket that closes again, and stays closed,
+      // stops the flow: the last word since the switch must be ws_open.
+      token.socketCheckFrom = switchedAt;
+    }
+  }
+
+  async function switchActorAndBackOnce(token, macro, flow) {
     const switcher = macro.actor_switch || {};
     const clicks = [];
     const mapBefore = latestWorld?.mapId ?? "?";
-    await openActorPicker(token, switcher, clicks);
-    const slots = await readActorSlots(token, switcher);
-    await pickActorSlot(token, switcher, slots.spare, clicks);
-    await openActorPicker(token, switcher, clicks);
-    await pickActorSlot(token, switcher, slots.mine, clicks);
+    const trail = () => `đã bấm: ${clicks.map(describeClick).join(" | ")}`;
+    // Opens Chọn NV and proves it by the character list the game sends.
+    const openPicker = async () => {
+      const listedBefore = latestWorld?.actorsAt || 0;
+      await openActorPicker(token, switcher, clicks);
+      try {
+        return await readActorSlots(token, switcher, listedBefore);
+      } catch (error) {
+        throw new Error(`${error.message}; ${trail()}`);
+      }
+    };
+    // Logs in on one card and proves it by the game's login packet.
+    const loginAs = async (slot) => {
+      const actor = (latestWorld?.actors || [])[slot];
+      await pickActorSlot(token, switcher, slot, clicks);
+      if (actor && latestWorld?.actorId !== actor.id) {
+        throw new Error(`Bấm ô ${slot + 1} (${actor.name}) mà game chưa đăng nhập nhân vật đó; ${trail()}`);
+      }
+    };
+    const slots = await openPicker();
+    await loginAs(slots.spare);
+    await openPicker();
+    await loginAs(slots.mine);
     appendDiagnostic("actor_switch", {
       flow,
       message: `${slots.note}; map trước ${mapBefore} sau ${latestWorld?.mapId ?? "?"}; `
@@ -946,8 +1190,10 @@
     });
   }
 
-  // Runs several dungeon macros back to back on the one character, switching
-  // characters between runs so the next one starts clean.
+  // Runs several dungeon macros back to back on the one character. Each run
+  // switches characters itself before walking out (switch_actor_before), and
+  // the dungeon's progress is cleared between runs so the next one starts clean
+  // (user, 2026-09-23: đổi NV -> ra khỏi map -> reset phó bản -> chạy lại).
   async function runDungeonPipeline(token, macro, flow) {
     const plan = [];
     // times: how many of each stage. A stage can pin its own count; otherwise
@@ -956,19 +1202,28 @@
       const times = Number(stage.times ?? macro.times ?? 1);
       for (let n = 0; n < times; n += 1) plan.push(String(stage.macro));
     }
-    if (!plan.length) throw new Error("Chưa cấu hình stages cho pipeline");
+    if (!plan.length) throw new Error("Chưa chọn lượt nào (mọi ô đều là 0)");
     appendDiagnostic("pipeline_start", { flow, message: `${plan.length} lượt: ${plan.join(", ")}` });
+    const exhausted = new Set();        // stages the game says are done for today
     for (const [index, id] of plan.entries()) {
       const title = `Lượt ${index + 1}/${plan.length}`;
-      if (index > 0) {
-        updateDomFlow(flow, `${title}: đổi nhân vật cho hết kẹt`, `switch_${index + 1}`);
-        await switchActorAndBack(token, macro, flow);
-      }
+      if (exhausted.has(id)) continue;
+      // Only from outside the instance: the game refuses inside one, and the
+      // run before ended by walking out.
+      if (index > 0) await runInstanceReset(token, macro, flow);
       const config = await api(`/macro?id=${encodeURIComponent(id)}`);
       updateDomFlow(flow, `${title}: ${config.macro.label || id}`, `run_${index + 1}`);
       appendDiagnostic("pipeline_run", { flow, message: `${title}: ${id}; ${describeWorld()}` });
       // One bell at the end of the whole pipeline, not after every run.
-      await runDungeonRoute(token, { ...config.macro, finish_chime: false }, flow);
+      try {
+        await runDungeonRoute(token, { ...config.macro, finish_chime: false }, flow);
+      } catch (error) {
+        // Out of runs for today: skip the rest of this stage, go on with the
+        // next one instead of stopping the whole pipeline.
+        if (!error.dailyLimit) throw error;
+        exhausted.add(id);
+        appendDiagnostic("pipeline_skip", { flow, message: `${title}: bỏ các lượt ${id} còn lại - ${error.message}` });
+      }
     }
     updateDomFlow(flow, `Xong ${plan.length} lượt phó bản`, "done");
     if (macro.finish_chime !== false) playChime();
@@ -1238,6 +1493,63 @@
     let shrink = 1;
     let doorIndex = 0;
     const summary = () => `đi tới ${step.goto.join(",")}: ${legs.join(" → ") || "đã đứng sẵn ở đó"}`;
+    // Clicking the door on the Map can leave us standing still beside it
+    // (Thiên Long's exit: stuck at 81,57 every time, and nudging on the Map
+    // stayed too far off - user, 2026-09-23). On the main screen the camera
+    // keeps us in the middle, so a tile near us can be clicked right where it
+    // is drawn. Once the Map walk has failed, click the door there: the game
+    // data's exits first (Thiên Long's portal circle sits on 85,59, the
+    // user's 84,60 beside it), then the door, then the tiles around it.
+    let nudged = false;
+    const [screenW, screenH] = (macro.map_panel_screen || [1280, 640]).map(Number);
+    // The world is drawn at 2x (a map pixel is 2 logical screen pixels):
+    // fitted on the user's screenshot, us at 81,57 and the portal circle at
+    // 85,59 drawn 110,60 px apart on a 1906 px wide canvas.
+    const worldScale = Number(macro.world_scale ?? 2);
+    const onScreen = (tile, me) => [
+      0.5 + ((tile.x + 0.5) * unit - me.x) * worldScale / screenW,
+      0.5 + ((tile.y + 0.5) * unit - me.y) * worldScale / screenH,
+    ];
+    // Clear of the HUD: top bar, joystick bottom-left, skills bottom-right.
+    const clearOfHud = ([x, y]) => x > 0.08 && x < 0.92 && y > 0.15 && y < 0.85
+      && !(x > 0.7 && y > 0.5) && !(x < 0.22 && y > 0.6);
+    const nudgeThrough = async () => {
+      if (!step.portal || nudged) return null;
+      nudged = true;
+      const grid = walkGridFor(latestWorld?.mapId);
+      const goal = { x: cellX, y: cellY };
+      const doors = doorTiles(grid, goal);
+      const tiles = [...doors.slice(1), goal];
+      const radius = Number(step.door_nudge_radius ?? macro.door_nudge_radius ?? 2);
+      const seen = new Set(tiles.map((tile) => `${tile.x},${tile.y}`));
+      for (let ring = 1; ring <= radius; ring += 1) {
+        for (const door of [...doors.slice(1), goal]) {
+          for (let dy = -ring; dy <= ring; dy += 1) {
+            for (let dx = -ring; dx <= ring; dx += 1) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+              const tile = { x: door.x + dx, y: door.y + dy };
+              if (!seen.has(`${tile.x},${tile.y}`)) {
+                seen.add(`${tile.x},${tile.y}`);
+                tiles.push(tile);
+              }
+            }
+          }
+        }
+      }
+      for (const tile of tiles) {
+        const me = await currentPosition(token);
+        const point = onScreen(tile, me);
+        if (!clearOfHud(point)) continue;
+        const since = Date.now();
+        clicks.push(await domClick(token, point));
+        const walk = await waitForArrival(token, macro, {
+          ...step, portal: true, wait_seconds: Number(macro.door_nudge_seconds ?? 6),
+        }, since, { idleSeconds: 3 });
+        legs.push(`bấm màn hình ${tile.x},${tile.y} ${walk.how} @${where(latestWorld?.me || me)}`);
+        if (walk.how === "map" || walk.how === "ambush") return { ...walk, note: `${walk.note}; ${summary()}` };
+      }
+      return null;
+    };
     for (let leg = 0; leg < maxLegs; leg += 1) {
       const me = await currentPosition(token);
       if (!step.portal && reached(me)) {
@@ -1302,6 +1614,8 @@
           lastEnd = null;
           continue;
         }
+        const through = await nudgeThrough();
+        if (through) return through;
         return { how: "blocked", note: `bị chặn ở ${where(after)}; ${summary()}` };
       }
       // Still walking when the leg timed out: plan again from here.
@@ -1325,6 +1639,8 @@
           bias.y = 0;
           continue;
         }
+        const through = await nudgeThrough();
+        if (through) return through;
         return { ...walk, note: `${walk.note}; ${summary()}` };
       }
       // Not on the door tile yet: correct the click below and try it again.
@@ -1335,6 +1651,8 @@
         bias.y = Math.max(-cap, Math.min(cap, bias.y + off.y));
       }
     }
+    const through = await nudgeThrough();
+    if (through) return through;
     return { how: "timeout", note: `chưa tới sau ${maxLegs} lượt; ${summary()}` };
   }
 

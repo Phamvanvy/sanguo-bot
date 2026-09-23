@@ -78,6 +78,22 @@
 #sanguo-flow-panel .sg-item-slots button:hover { border-color: #d69b3b; background: #463017; }
 #sanguo-flow-panel .sg-item-slots button:disabled { opacity: .45; cursor: default; }
 #sanguo-flow-panel .sg-item-slots button.sg-wide { grid-column: 1 / -1; }
+#sanguo-flow-panel .sg-stage-counts { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; margin-top: 4px; align-items: center; }
+#sanguo-flow-panel .sg-stage-counts label {
+  display: flex; align-items: center; gap: 4px; color: #ffd77b; font-size: 9px; font-weight: 700;
+}
+#sanguo-flow-panel .sg-stage-counts input {
+  width: 100%; min-width: 0; box-sizing: border-box; padding: 3px 2px; border: 1px solid #765326;
+  border-radius: 6px; color: #ffd77b; background: #241809; font-family: inherit; font-size: 10px;
+  font-weight: 700; text-align: center;
+}
+#sanguo-flow-panel .sg-stage-counts input:disabled { opacity: .45; }
+#sanguo-flow-panel .sg-stage-counts button {
+  padding: 4px 10px; border: 1px solid #765326; border-radius: 6px; color: #ffd77b;
+  background: #352511; cursor: pointer; font-family: inherit; font-size: 9px; font-weight: 700;
+}
+#sanguo-flow-panel .sg-stage-counts button:hover { border-color: #d69b3b; background: #463017; }
+#sanguo-flow-panel .sg-stage-counts button:disabled { opacity: .45; cursor: default; }
 #sanguo-flow-panel .sg-stop {
   width: 100%; margin-top: 5px; padding: 6px; border: 1px solid #823d35;
   border-radius: 7px; color: #ffb7ac; background: #351c19; cursor: pointer;

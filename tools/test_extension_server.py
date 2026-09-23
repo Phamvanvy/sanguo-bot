@@ -585,6 +585,7 @@ class ExtensionServerTest(unittest.TestCase):
         macros = extension_server.load_config()["activity_macros"]
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        css = (PROJECT_ROOT / "extension" / "content.css").read_text(encoding="utf-8")
         for flow_id in ("thien_long_hard", "thien_long_easy"):
             self.assertEqual("dungeon_route", flows[flow_id]["runner"])
             macro = macros[flow_id]
@@ -606,20 +607,25 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual([[55, 16]], [step["goto"] for step in easy_entry])
         self.assertEqual([512, 512], easy_entry[0]["map_size"])
         self.assertTrue(easy_entry[0]["portal"])
-        # Hard goes through the NPC: the flow finds it by NAME in the game's own
-        # unit list and sends TOUCHNPC, so no guessing where it is on screen.
+        # Hard goes through the NPC. The packets the client sends (TOUCHNPC -1,
+        # NOTIFY 1649/1/16) did not take us in on their own (2026-09-23), so the
+        # flow clicks it like a person: NPC on the Map, then option 1 - finding
+        # the NPC by NAME in the game's own unit list, and checking each click
+        # by the packet the client itself sends.
         hard_entry = macros["thien_long_hard"]["entry_steps"]
-        self.assertEqual("Thái Trường Trị", hard_entry[0]["touch_npc"])
-        self.assertEqual(-2, hard_entry[0]["touch_quest_id"])
         self.assertEqual([53, 16], hard_entry[0]["goto"])
-        # The popup is answered with a packet carrying the game's own notifyId,
-        # not a click: which unit the client has selected is a client-only
-        # notion the server has no opcode for, so a click can miss entirely.
-        self.assertEqual(1, hard_entry[1]["answer_question"])
-        self.assertNotIn("click_point", hard_entry[1])
+        self.assertNotIn("portal", hard_entry[0])
+        self.assertEqual("Thái Trường Trị", hard_entry[1]["touch_npc_by_map"])
+        self.assertEqual([512, 512], hard_entry[1]["map_size"])
+        self.assertEqual([0.5, 0.508], hard_entry[1]["option_point"])
         self.assertTrue(hard_entry[1]["portal"])
+        self.assertNotIn("goto", hard_entry[1])
+        self.assertIn("step.touch_npc_by_map", content)
+        self.assertIn("item.target === near.id", content)
+        self.assertIn("latestWorld?.answers", content)
+        self.assertIn('type: "npc_trace"', probe)
         self.assertIn("const OP_NOTIFY_CLIENT = 174;", content)
-        self.assertIn("asked.notifyId", content)
+        self.assertIn("asked?.notifyId", content)
         # Both directions of the NPC conversation are logged, so one real click
         # by hand pins down the values the map's script expects.
         self.assertIn('type: "npc_touch_sent"', probe)
@@ -627,40 +633,45 @@ class ExtensionServerTest(unittest.TestCase):
         # And the popup the server sends back, so one real click shows whether
         # the popup comes over the wire at all.
         self.assertIn('type: "npc_dialog"', probe)
+        # Every popup packet opens with the asking quest's id (Player.question).
+        self.assertIn("int questId | STR message | STR options | int notifyId", probe)
         self.assertIn("const OP_TOUCH_NPC = 120;", content)
         self.assertIn("step.touch_npc", content)
         # The server refuses a touch past 80 px, so the flow says so itself.
         self.assertIn("near.d >= 80", content)
-        # The NPC's answer is read off the wire, so the log carries the popup's
-        # own words and a touch that opens nothing fails loudly instead of the
-        # next step clicking at an empty screen.
+        # The NPC's answer is read off the wire when the server sends one, so
+        # the log carries the popup's own words. The client can draw the popup
+        # by itself, so the touch does not fail on a silent server: the answer
+        # step does, when the map never changes.
         self.assertIn("const OP_QUESTION_SERVER = 123;", probe)
         self.assertIn("world.dialogs = [", probe)
         self.assertIn("latestWorld?.dialogs", content)
-        self.assertIn("game không mở thoại nào", content)
+        self.assertIn("nhưng vẫn ở map", content)
 
-        # The pipeline: 5 hard then 5 easy on the one character, switching
-        # characters between runs because that is the only thing that clears
-        # the trận's "monsters attacking" state (user, 2026-09-23).
+        # The pipeline: n hard then m easy on the one character (user,
+        # 2026-09-23), each count chosen on the panel; 0 skips that stage.
         self.assertEqual("dungeon_pipeline", flows["thien_long_pipeline"]["runner"])
         pipeline = macros["thien_long_pipeline"]
-        self.assertEqual([{"macro": "thien_long_hard"}, {"macro": "thien_long_easy"}],
-                         pipeline["stages"])
-        # How many of each: 5 by default, and the panel offers 5 / 3 / 1.
-        self.assertEqual(5, pipeline["times"])
-        self.assertEqual([5, 3, 1], pipeline["run_options"])
-        self.assertEqual([5, 3, 1], flows["thien_long_pipeline"]["run_options"])
-        self.assertNotIn("run_options", flows["thien_long_hard"])
+        self.assertEqual(["thien_long_hard", "thien_long_easy"],
+                         [stage["macro"] for stage in pipeline["stages"]])
+        # The catalogue hands each stage's label and default count to the panel.
+        self.assertEqual([
+            {"macro": "thien_long_hard", "label": "Khó", "times": 5},
+            {"macro": "thien_long_easy", "label": "Dễ", "times": 5},
+        ], flows["thien_long_pipeline"]["stages"])
+        self.assertNotIn("stages", flows["thien_long_hard"])
+        self.assertNotIn("run_options", flows["thien_long_pipeline"])
         self.assertIn("Number(stage.times ?? macro.times ?? 1)", content)
-        # One button per count, and pressing it overrides times for that run.
-        self.assertIn("flow.run_options?.length", content)
-        self.assertIn("runFlow(flow, { times })", content)
-        # Only a flow that declares them gets the buttons.
-        self.assertNotIn("run_options", flows["thien_long_easy"])
+        # One count box per stage; the run button sends every stage's count.
+        self.assertIn("if (flow.stages?.length) return renderPipelineCard(flow, running);", content)
+        self.assertIn("runFlow(flow, { stages: flow.stages.map(", content)
+        # The status refresh must not redraw (and wipe) a box being typed into.
+        self.assertIn("if (key === renderedKey) return;", content)
+        self.assertIn(".sg-stage-counts input", css)
         switcher = pipeline["actor_switch"]
 
         self.assertEqual(4, len(switcher["actor_slot_points"]))
-        for key in ("hanh_trang_point", "menu_scroll_point", "he_thong_point", "doi_nhan_vat_point"):
+        for key in ("hanh_trang_point", "menu_drag_from", "menu_drag_to", "he_thong_point", "doi_nhan_vat_point"):
             self.assertEqual(2, len(switcher[key]), key)
         # The slots are read from the game, not configured: these stay null and
         # exist only to override the detection.
@@ -672,12 +683,56 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("world.actorId = reader.i32();", probe)
         self.assertIn("actors.push({ id, name, level });", probe)
         self.assertIn("actor.id === latestWorld?.actorId", content)
+        # The left menu is scrolled to its end before H.Thống is clicked, and
+        # Chọn NV only counts as open once a fresh character list arrives.
+        # H.Thống only shows once the menu is DRAGGED to its end; its arrow
+        # does nothing when clicked from here (user, 2026-09-23).
+        self.assertEqual(2, switcher["menu_drag_times"])
+        self.assertGreater(switcher["menu_drag_from"][1], switcher["menu_drag_to"][1])
+        self.assertNotIn("menu_scroll_point", switcher)
+        self.assertIn("async function domDrag(", content)
+        # The switch by hand is a reconnect; both ends get traced, login
+        # bodies never.
+        self.assertIn('type: "switch_trace"', probe)
+        self.assertIn("TRACE_SECRET.has(opcode)", probe)
+        self.assertIn("(latestWorld?.actorsAt || 0) > listedBefore", content)
+        self.assertIn("world.actorsAt = Date.now();", probe)
+        self.assertIn("latestWorld?.actorId !== actor.id", content)
+        # Chọn NV closes the client's socket and a new one logs in (16:45):
+        # expected during a switch, a failure only if it stays closed after.
+        self.assertIn('socketEvent?.type === "ws_close" && !token.reconnecting', content)
+        self.assertIn("token.socketCheckFrom = switchedAt;", content)
+        # "mỗi ngày chỉ có thể đi 5 lần": that stage is skipped, not the pipeline.
+        self.assertIn("error.dailyLimit = /mỗi ngày/i.test(refusal.message);", content)
+        self.assertIn("if (exhausted.has(id)) continue;", content)
+        # A door that leaves us standing beside it is tried again a tile or two
+        # to either side (user, 2026-09-23: 84,60 stopped us at 82,57).
+        self.assertIn("const nudgeThrough = async () => {", content)
+        self.assertEqual(3, content.count("const through = await nudgeThrough();"))
+        # ...clicked on the main screen, where the camera keeps us centred and
+        # the world is drawn at 2x, not on the Map (still too far off there).
+        self.assertIn("0.5 + ((tile.x + 0.5) * unit - me.x) * worldScale / screenW", content)
+        self.assertIn("const tiles = [...doors.slice(1), goal];", content)
+        # A click under our own panel still reaches the game.
+        self.assertIn("hit && panel.contains(hit)", content)
         # An override wins over the detection when it is set.
         self.assertIn("forced > 0 ? forced - 1 :", content)
         self.assertIn("dungeon_pipeline", content)
         self.assertIn("async function switchActorAndBack", content)
-        # Never before the first run: the character is only stuck after one.
-        self.assertIn("if (index > 0) {", content)
+        # The switch happens inside each run, right before the exit: the door
+        # stays shut until then (user, 2026-09-23). Both buttons and the
+        # pipeline share the one set of click points.
+        exit_step = macros["thien_long_hard"]["route_steps"][-1]
+        self.assertTrue(exit_step["switch_actor_before"])
+        self.assertTrue(exit_step["portal"])
+        self.assertEqual(switcher, macros["thien_long_hard"]["actor_switch"])
+        self.assertEqual(switcher, macros["thien_long_easy"]["actor_switch"])
+        self.assertIn("if (step.switch_actor_before) {", content)
+        # A switch reloads the map; that must not read as the exit crossed.
+        self.assertIn("if (latestWorld?.mapId === mapBefore) mapMark = mapSwitchedAt;", content)
+        # Between runs the pipeline clears the dungeon's progress - once out of
+        # it, never before the first run.
+        self.assertIn("if (index > 0) await runInstanceReset(token, macro, flow);", content)
         # One bell at the end, not after every run in the pipeline.
         self.assertIn("finish_chime: false", content)
 
