@@ -580,6 +580,13 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("async function runWarehouseTake", content)
         self.assertIn("macro.amount_confirm_point != null", content)
 
+    def test_screen_door_click_skips_tiles_under_a_unit(self):
+        # Thiên Long lobby 2026-09-24: the screen click on door 56,15 hit
+        # "Thái Trường Trị" and its panel took every click after it.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const under = unitOver(tile);", content)
+        self.assertIn("(macro.unit_click_box || [20, 56])", content)
+
     def test_discard_items_finds_vut_bo_by_its_text(self):
         # "Vứt bỏ" moves with the item's kind (user, 2026-09-24): the UI flow
         # stays, but that one button is found by its text on screen.

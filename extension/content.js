@@ -1808,6 +1808,17 @@
     let nudged = false;
     const onScreen = (tile, me) => screenPointOf(macro, center(tile), me,
       walkGridFor(latestWorld?.mapId)?.size || step.map_size);
+    // A unit drawn over the tile takes the click instead: its sprite stands on
+    // its feet and rises above them. Thiên Long's lobby, 2026-09-24 18:37 and
+    // 19:33: back from a run at 53,17, the click on door 56,15 hit "Thái
+    // Trường Trị" 30 px away, its panel opened and took every click after it
+    // for 4.5 minutes. [half width, height] in map px.
+    const [unitHalfW, unitH] = (macro.unit_click_box || [20, 56]).map(Number);
+    const unitOver = (tile) => {
+      const spot = center(tile);
+      return (latestWorld?.creatures || []).find(([, x, y]) => Math.abs(x - spot.x) <= unitHalfW
+        && y - spot.y >= -8 && y - spot.y <= unitH);
+    };
     const nudgeThrough = async ({ doorsOnly = false } = {}) => {
       if (!step.portal || nudged) return null;
       if (!doorsOnly) nudged = true;
@@ -1842,6 +1853,11 @@
         const me = await currentPosition(token);
         const point = onScreen(tile, me);
         if (!clearOfHud(point)) continue;
+        const under = unitOver(tile);
+        if (under) {
+          legs.push(`bỏ ô ${tile.x},${tile.y} (${under[5] || `#${under[0]}`} đứng đó)`);
+          continue;
+        }
         const since = Date.now();
         clicks.push(await domClick(token, point));
         const walk = await waitForArrival(token, macro, {
