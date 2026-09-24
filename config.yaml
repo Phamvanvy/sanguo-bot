@@ -181,10 +181,13 @@ activity_macros:
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
   co_mo_hard: &co_mo_hard
-    label: "Phó bản Cổ Mộ (dễ/khó)"
-    description: "Đứng trong Cổ Mộ dễ hoặc khó rồi bấm: đánh 3 boss ở 3 phòng"
+    label: "Phó bản Cổ Mộ (khó)"
+    description: "Vào bản khó qua NPC rồi đánh 3 boss ở 3 phòng"
     icon: "墓"
     runner: "dungeon_route"
+    # Không có nút riêng: chạy qua thẻ "Phó bản Cổ Mộ" (co_mo_pipeline), như Hà
+    # Đông / Thiên Long (user, 2026-09-23). Các macro khác merge từ đây cũng ẩn.
+    hidden: true
     # Đọc dữ liệu game (gói tin WebSocket, xem extension/network_probe.js): biết vị
     # trí nhân vật, quái còn sống và lúc qua cổng -> hết quái thì đi tiếp ngay, tới
     # nơi thì làm bước sau luôn. fight_seconds / wait_seconds chỉ là giới hạn tối đa
@@ -261,12 +264,14 @@ activity_macros:
     # Map sảnh Cổ Mộ Lạc Dương (id đọc từ gói tin). Bấm chạy khi đang ở map khác
     # (đã ở trong phó bản) thì bỏ qua các bước vào cửa, đi thẳng vào lộ trình.
     entry_map: 768
-    # Bản dễ và khó giống hệt nhau nên chung một nút (user, 2026-09-15). Đang ở
-    # trong (dễ hay khó) thì đi thẳng lộ trình; bấm ở sảnh Cổ Mộ Lạc Dương, đứng
-    # ở (32,27) như ảnh mẫu, thì vào bản khó qua NPC.
+    # Bản dễ và khó cùng lộ trình, chỉ khác lối vào. Đang ở trong thì đi thẳng lộ
+    # trình. Bản KHÓ: NPC "Đặc sứ triều đình Đông Hán" ở sảnh (~22,27, nơi nút cũ
+    # bấm khi đứng ở 32,27) -> "Không ngại hiểm nguy, vào khiêu chiến" (user,
+    # 2026-09-23). Sảnh 560x432 nằm gọn trong Map nên bấm NPC trên Map từ đâu
+    # cũng được, client tự đi tới; không thấy tên trong dữ liệu game thì bấm ô
+    # npc_tile.
     entry_steps:
-      - {label: "Bấm NPC vào Cổ Mộ khó", click_point: [0.338, 0.485], wait_seconds: 10, after_seconds: 1}
-      - {label: "Không ngại hiểm nguy, vào khiêu chiến", click_point: [0.500, 0.509], portal: true, wait_seconds: 10}
+      - {label: "Bấm NPC trên Map, chọn Không ngại hiểm nguy, vào khiêu chiến", touch_npc_by_map: "Đặc sứ triều đình Đông Hán", npc_tile: [22, 27], dialog_seconds: 20, map_size: &co_mo_lobby [560, 432], maps: &co_mo_lobby_maps [768], option_point: [0.500, 0.509], portal: true, wait_seconds: 15}
     # Mục tiêu là 3 boss ở 3 phòng riêng. Cửa phòng boss khóa khi còn quái đánh
     # mình: dọn quái trước cửa rồi mới vào; kẹt ở cửa thì flow đánh hết rồi vào lại.
     # Cỡ map theo dữ liệu gốc: khó 1137/1141/1139/1140, dễ 769/773/771/772 (cùng cỡ).
@@ -277,8 +282,11 @@ activity_macros:
     # 0 vòng, "bỏ qua 3 con đứng yên"). Tượng không đánh được thì lọc bằng
     # ignore_monster_names, còn lại stall_giveup_seconds cắt sau 30 giây.
     route_steps:
-      - {label: "Dọn quái trước cửa boss 1 (38,12)", goto: [38, 12], map_size: &co_mo_main [800, 608], fight_seconds: 180}
-      - {label: "Vào cửa boss 1 (44,10)", goto: [44, 10], map_size: *co_mo_main, portal: true}
+      # "Xe đâm húc" đứng yên cách chỗ dọn 175-210 px, ngoài bán kính đứng yên
+      # mặc định 160, nên bị bỏ qua rồi xông vào đánh lúc mình ra cửa 44,10 - cửa
+      # khóa (user, 2026-09-23 23:41). Hai bước dọn trước cửa quét 250 px.
+      - {label: "Dọn quái trước cửa boss 1 (38,12)", goto: [38, 12], map_size: &co_mo_main [800, 608], maps: &co_mo_main_maps [1137, 769], fight_seconds: 180, idle_monster_radius: 250}
+      - {label: "Vào cửa boss 1 (44,10)", goto: [44, 10], map_size: *co_mo_main, maps: *co_mo_main_maps, portal: true}
       # Phòng boss 1: PHẢI phá hết xe và tượng thì boss mới xuất hiện (user,
       # 2026-09-21) - trước đây flow không thấy gì để đánh nên đi luôn, chưa kịp ra
       # boss. Nên bước này:
@@ -290,53 +298,54 @@ activity_macros:
       #                            thật, khác với tượng cảnh ngoài map chính.
       #   idle_monster_radius: 250 phòng 352x256 px, đứng ở 20,18 góc xa nhất ~221 px
       #                            nên phải bằng monster_radius mới quét hết phòng.
-      - {label: "Đánh boss 1 (20,18)", goto: [20, 18], map_size: &co_mo_boss1 [352, 256], fight_seconds: 180, idle_monster_radius: 250, clear_room: true, ignore_monster_names: ["Lữ Bố"]}
-      - {label: "Ra cửa 31,24", goto: [31, 24], map_size: *co_mo_boss1, portal: true}
-      - {label: "Dọn quái trước cửa boss 2 (90,30)", goto: [90, 30], map_size: *co_mo_main, fight_seconds: 180}
+      # Vừa vào phòng boss 1 có một con quái ở ngay cửa: đánh tại chỗ cho xong con
+      # đó rồi mới ra giữa phòng (user, 2026-09-23). Chỉ quét quanh cửa (96 px,
+      # phòng rộng 352) để không kéo cả xe / tượng giữa phòng - việc của bước sau.
+      - {label: "Đánh quái ở cửa phòng boss 1 (tại chỗ)", map_size: &co_mo_boss1 [352, 256], maps: &co_mo_boss1_maps [1141, 773], fight_seconds: 60, monster_radius: 96, idle_monster_radius: 96}
+      - {label: "Đánh boss 1 (20,18)", goto: [20, 18], map_size: *co_mo_boss1, maps: *co_mo_boss1_maps, fight_seconds: 180, idle_monster_radius: 250, clear_room: true, ignore_monster_names: ["Lữ Bố"]}
+      - {label: "Ra cửa 31,24", goto: [31, 24], map_size: *co_mo_boss1, maps: *co_mo_boss1_maps, portal: true}
+      - {label: "Dọn quái trước cửa boss 2 (90,30)", goto: [90, 30], map_size: *co_mo_main, maps: *co_mo_main_maps, fight_seconds: 180, idle_monster_radius: 250}
       # Cửa boss 2 đúng ô 83,34 (user, 2026-09-14): 84,32 và 85,33 đứng mãi không vào.
-      - {label: "Vào cửa boss 2 (83,34)", goto: [83, 34], map_size: *co_mo_main, portal: true}
-      - {label: "Đánh boss 2 (44,34)", goto: [44, 34], map_size: &co_mo_boss2 [560, 432], fight_seconds: 180}
-      - {label: "Ra cửa 9,10", goto: [9, 10], map_size: *co_mo_boss2, portal: true}
+      - {label: "Vào cửa boss 2 (83,34)", goto: [83, 34], map_size: *co_mo_main, maps: *co_mo_main_maps, portal: true}
+      - {label: "Đánh boss 2 (44,34)", goto: [44, 34], map_size: &co_mo_boss2 [560, 432], maps: &co_mo_boss2_maps [1139, 771], fight_seconds: 180}
+      - {label: "Ra cửa 9,10", goto: [9, 10], map_size: *co_mo_boss2, maps: *co_mo_boss2_maps, portal: true}
       # Cửa boss 3: vòng lên 99,4 rồi xuống cửa, né quái chứ không dừng lại đánh.
-      - {label: "Vòng lên 99,4 (né quái)", goto: [99, 4], map_size: *co_mo_main, ignore_ambush: true}
-      - {label: "Vào cửa boss 3 (93,6)", goto: [93, 6], map_size: *co_mo_main, portal: true, ignore_ambush: true}
+      - {label: "Vòng lên 99,4 (né quái)", goto: [99, 4], map_size: *co_mo_main, maps: *co_mo_main_maps, ignore_ambush: true}
+      - {label: "Vào cửa boss 3 (93,6)", goto: [93, 6], map_size: *co_mo_main, maps: *co_mo_main_maps, portal: true, ignore_ambush: true}
       # Boss cuối bản KHÓ (phòng boss 3 = map 1140) trâu máu nên cho gấp 2.5 lần;
       # bản dễ (map 772) giữ 180 giây (user, 2026-09-19).
-      - {label: "Đánh boss 3 (69,23)", goto: [69, 23], map_size: [832, 720], fight_seconds: 180, fight_seconds_by_map: {1140: 450}}
-  ha_dong_hard:
-    # Dùng chung cài đặt đánh / đi Map của Cổ Mộ; chỉ khác lộ trình.
+      - {label: "Đánh boss 3 (69,23)", goto: [69, 23], map_size: &co_mo_boss3 [832, 720], maps: &co_mo_boss3_maps [1140, 772], fight_seconds: 180, fight_seconds_by_map: {1140: 450}}
+      # Cửa ra về sảnh 79,21 (user, 2026-09-23); dữ liệu map ghi exit 80,21 (dễ,
+      # 772) / 80,20 (khó, 1140) ngay cạnh nên bước portal tự thử nốt.
+      - {label: "Ra cửa 79,21", goto: [79, 21], map_size: *co_mo_boss3, maps: *co_mo_boss3_maps, portal: true}
+  co_mo_easy:
+    # Y hệt bản khó, chỉ khác lối vào: cửa 59,11 ở sảnh (user, 2026-09-23; dữ
+    # liệu map 768 ghi exit 60,8, trong 3 ô nên bước portal tự thử nốt).
     <<: *co_mo_hard
-    label: "Phó bản Hà Đông (khó)"
-    description: "Dọn 3 bãi quái ngoài rồi vào trong đánh ở 66,22"
-    icon: "賊"
-    # Bấm chạy khi đã đứng trong Hà Đông Thảo Tặc (Ngoài), vd. ở cửa vào 94,100.
-    entry_map: null
-    entry_steps: []
-    # Cỡ map theo dữ liệu gốc: ngoài = Hà đông phế thành 992x992 (cửa vào trong ở
-    # pixel 196,67), trong = quan nha 608x464.
-    route_steps:
-      # Boss bãi chết là xong, không cần dọn nốt lính đứng yên (user, 2026-09-17).
-      - {label: "Dọn quái ở 77,16", goto: [77, 16], map_size: &ha_dong_outer [992, 992], fight_seconds: 240, ignore_idle_monsters: true}
-      - {label: "Dọn quái ở 57,114", goto: [57, 114], map_size: *ha_dong_outer, fight_seconds: 240, ignore_idle_monsters: true}
-      - {label: "Dọn quái ở 19,25", goto: [19, 25], map_size: *ha_dong_outer, fight_seconds: 240, ignore_idle_monsters: true}
-      - {label: "Vào phó bản trong (22,8)", goto: [22, 8], map_size: *ha_dong_outer, portal: true}
-      - &ha_dong_inner_fight {label: "Đánh ở 66,22", goto: [66, 22], map_size: [608, 464], fight_seconds: 240}
-  ha_dong_easy:
-    <<: *co_mo_hard
-    label: "Phó bản Hà Đông (dễ)"
-    description: "Đi tới 66,22 rồi đánh tới khi hết quái"
-    icon: "賊"
-    entry_map: null
-    entry_steps: []
-    # Giống phần trong của bản khó (giả định cùng map 608x464).
-    route_steps:
-      - *ha_dong_inner_fight
+    label: "Phó bản Cổ Mộ (dễ)"
+    description: "Vào cửa 59,11 rồi đánh 3 boss ở 3 phòng"
+    entry_steps:
+      - {label: "Vào Cổ Mộ dễ (59,11)", goto: [59, 11], map_size: *co_mo_lobby, maps: *co_mo_lobby_maps, portal: true}
+  co_mo_pipeline:
+    label: "Phó bản Cổ Mộ"
+    description: "Chọn số lượt khó / dễ (0 = bỏ qua); chạy hết khó rồi tới dễ"
+    icon: "墓"
+    runner: "dungeon_pipeline"
+    # Mỗi lượt ra cửa 79,21 phòng boss 3 về sảnh 768 rồi reset phó bản (game chỉ
+    # cho reset khi đứng ngoài phó bản) rồi chạy lượt sau.
+    stages:
+      - {macro: "co_mo_hard", label: "Khó", times: 5}
+      - {macro: "co_mo_easy", label: "Dễ", times: 5}
+    reply_seconds: 8
+    finish_chime: true
   thien_long_hard:
     # Dùng chung cài đặt đánh / đi Map của Cổ Mộ; chỉ khác lộ trình.
     <<: *co_mo_hard
     label: "Thiên Long trận (khó)"
     description: "Vào bản khó qua NPC rồi đánh 5 boss, xong ra cửa"
     icon: "龍"
+    # Không có nút riêng: chạy qua thẻ "Thiên Long trận" (user, 2026-09-23).
+    hidden: true
     # Bản dễ và khó giống nhau. Đứng sẵn trong trận thì bấm chạy là đi luôn:
     # Ngũ hành thiên long trận, 1280x1024 theo dữ liệu gốc (977 / 978 "trong
     # trận" cùng cỡ). Đứng ở sảnh (map 976 "Của vào Thiên Long Trận", 512x512)
@@ -379,6 +388,9 @@ activity_macros:
       # thì flow báo lỗi và bảo đặt actor_slot.
       actor_slot: null
       spare_actor_slot: null
+      # Vào lại CHÍNH nhân vật đang chơi là đủ hết kẹt (user, 2026-09-23), không
+      # cần qua nhân vật khác; true = cách cũ, sang ô khác rồi mới về.
+      via_spare: false
       # Chờ game gửi danh sách nhân vật sau khi mở màn Chọn NV.
       list_seconds: 6
       panel_seconds: 1.5
@@ -393,31 +405,35 @@ activity_macros:
     # cú bấm (npc_touch_sent / npc_answer_sent) cho biết bấm có trúng không.
     entry_steps:
       # Game chỉ cho bấm NPC trong 80px nên đi tới sát trước.
-      - {label: "Tới chỗ NPC Thái Trường Trị (53,16)", goto: [53, 16], map_size: &thien_long_lobby [512, 512]}
+      - {label: "Tới chỗ NPC Thái Trường Trị (53,16)", goto: [53, 16], map_size: &thien_long_lobby [512, 512], maps: &thien_long_lobby_maps [976]}
       # option_point: mục 1 của popup, giữa màn hình (ảnh user 2026-09-23:
       # 960,568 trên màn 1920x1080, canvas bắt đầu ở y 81).
       # portal: chờ đổi map, không đổi thì dừng flow báo lỗi.
-      - {label: "Bấm NPC trên Map, chọn 1. Vào Thiên Long Trận chế độ Khó", touch_npc_by_map: "Thái Trường Trị", map_size: *thien_long_lobby, option_point: [0.5, 0.508], portal: true, wait_seconds: 15}
+      - {label: "Bấm NPC trên Map, chọn 1. Vào Thiên Long Trận chế độ Khó", touch_npc_by_map: "Thái Trường Trị", map_size: *thien_long_lobby, maps: *thien_long_lobby_maps, option_point: [0.5, 0.508], portal: true, wait_seconds: 15}
+    # click_boss: boss Thiên Long không có trong danh sách quái bot thấy, skill
+    # tự nó không nhắm tới - bấm vào chỗ boss đứng (tọa độ goto) cho game chọn
+    # làm mục tiêu; boss 5 từng bị bỏ sót khi bị chặn ở 76,60 (2026-09-24).
     route_steps: &thien_long_route
-      - {label: "Boss 1 (20,31)", goto: [20, 31], map_size: &thien_long_map [1280, 1024], fight_seconds: 300}
-      - {label: "Boss 2 (88,10)", goto: [88, 10], map_size: *thien_long_map, fight_seconds: 300}
-      - {label: "Boss 3 (145,45)", goto: [145, 45], map_size: *thien_long_map, fight_seconds: 300}
-      - {label: "Boss 4 (41,117)", goto: [41, 117], map_size: *thien_long_map, fight_seconds: 300}
-      - {label: "Boss 5 (77,64)", goto: [77, 64], map_size: *thien_long_map, fight_seconds: 300}
+      - {label: "Boss 1 (20,31)", goto: [20, 31], map_size: &thien_long_map [1280, 1024], maps: &thien_long_maps [977, 978], fight_seconds: 300, click_boss: true}
+      - {label: "Boss 2 (88,10)", goto: [88, 10], map_size: *thien_long_map, maps: *thien_long_maps, fight_seconds: 300, click_boss: true}
+      - {label: "Boss 3 (145,45)", goto: [145, 45], map_size: *thien_long_map, maps: *thien_long_maps, fight_seconds: 300, click_boss: true}
+      - {label: "Boss 4 (41,117)", goto: [41, 117], map_size: *thien_long_map, maps: *thien_long_maps, fight_seconds: 300, click_boss: true}
+      - {label: "Boss 5 (77,64)", goto: [77, 64], map_size: *thien_long_map, maps: *thien_long_maps, fight_seconds: 300, click_boss: true}
       # Lối ra ở 84,60 (user, 2026-09-23); dữ liệu map ghi exit 85,59 ngay cạnh.
       # Đánh xong game vẫn báo bị quái tấn công và cửa không cho ra, chỉ đổi
       # nhân vật qua lại mới hết (user, 2026-09-23) - nên đổi trước khi ra.
-      - {label: "Ra cửa 84,60", goto: [84, 60], map_size: *thien_long_map, portal: true, switch_actor_before: true}
+      - {label: "Ra cửa 84,60", goto: [84, 60], map_size: *thien_long_map, maps: *thien_long_maps, portal: true, switch_actor_before: true}
   thien_long_easy:
     # Y hệt bản khó, chỉ khác lối vào: bản dễ đi thẳng vào cửa, không qua NPC.
     <<: *co_mo_hard
     label: "Thiên Long trận (dễ)"
     description: "Vào cửa 55,16 rồi đánh 5 boss, xong ra cửa"
     icon: "龍"
+    hidden: true
     actor_switch: *actor_switch
     entry_map: 976
     entry_steps:
-      - {label: "Vào Thiên Long Trận dễ (55,16)", goto: [55, 16], map_size: *thien_long_lobby, portal: true}
+      - {label: "Vào Thiên Long Trận dễ (55,16)", goto: [55, 16], map_size: *thien_long_lobby, maps: *thien_long_lobby_maps, portal: true}
     route_steps: *thien_long_route
   thien_long_pipeline:
     label: "Thiên Long trận"
@@ -434,6 +450,84 @@ activity_macros:
     # route); giữa hai lượt pipeline gửi lệnh reset phó bản (OpCode 534) lúc
     # đã ra sảnh, như user làm tay: đổi NV -> ra khỏi map -> reset -> chạy lại.
     actor_switch: *actor_switch
+    reply_seconds: 8
+    finish_chime: true
+  ha_dong_hard:
+    # Dùng chung cài đặt đánh / đi Map của Cổ Mộ; chỉ khác lộ trình.
+    <<: *co_mo_hard
+    label: "Phó bản Hà Đông (khó)"
+    description: "Dọn 3 bãi quái ngoài rồi vào trong đánh ở 66,22"
+    icon: "賊"
+    # Không có nút riêng: chạy qua thẻ "Phó bản Hà Đông" (ha_dong_pipeline).
+    hidden: true
+    actor_switch: *actor_switch
+    # Bản KHÓ vào từ ngoài bản dễ (map 448) bằng NPC "Chiêu thảo sứ triều đình
+    # Đại Hán" ở 18,55: popup "Các hạ xác nhận vào Hà Đông (Khó) chứ?" rồi
+    # "1.Có" (user, 2026-09-23) - cùng chỗ mục 1 của popup Thiên Long (ảnh
+    # user: 960,568 trên màn 1920x1080). Đứng sẵn trong bản khó (map 450
+    # 992x992) thì bấm chạy là đi luôn.
+    entry_map: 448
+    entry_steps:
+      # NPC này KHÔNG có trong danh sách đơn vị game gửi xuống ở map 448 (log
+      # 2026-09-23 21:13: "0 NPC đang thấy") nên không tìm theo tên được; bấm ô
+      # 18,55 của nó trên Map thì client tự đi tới rồi bấm NPC (cú bấm đi tới
+      # 18,55 hôm đó đã mở popup). Đi tới đứng cách vài ô trước để Map lúc mở
+      # thấy ô đó (đứng ở y 40 trở xuống Map mới cuộn tới dòng 55) mà cú bấm
+      # đi đường không đè lên NPC: bấm 25,56 trên Map từng trúng "Đại sứ càn
+      # quét phó bản Hà Đông" (~24,60) và mở popup quét (2026-09-23 21:25).
+      # 26,45 cách nó và Chiêu thảo sứ (~18,54) trên 90 px map.
+      - {label: "Tới gần NPC Chiêu thảo sứ (26,45)", goto: [26, 45], map_size: &ha_dong_lobby [512, 512], maps: &ha_dong_lobby_maps [448]}
+      - {label: "Bấm NPC trên Map, chọn 1.Có vào Hà Đông (Khó)", touch_npc_by_map: "Chiêu thảo sứ triều đình Đại Hán", npc_tile: [18, 55], dialog_seconds: 10, map_size: *ha_dong_lobby, maps: *ha_dong_lobby_maps, option_point: [0.5, 0.508], portal: true, wait_seconds: 15}
+    # Cỡ map theo dữ liệu gốc: ngoài = Hà đông phế thành 992x992 (cửa vào trong ở
+    # pixel 196,67), trong = quan nha 608x464.
+    # maps: map id mỗi bước chạy trên đó; bấm chạy khi đang đứng ở map nào thì
+    # bắt đầu từ bước đầu tiên của map đó (user, 2026-09-23).
+    route_steps:
+      # Boss bãi chết là xong, không cần dọn nốt lính đứng yên (user, 2026-09-17).
+      - {label: "Dọn quái ở 77,16", goto: [77, 16], map_size: &ha_dong_outer [992, 992], maps: &ha_dong_outer_maps [450, 449], fight_seconds: 240, ignore_idle_monsters: true}
+      - {label: "Dọn quái ở 57,114", goto: [57, 114], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, fight_seconds: 240, ignore_idle_monsters: true}
+      - {label: "Dọn quái ở 19,25", goto: [19, 25], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, fight_seconds: 240, ignore_idle_monsters: true}
+      # Hay có một con "Binh sĩ phản quân" quanh cửa 22,8 đánh mình, cửa khóa
+      # tới khi nó chết (2026-09-23 21:53: bấm cửa 11 lần mất 48 giây). User:
+      # tới đây thì đánh thêm cho chắc - đứng ở 30,13 mà dọn, tính cả con đứng
+      # yên, rồi mới vào. KHÔNG sát cửa: ô cửa theo dữ liệu map là 24,8; đi tới
+      # 25,9 từng dẫm vào nó (01:15), và bấm 27,12 trên Map trúng biểu tượng cửa
+      # nên game tự dẫn vào cửa (09:30) - cả hai lần game tải lại map, Map tự tắt.
+      # 30,13 cách 24,8 sáu ô (~60 px trên Map).
+      - {label: "Dọn quái trước cửa trong (30,13)", goto: [30, 13], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, fight_seconds: 90}
+      # Hết quái mà vẫn dính hiệu ứng bị đánh thì cửa không cho vào; chỉ vào
+      # lại nhân vật (chính nhân vật đó) mới hết (user, 2026-09-23).
+      - {label: "Vào phó bản trong (22,8)", goto: [22, 8], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, portal: true, switch_actor_if_stuck: true}
+      - &ha_dong_inner_fight {label: "Đánh ở 66,22", goto: [66, 22], map_size: &ha_dong_inner [608, 464], maps: &ha_dong_inner_maps [432, 433], fight_seconds: 240}
+      # Lối ra trong quan nha ở 59,14 (user, 2026-09-23); dữ liệu map 432 ghi
+      # exit 59,12. Hà Đông không kẹt "đang bị quái tấn công" như Thiên Long
+      # nên ra thẳng, không đổi nhân vật (user, 2026-09-23).
+      - &ha_dong_exit {label: "Ra cửa 59,14", goto: [59, 14], map_size: *ha_dong_inner, maps: *ha_dong_inner_maps, portal: true}
+  ha_dong_easy:
+    <<: *co_mo_hard
+    label: "Phó bản Hà Đông (dễ)"
+    description: "Vào cửa 24,21 rồi đánh ở 66,22, xong ra cửa 59,14"
+    icon: "賊"
+    hidden: true
+    # Ngoài bản dễ = map 448 "Hà đông phỉ thành ngoại thành" (512x512, game
+    # ghi "Phó Bản - Hà Đông Thảo Tặc (Ngoài)"); cửa vào trong ở 24,21 (user,
+    # 2026-09-23; dữ liệu map ghi exit 22,21). Trong = 432, 608x464.
+    entry_map: 448
+    entry_steps:
+      - {label: "Vào Hà Đông Quan Nha dễ (24,21)", goto: [24, 21], map_size: *ha_dong_lobby, maps: *ha_dong_lobby_maps, portal: true}
+    route_steps:
+      - *ha_dong_inner_fight
+      - *ha_dong_exit
+  ha_dong_pipeline:
+    label: "Phó bản Hà Đông"
+    description: "Chọn số lượt khó / dễ (0 = bỏ qua); chạy hết khó rồi tới dễ"
+    icon: "賊"
+    runner: "dungeon_pipeline"
+    # Như Thiên Long trận (user, 2026-09-23), trừ việc đổi nhân vật: mỗi lượt
+    # ra cửa 59,14 về map 448 rồi reset phó bản (OpCode 534 chạy được ở 448).
+    stages:
+      - {macro: "ha_dong_hard", label: "Khó", times: 5}
+      - {macro: "ha_dong_easy", label: "Dễ", times: 5}
     reply_seconds: 8
     finish_chime: true
   instance_reset:

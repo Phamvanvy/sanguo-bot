@@ -68,7 +68,9 @@ def log_network_event(data: dict[str, Any]) -> dict[str, Any]:
         "document_state": str(data.get("documentState", ""))[:32],
         "performance_ms": int(data.get("perfMs", 0) or 0),
         "persisted": bool(data.get("persisted", False)),
-        "message": str(data.get("message", ""))[:500],
+        # A dungeon step's full click list runs past 500 characters, and the
+        # click that opened a stray panel was always in the part cut off.
+        "message": str(data.get("message", ""))[:4000],
         "filename": str(data.get("filename", ""))[:500],
         "line": int(data.get("line", 0) or 0),
         "column": int(data.get("column", 0) or 0),
@@ -92,6 +94,10 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
         {"id": "full_auto", "label": "Full auto", "description": "Gom rồi làm toàn bộ nhiệm vụ", "icon": "⚡"},
     ]
     for flow_id, macro in cfg.get("activity_macros", {}).items():
+        # A pipeline's stage macros get no card of their own (hidden: true);
+        # the pipeline still loads them through /api/macro.
+        if macro.get("hidden"):
+            continue
         flow = {
             "id": flow_id,
             "label": str(macro.get("label", flow_id)),

@@ -359,29 +359,49 @@ class ExtensionServerTest(unittest.TestCase):
 
     def test_default_catalog_contains_co_mo_hard_dungeon_route(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
-        self.assertEqual("dungeon_route", flows["co_mo_hard"]["runner"])
         macros = extension_server.load_config()["activity_macros"]
         macro = macros["co_mo_hard"]
+        self.assertEqual("dungeon_route", macro["runner"])
         self.assertEqual(macros["auto_attack"]["skill_points"], macro["skill_points"])
-        self.assertEqual(2, len(macro["entry_steps"]))
+        # Hard goes in through the NPC, clicked on the lobby's Map (user,
+        # 2026-09-23); easy walks into the door at 59,11.
+        self.assertEqual(1, len(macro["entry_steps"]))
+        self.assertEqual("Đặc sứ triều đình Đông Hán", macro["entry_steps"][0]["touch_npc_by_map"])
+        self.assertEqual([0.5, 0.509], macro["entry_steps"][0]["option_point"])
+        easy = macros["co_mo_easy"]
+        self.assertEqual([[59, 11]], [step["goto"] for step in easy["entry_steps"]])
+        self.assertTrue(easy["entry_steps"][0]["portal"])
+        self.assertEqual(macro["route_steps"], easy["route_steps"])
         route = macro["route_steps"]
         # Three bosses in three rooms; each door stays shut while monsters attack.
+        # None: boss 1's room is entered fighting on the spot (the monster at
+        # its door), then the middle (user, 2026-09-23).
         self.assertEqual(
-            [[38, 12], [44, 10], [20, 18], [31, 24], [90, 30], [83, 34], [44, 34], [9, 10],
-             [99, 4], [93, 6], [69, 23]],
-            [step["goto"] for step in route],
+            [[38, 12], [44, 10], None, [20, 18], [31, 24], [90, 30], [83, 34], [44, 34], [9, 10],
+             [99, 4], [93, 6], [69, 23], [79, 21]],
+            [step.get("goto") for step in route],
         )
-        self.assertEqual(5, sum(1 for step in route if "fight_seconds" in step))
-        self.assertEqual([[44, 10], [31, 24], [83, 34], [9, 10], [93, 6]],
+        self.assertEqual(96, route[2]["monster_radius"])
+        # Both clear-before-door steps sweep idle adds out to 250 px: a "Xe đâm
+        # húc" at 175-210 px was left and shut door 44,10 (user, 2026-09-23).
+        self.assertEqual([250, 250], [route[i]["idle_monster_radius"] for i in (0, 5)])
+        self.assertEqual(6, sum(1 for step in route if "fight_seconds" in step))
+        # ...and out of boss 3's room at 79,21 back to the lobby (user, 2026-09-23).
+        self.assertEqual([[44, 10], [31, 24], [83, 34], [9, 10], [93, 6], [79, 21]],
                          [step["goto"] for step in route if step.get("portal")])
-        self.assertTrue(all(step.get("ignore_ambush") for step in route[8:10]))
+        self.assertTrue(all(step.get("ignore_ambush") for step in route[9:11]))
         self.assertTrue(all(len(step["map_size"]) == 2 for step in route))
         for step in macro["entry_steps"] + route:
-            self.assertTrue({"goto", "map_point", "click_point", "fight_seconds"} & step.keys(), step)
-        # Easy and hard are the same dungeon: one flow for both, started inside
-        # either (anything but the lobby map skips the entry).
+            self.assertTrue({"goto", "map_point", "click_point", "fight_seconds", "touch_npc_by_map"} & step.keys(), step)
+        # Only the one Cổ Mộ card shows, counts for hard and easy; each step
+        # names its maps so a run resumes where we stand.
         self.assertNotIn("co_mo_easy", flows)
-        self.assertIn("(dễ/khó)", macro["label"])
+        self.assertNotIn("co_mo_hard", flows)
+        self.assertEqual([
+            {"macro": "co_mo_hard", "label": "Khó", "times": 5},
+            {"macro": "co_mo_easy", "label": "Dễ", "times": 5},
+        ], flows["co_mo_pipeline"]["stages"])
+        self.assertTrue(all(step.get("maps") for step in route))
         self.assertEqual(768, macro["entry_map"])
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn('"dungeon_route"', content)
@@ -440,7 +460,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual(15, macro["damage_grace_seconds"])
         # The hard version's last boss (its room is map 1140) gets 2.5x the cap;
         # the easy one, sharing this route, keeps the normal 180 s.
-        boss3 = macro["route_steps"][-1]
+        boss3 = macro["route_steps"][-2]
         self.assertEqual({1140: 450}, boss3["fight_seconds_by_map"])
         self.assertEqual(180, boss3["fight_seconds"])
         self.assertIn("(step.fight_seconds_by_map || {})[latestWorld?.mapId]", route_runner)
@@ -464,7 +484,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("(idle && monster.d <= idleRadius)", route_runner)
         # Boss 1 only appears once every cart and statue in its room is dead
         # (user, 2026-09-21), so that step must not take any give-up shortcut.
-        boss1 = macro["route_steps"][2]
+        boss1 = macro["route_steps"][3]
         self.assertEqual("Đánh boss 1 (20,18)", boss1["label"])
         self.assertTrue(boss1["clear_room"])
         # The statues in the room are real targets, unlike the scenery statues
@@ -503,7 +523,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("unhittable.has(fail.reason)", route_runner)
         self.assertIn("Mật thư", macro["ignore_monster_names"])
         # With no monster left the fight only waits out its checks, no Đánh.
-        self.assertIn('if (last.state === "clear" && !hitting) {', route_runner)
+        self.assertIn('if (last.state === "clear" && !hitting && rounds >= minRounds) {', route_runner)
         self.assertEqual(40, macro["monster_path_tiles"])
         self.assertIn("walkDistances(grid", route_runner)
         # A door is hit exactly (no tolerance), then the game data's exit next to it.
@@ -514,9 +534,10 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("if (doors && doorIndex + 1 < doors.length) {", route_runner)
         self.assertIn("settleSeconds || macro.arrive_settle_seconds", route_runner)
         self.assertIn("Lữ Bố", macros["thien_long_hard"]["ignore_monster_names"])
-        # Both places that read monsters (the ambush check and the fight) apply
-        # the ignore list; only the fight lets a step replace it.
-        self.assertEqual(2, route_runner.count("macro.ignore_monster_names)"))
+        # Every place that reads monsters (the ambush check, the fight, the
+        # stray-Cầu-phúc check) applies the ignore list; only the fight lets a
+        # step replace it.
+        self.assertEqual(3, route_runner.count("macro.ignore_monster_names)"))
         # Starting inside the dungeon skips the entry; a portal already crossed is skipped.
         self.assertEqual(768, macro["entry_map"])
         self.assertIn("macro.entry_map", route_runner)
@@ -557,38 +578,109 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("async function runWarehouseTake", content)
         self.assertIn("macro.amount_confirm_point != null", content)
 
-    def test_default_catalog_contains_ha_dong_dungeon_routes(self):
+    def test_default_catalog_contains_ha_dong_dungeon_routes_and_pipeline(self):
+        """One Hà Đông card runs n hard + m easy, like Thiên Long trận."""
         flows = {flow["id"]: flow for flow in flow_catalog()}
         macros = extension_server.load_config()["activity_macros"]
         hard, easy = macros["ha_dong_hard"], macros["ha_dong_easy"]
+        # No card of their own (user, 2026-09-23): only the pipeline shows.
         for flow_id in ("ha_dong_hard", "ha_dong_easy"):
-            self.assertEqual("dungeon_route", flows[flow_id]["runner"])
-        self.assertEqual([[77, 16], [57, 114], [19, 25], [22, 8], [66, 22]],
+            self.assertNotIn(flow_id, flows)
+            self.assertEqual("dungeon_route", macros[flow_id]["runner"])
+        self.assertEqual([[77, 16], [57, 114], [19, 25], [30, 13], [22, 8], [66, 22], [59, 14]],
                          [step["goto"] for step in hard["route_steps"]])
-        self.assertEqual(4, sum(1 for step in hard["route_steps"] if "fight_seconds" in step))
+        self.assertEqual(5, sum(1 for step in hard["route_steps"] if "fight_seconds" in step))
         # The three camps end once nothing attacks us: the camp's leader dead is
         # enough, idle soldiers are left standing. The inner fight still clears.
-        self.assertEqual([True, True, True, None],
+        # The monster by the inner door (25,9) is cleared idle ones included.
+        self.assertEqual([True, True, True, None, None],
                          [step.get("ignore_idle_monsters") for step in hard["route_steps"] if "fight_seconds" in step])
-        self.assertTrue(hard["route_steps"][3]["portal"])
+        self.assertTrue(hard["route_steps"][4]["portal"])
         self.assertEqual([992, 992], hard["route_steps"][0]["map_size"])
-        self.assertEqual([hard["route_steps"][-1]], easy["route_steps"])
-        self.assertEqual([608, 464], easy["route_steps"][0]["map_size"])
+        # Easy shares the inner fight and the way out at 59,14 (map data 59,12).
+        # Hà Đông does not get stuck like Thiên Long, so no character switch.
+        self.assertEqual(hard["route_steps"][-2:], easy["route_steps"])
+        exit_step = easy["route_steps"][-1]
+        self.assertEqual([608, 464], exit_step["map_size"])
+        self.assertTrue(exit_step["portal"])
+        self.assertNotIn("switch_actor_before", exit_step)
+        self.assertNotIn("fight_seconds", exit_step)
+        # Easy walks in through the door at 24,21 of map 448 (512x512).
+        self.assertEqual(448, easy["entry_map"])
+        self.assertEqual([[24, 21]], [step["goto"] for step in easy["entry_steps"]])
+        self.assertEqual([512, 512], easy["entry_steps"][0]["map_size"])
+        self.assertTrue(easy["entry_steps"][0]["portal"])
+        # Hard starts at the same map 448, through the NPC by 18,55 and "1.Có".
+        self.assertEqual(448, hard["entry_map"])
+        hard_entry = hard["entry_steps"]
+        self.assertEqual([26, 45], hard_entry[0]["goto"])
+        # Not in the unit list on 448: clicked by its tile on the Map instead.
+        self.assertEqual([18, 55], hard_entry[1]["npc_tile"])
+        self.assertIn("(!near || item.target === near.id)",
+                      (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8"))
+        # A door the server refuses (ERROR to TOUCHEXIT 116) is read, not clicked
+        # for minutes; out of runs for today skips the rest of that stage.
+        source = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const OP_TOUCH_EXIT = 116;", source)
+        self.assertIn("reply.type === OP_TOUCH_EXIT && reply.at >= since", source)
+        self.assertEqual("Chiêu thảo sứ triều đình Đại Hán", hard_entry[1]["touch_npc_by_map"])
+        self.assertEqual([512, 512], hard_entry[1]["map_size"])
+        self.assertEqual([0.5, 0.508], hard_entry[1]["option_point"])
+        self.assertTrue(hard_entry[1]["portal"])
         for macro in (hard, easy):
-            self.assertIsNone(macro["entry_map"])
-            self.assertEqual([], macro["entry_steps"])
             self.assertEqual(macros["auto_attack"]["skill_points"], macro["skill_points"])
+        # A run that starts the second the exit put us on 448 must not click
+        # the Map while the map loads: the Map's X would then hit C.Phúc.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("(latestWorld?.mapLoadedAt || 0) >= mapSwitchedAt - 1000", content)
+        self.assertIn("loadedAt + Number(macro.map_ready_seconds ?? 3) * 1000", content)
+        self.assertIn("world.mapLoadedAt = Date.now();",
+                      (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8"))
+        self.assertEqual(2, content.count("await openMap(token, macro, clicks);"))
+        self.assertEqual(1, content.count("macro.map_button_point || [0.85, 0.07]"))
+        # Each step names its map(s); the map we stand on picks the first step
+        # (user, 2026-09-23): in the quan nha a run starts at its fight.
+        self.assertEqual([[448], [448], [450, 449], [450, 449], [450, 449], [450, 449], [450, 449], [432, 433], [432, 433]],
+                         [step["maps"] for step in hard["entry_steps"] + hard["route_steps"]])
+        self.assertEqual([[448], [432, 433], [432, 433]],
+                         [step["maps"] for step in easy["entry_steps"] + easy["route_steps"]])
+        self.assertIn("planned.findIndex((step) => (step.maps || []).map(Number).includes(here))", content)
+        # A door already on screen is clicked on the main screen - no Map, so no
+        # Map X landing on C.Phúc - with the camera stopped at the map's edges
+        # (a map narrower than the screen is drawn centred).
+        self.assertIn("step.screen_door_tiles ?? macro.screen_door_tiles ?? 10", content)
+        self.assertIn("(size <= view ? size / 2", content)
+        # Going to another map closes the Map by itself (user, 2026-09-23): its X
+        # is then never clicked, or it would open C.Phúc / H.Trang beneath it.
+        self.assertIn("if (mapSwitchedAt > openedAt) return", content)
+        self.assertEqual(3, content.count("await closeMap(token, ") + content.count("return closeMap(token, "))
+        self.assertNotIn("clicks.push(await domClick(token, panel.closePoint));", content)
+        self.assertEqual("dungeon_pipeline", flows["ha_dong_pipeline"]["runner"])
+        self.assertEqual([
+            {"macro": "ha_dong_hard", "label": "Khó", "times": 5},
+            {"macro": "ha_dong_easy", "label": "Dễ", "times": 5},
+        ], flows["ha_dong_pipeline"]["stages"])
+
+    def test_hidden_macros_get_no_card(self):
+        cfg = {"activity_macros": {
+            "stage": {"label": "Lẻ", "hidden": True},
+            "pipe": {"label": "Gộp", "runner": "dungeon_pipeline", "stages": [{"macro": "stage", "times": 2}]},
+        }}
+        flows = {flow["id"]: flow for flow in flow_catalog(cfg)}
+        self.assertNotIn("stage", flows)
+        self.assertEqual([{"macro": "stage", "label": "Lẻ", "times": 2}], flows["pipe"]["stages"])
 
     def test_default_catalog_contains_thien_long_routes_and_pipeline(self):
-        """Easy and hard are separate buttons; a third runs 5 hard + 5 easy."""
+        """Easy and hard are stage macros with no card; one card runs n hard + m easy."""
         flows = {flow["id"]: flow for flow in flow_catalog()}
         macros = extension_server.load_config()["activity_macros"]
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
         css = (PROJECT_ROOT / "extension" / "content.css").read_text(encoding="utf-8")
         for flow_id in ("thien_long_hard", "thien_long_easy"):
-            self.assertEqual("dungeon_route", flows[flow_id]["runner"])
+            self.assertNotIn(flow_id, flows)
             macro = macros[flow_id]
+            self.assertEqual("dungeon_route", macro["runner"])
             route = macro["route_steps"]
             # Five bosses, then the way out at 84,60 (map data's exit is 85,59).
             self.assertEqual([[20, 31], [88, 10], [145, 45], [41, 117], [77, 64], [84, 60]],
@@ -597,6 +689,9 @@ class ExtensionServerTest(unittest.TestCase):
             self.assertTrue(all("fight_seconds" in step for step in route[:-1]), route)
             self.assertTrue(route[-1]["portal"])
             self.assertNotIn("fight_seconds", route[-1])
+            # The bosses are not in the unit list: each is clicked where it
+            # stands so the skills have a target (boss 5 went unhit, 2026-09-24).
+            self.assertTrue(all(step["click_boss"] for step in route[:-1]), route)
             # Both start from the lobby, map 976 "Của vào Thiên Long Trận".
             self.assertEqual(976, macro["entry_map"])
         # The two share one route list, so a fix lands on both.
@@ -638,7 +733,34 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("const OP_TOUCH_NPC = 120;", content)
         self.assertIn("step.touch_npc", content)
         # The server refuses a touch past 80 px, so the flow says so itself.
-        self.assertIn("near.d >= 80", content)
+        self.assertIn("function nearestNpc(name, withinPx = 80)", content)
+        self.assertIn("near = nearestNpc(step.touch_npc_by_map, Infinity);", content)
+        # A walk that touches an NPC by accident closes its popup and goes on.
+        self.assertIn("macro.npc_popup_close_point || [0.842, 0.145]", content)
+        self.assertIn("macro.stray_popup_limit ?? 3", content)
+        # A Map leg that did not move us at all means the Map never opened and
+        # its X opened Cầu phúc: close that and walk on (user, 2026-09-23).
+        self.assertIn("macro.blessing_close_point || [0.933, 0.095]", content)
+        # ...only where the Map's X covers C.Phúc and nothing is hitting us.
+        self.assertIn("stood && !near && xClicked && strayPanel && !attacked", content)
+        # H.Động too, on the 992-wide map; and no X at all after the map loaded
+        # again (a refused door), which closes the Map as a switch does.
+        self.assertIn("const strayPanel = !step.portal && [", content)
+        self.assertIn("if ((latestWorld?.mapLoadedAt || 0) > openedAt) return", content)
+        # The inner door shut with nothing left alive: log the same character in
+        # again, then retry (user, 2026-09-23). One login, no spare character.
+        hard = macros["ha_dong_hard"]
+        inner_door = hard["route_steps"][4]
+        self.assertEqual([22, 8], inner_door["goto"])
+        self.assertTrue(inner_door["switch_actor_if_stuck"])
+        self.assertFalse(hard["actor_switch"]["via_spare"])
+        self.assertIn("if (shut && step.switch_actor_if_stuck && !relogged && (attempt >= 1 || doorFight.rounds === 0)) {", content)
+        # A refused door is handed back at once, not clicked again and again.
+        self.assertIn("if (walk.refused) return { ...walk, note:", content)
+        self.assertIn("if (switcher.via_spare) {", content)
+        # Still shut after that: a few skill rounds even with no monster seen.
+        self.assertIn("minRounds: relogged ? Number(step.extra_rounds_after_relog ?? macro.extra_rounds_after_relog ?? 6) : 0,", content)
+        self.assertIn("if (last.state === \"clear\" && !hitting && rounds >= minRounds) {", content)
         # The NPC's answer is read off the wire when the server sends one, so
         # the log carries the popup's own words. The client can draw the popup
         # by itself, so the touch does not fail on a silent server: the answer
@@ -659,7 +781,6 @@ class ExtensionServerTest(unittest.TestCase):
             {"macro": "thien_long_hard", "label": "Khó", "times": 5},
             {"macro": "thien_long_easy", "label": "Dễ", "times": 5},
         ], flows["thien_long_pipeline"]["stages"])
-        self.assertNotIn("stages", flows["thien_long_hard"])
         self.assertNotIn("run_options", flows["thien_long_pipeline"])
         self.assertIn("Number(stage.times ?? macro.times ?? 1)", content)
         # One count box per stage; the run button sends every stage's count.
@@ -707,11 +828,21 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("if (exhausted.has(id)) continue;", content)
         # A door that leaves us standing beside it is tried again a tile or two
         # to either side (user, 2026-09-23: 84,60 stopped us at 82,57).
-        self.assertIn("const nudgeThrough = async () => {", content)
+        self.assertIn("const nudgeThrough = async ({ doorsOnly = false } = {}) => {", content)
+        # Also tried first when the door is already on screen (2026-09-23).
         self.assertEqual(3, content.count("const through = await nudgeThrough();"))
-        # ...clicked on the main screen, where the camera keeps us centred and
-        # the world is drawn at 2x, not on the Map (still too far off there).
-        self.assertIn("0.5 + ((tile.x + 0.5) * unit - me.x) * worldScale / screenW", content)
+        self.assertIn("const through = await nudgeThrough({ doorsOnly: true });", content)
+        # ...clicked on the main screen, where the camera keeps us centred (up
+        # to the map's edges) and the world is drawn at 2x, not on the Map.
+        self.assertIn("0.5 + (point.x - eye.x) * worldScale / screenW", content)
+        self.assertIn("const onScreen = (tile, me) => screenPointOf(macro, center(tile), me,", content)
+        # An idle full-health monster the skills never reach is clicked on the
+        # main screen once - made the target, walked up to - before it is
+        # given up on (Cổ Mộ boss 2, 2026-09-23).
+        self.assertIn("if (aim && clearOfHud(aim)) {", content)
+        self.assertIn("approached.add(fresh[0].id);", content)
+        self.assertIn("minRounds: Number(step.min_rounds ?? (step.click_boss ? 12 : 0)),", content)
+        self.assertIn("if (bossAt && !hitting && Date.now() - bossClickedAt >= retargetMs && latestWorld?.me) {", content)
         self.assertIn("const tiles = [...doors.slice(1), goal];", content)
         # A click under our own panel still reaches the game.
         self.assertIn("hit && panel.contains(hit)", content)
@@ -732,7 +863,18 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("if (latestWorld?.mapId === mapBefore) mapMark = mapSwitchedAt;", content)
         # Between runs the pipeline clears the dungeon's progress - once out of
         # it, never before the first run.
-        self.assertIn("if (index > 0) await runInstanceReset(token, macro, flow);", content)
+        self.assertIn("let resetDone = index === 0;", content)
+        # The client's own 3 s "progress cleared" box must be gone before the
+        # next run's first click.
+        self.assertIn("await domWait(token, Number(macro.reset_message_seconds ?? 4));", content)
+        self.assertIn("resetDone = true;", content)
+        # A run cut off by a dropped connection (1006) waits for the game to
+        # log in again and picks up where we stand - never after a stop or a
+        # guard close (user, 2026-09-23).
+        self.assertIn("error.socketClosed = { code: Number(socketEvent.code)", content)
+        self.assertIn("(macro.resume_close_codes || [1006]).map(Number)", content)
+        self.assertIn("await awaitReconnect(token, macro, flow, closed);", content)
+        self.assertIn("(latestWorld?.mapLoadedAt || 0) > openedAt && latestWorld?.mapId != null", content)
         # One bell at the end, not after every run in the pipeline.
         self.assertIn("finish_chime: false", content)
 

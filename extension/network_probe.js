@@ -56,6 +56,7 @@
           clean: Boolean(event.wasClean),
         });
         dumpTraceNow("20s trước khi đóng kết nối", Date.now() - 20000);
+        dumpCloseCause(Date.now() - 20000);
       });
       tapGameTraffic(socket);
       return socket;
@@ -119,7 +120,7 @@
 
   const world = {
     messages: 0, frames: 0, desync: 0, badSegments: 0, firstBytes: "",
-    mapId: null, mapInstanceId: -1, mapChangedAt: 0,
+    mapId: null, mapInstanceId: -1, mapChangedAt: 0, mapLoadedAt: 0,
     me: null, meMoving: false, meMovedAt: 0,
     creatures: new Map(),              // instanceId -> { x, y, hp (0-200), state, name }
     npcIds: new Set(),                 // creatures the server flags as functional NPCs
@@ -276,6 +277,13 @@
   // packets we do not decode (e.g. script driven): drop the old map's units.
   function onMapLoaded() {
     if (Date.now() - world.mapChangedAt < 5000) return;
+    // Which packet moved us, when it was none we decode (Hà Đông dễ, 2026-09-23
+    // 20:49: a second run stood at the door 24,20 and came back "map ?" with no
+    // unit around). Opcodes only, so the whole 6 s fit in one log line.
+    const from = Date.now() - 6000;
+    const lines = trace.filter((item) => item.at >= from && !(item.out && item.opcode === OP_MOVE_CLIENT))
+      .map((item) => `${item.at - from}ms ${item.out ? ">" : "<"}${item.opcode}(${item.length})`);
+    remember({ type: "map_trace", message: `nạp map không qua gói đổi map (map cũ ${world.mapId}): ${lines.slice(-22).join(" | ")}` });
     world.mapId = null;
     world.mapChangedAt = Date.now();
     world.creatures.clear();
@@ -386,6 +394,26 @@
     remember({ type: "switch_trace", message: `${reason}: ${lines.join(" | ")}` });
   }
 
+  // Why the game dropped us (Hà Đông, 2026-09-23: three 1006 closes, one with
+  // no flow running). The full trace is all fight packets and gets cut at 500
+  // characters, so this line keeps what can explain a kick: every packet WE
+  // sent but our position, the anti-bot challenges (2038) and our answers
+  // (2039), and anything the server said in words.
+  function dumpCloseCause(from) {
+    const sent = trace.filter((item) => item.at >= from && item.out && item.opcode !== 105)
+      .map((item) => `${item.at - from}ms >${item.opcode} ${item.hex}`);
+    const challenges = trace.filter((item) => item.at >= from && !item.out && item.opcode === 2038)
+      .map((item) => `${item.at - from}ms <2038`);
+    const said = [...world.replies.filter((reply) => !reply.ok), ...world.dialogs]
+      .filter((item) => item.at >= from)
+      .map((item) => `${item.at - from}ms "${item.message}"`);
+    remember({
+      type: "close_cause",
+      message: `gửi đi: ${sent.slice(-12).join(" | ") || "không"}; `
+        + `2038: ${challenges.join(" | ") || "không"}; server báo: ${said.join(" | ") || "không"}`,
+    });
+  }
+
   function dumpTraceLater(reason) {
     const from = Date.now() - 4000;
     if (traceDumpAt > from) return;       // one dump already covers this click
@@ -404,7 +432,11 @@
     try {
       if (outgoing) {
         if (opcode === OP_MOVE_CLIENT) readOwnMove(reader);
-        else if (opcode === OP_LOADING_FINISHED || opcode === OP_LOADING_FINISHED1) onMapLoaded();
+        else if (opcode === OP_LOADING_FINISHED || opcode === OP_LOADING_FINISHED1) {
+          // The client's own word that the new map is drawn and takes clicks.
+          world.mapLoadedAt = Date.now();
+          onMapLoaded();
+        }
         else if (opcode === OP_SKILL_ATTACK) {
           reader.skip(9);              // time, x, y, dir
           world.aim = { target: reader.i32(), at: Date.now() };
