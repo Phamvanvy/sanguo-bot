@@ -669,10 +669,11 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual([[448], [432, 433], [432, 433]],
                          [step["maps"] for step in easy["entry_steps"] + easy["route_steps"]])
         self.assertIn("planned.findIndex((step) => (step.maps || []).map(Number).includes(here))", content)
-        # A door already on screen is clicked on the main screen - no Map, so no
-        # Map X landing on C.Phúc - with the camera stopped at the map's edges
-        # (a map narrower than the screen is drawn centred).
-        self.assertIn("step.screen_door_tiles ?? macro.screen_door_tiles ?? 10", content)
+        # Doors go by the Map (user, 2026-09-24: a player stood on Thiên Long's
+        # door and took the screen click); screen_door_tiles can turn the
+        # screen click back on. The camera stops at the map's edges (a map
+        # narrower than the screen is drawn centred).
+        self.assertIn("step.screen_door_tiles ?? macro.screen_door_tiles ?? -1", content)
         self.assertIn("(size <= view ? size / 2", content)
         # Going to another map closes the Map by itself (user, 2026-09-23): its X
         # is then never clicked, or it would open C.Phúc / H.Trang beneath it.

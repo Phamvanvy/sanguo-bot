@@ -1868,14 +1868,17 @@
       }
       return null;
     };
-    // A door already on screen is clicked right there, not through the Map: a
-    // Map that did not open leaves its X click on whatever button sits below
-    // it - C.Phúc on a 512-wide map - and Cầu phúc then swallows every click
-    // after it (Hà Đông 448, 2026-09-23, run after run).
+    // A door already on screen could be clicked right there instead of through
+    // the Map (a Map that did not open once left its X on C.Phúc - Hà Đông 448,
+    // 2026-09-23). Off by default: a player standing on the door takes that
+    // click and opens their panel (Thiên Long lobby 55,16, 2026-09-24), so
+    // doors go by the Map, like the user does (user, 2026-09-24). openMap now
+    // waits for the map to load, and a stray Cầu phúc is closed on the way.
+    // screen_door_tiles: n turns it back on within n tiles.
     if (step.portal) {
       const start = tileOf(await currentPosition(token));
       const away = Math.max(Math.abs(start.x - cellX), Math.abs(start.y - cellY));
-      if (away <= Number(step.screen_door_tiles ?? macro.screen_door_tiles ?? 10)) {
+      if (away <= Number(step.screen_door_tiles ?? macro.screen_door_tiles ?? -1)) {
         const through = await nudgeThrough({ doorsOnly: true });
         if (through) return through;
       }
