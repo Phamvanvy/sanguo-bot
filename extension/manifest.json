@@ -7,7 +7,8 @@
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "http://127.0.0.1:8765/*",
-    "https://play.minhchauh5.com/*"
+    "https://play.minhchauh5.com/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"

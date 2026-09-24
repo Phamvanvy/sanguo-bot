@@ -640,18 +640,132 @@
     }
   }
 
+  // "Vứt bỏ" as the game draws it: its dark letters (red < 135) on the
+  // yellow button, cut from the user's screenshot (2026-09-24) in a 1918x959
+  // game canvas. One hex string per pixel row, 94 x 22.
+  const VUT_BO_TEXT = {
+    width: 94,
+    rows: [
+      "f00078078003000380000fc0", "f0007807800f0003800001e0", "f800f00e000f0003800001e0",
+      "7800f004000f0003800003c0", "7c01e000000f000380000000", "3c01e000001f0003c0000000",
+      "3c03c1e0ffbfe003ff801fe0", "3e03c1e0ff3fe003ffe0fff0", "1e03c1e0f31f0003f3e0fdf8",
+      "1e0381e0f30f0003e1f1f0f8", "1f0701e0f30f0003c0f1f03c", "0f0f01e0fe0f0003c0f3e03c",
+      "078f01e0fc0f000380f3c03c", "078e01e0f00f000380f3c03c", "079e01e0f00f000380f3c03c",
+      "039e01e0f00f000380f3c03c", "03fc01e0f00f0003c0f3e07c", "03fc01e1f00f0003c1e1f0f8",
+      "01f801f3f00f0003e1e0f9f8", "00f801fff00fe003ffe0fff8", "00f800fff007e003ff803fe0",
+      "00f0007e7003c0033f001fc0",
+    ],
+  };
+  // The canvas size the text above was cut at; any other size is scaled to it.
+  const TEXT_CANVAS = [1918, 959];
+
+  // The game canvas as pixels, scaled to TEXT_CANVAS. Read straight off the
+  // canvas; if the page will not give its pixels (blank or tainted), from a
+  // screenshot of the tab instead.
+  async function readGameScreen() {
+    const [width, height] = TEXT_CANVAS;
+    const board = document.createElement("canvas");
+    board.width = width;
+    board.height = height;
+    const context = board.getContext("2d", { willReadFrequently: true });
+    const screen = document.querySelector("#screen");
+    if (!screen) throw new Error("Không thấy canvas #screen của game");
+    try {
+      context.drawImage(screen, 0, 0, width, height);
+      const image = context.getImageData(0, 0, width, height);
+      let lit = 0;
+      for (let i = 0; i < image.data.length; i += 4 * 97) if (image.data[i] || image.data[i + 1] || image.data[i + 2]) lit += 1;
+      if (lit > 100) return { image, source: "canvas" };
+    } catch (_) { /* tainted: fall through to a screenshot */ }
+    const { dataUrl } = await send({ type: "capture" });
+    const shot = await createImageBitmap(await (await fetch(dataUrl)).blob());
+    const rect = screen.getBoundingClientRect();
+    const scale = shot.width / innerWidth;
+    context.drawImage(shot, rect.left * scale, rect.top * scale, rect.width * scale, rect.height * scale, 0, 0, width, height);
+    return { image: context.getImageData(0, 0, width, height), source: "ảnh chụp tab" };
+  }
+
+  // Where a text's dark letters best overlap the dark pixels on screen, inside
+  // area ([x0, y0, x1, y1], canvas fractions). Score = overlap / union of the
+  // two masks, 1 for a perfect match; the popup's plain brown panel scores ~0.2.
+  function findText(image, text, area) {
+    const { width, height, data } = image;
+    const dark = new Uint8Array(width * height);
+    for (let i = 0; i < dark.length; i += 1) dark[i] = data[i * 4] < 135 ? 1 : 0;
+    // Summed dark counts, so a window's total costs four lookups.
+    const sums = new Int32Array((width + 1) * (height + 1));
+    for (let y = 0; y < height; y += 1) {
+      let row = 0;
+      for (let x = 0; x < width; x += 1) {
+        row += dark[y * width + x];
+        sums[(y + 1) * (width + 1) + x + 1] = sums[y * (width + 1) + x + 1] + row;
+      }
+    }
+    const letters = [];
+    text.rows.forEach((hex, y) => {
+      for (let x = 0; x < text.width; x += 1) {
+        if ((parseInt(hex[x >> 2], 16) >> (3 - (x & 3))) & 1) letters.push(y * width + x);
+      }
+    });
+    const textH = text.rows.length;
+    const inWindow = (x, y) => sums[(y + textH) * (width + 1) + x + text.width] - sums[y * (width + 1) + x + text.width]
+      - sums[(y + textH) * (width + 1) + x] + sums[y * (width + 1) + x];
+    const scoreAt = (x, y) => {
+      const around = inWindow(x, y);
+      if (around < letters.length / 2) return 0;       // cannot reach 0.5
+      const base = y * width + x;
+      let both = 0;
+      for (const at of letters) both += dark[base + at];
+      return both / (letters.length + around - both);
+    };
+    const [x0, y0] = [Math.round(area[0] * width), Math.round(area[1] * height)];
+    const [x1, y1] = [Math.round(area[2] * width) - text.width, Math.round(area[3] * height) - textH];
+    let best = { x: 0, y: 0, score: 0 };
+    for (let y = y0; y <= y1; y += 2) {
+      for (let x = x0; x <= x1; x += 2) {
+        const score = scoreAt(x, y);
+        if (score > best.score) best = { x, y, score };
+      }
+    }
+    // Coarse steps of 2, then every pixel around the best one.
+    const coarse = best;
+    for (let y = coarse.y - 2; y <= coarse.y + 2; y += 1) {
+      for (let x = coarse.x - 2; x <= coarse.x + 2; x += 1) {
+        if (x < 0 || y < 0 || x > width - text.width || y > height - textH) continue;
+        const score = scoreAt(x, y);
+        if (score > best.score) best = { x, y, score };
+      }
+    }
+    return { point: [(best.x + text.width / 2) / width, (best.y + textH / 2) / height], score: best.score };
+  }
+
+  // Sort, open the first item, "Vứt bỏ", confirm - as before, except that
+  // "Vứt bỏ" is found by its text: it moves with the item's kind (the 4th
+  // button for equipment, under Mặc / Nâng cấp / Siêu cấp sao - user,
+  // 2026-09-24), so a fixed point hit the wrong button.
   async function runDiscardItems(token, macro) {
     const maxCycles = Number(macro.max_cycles || 0);
+    const area = macro.discard_search_area || [0.64, 0.15, 0.82, 0.92];
+    const minScore = Number(macro.discard_min_score ?? 0.65);
     for (let cycle = 0; maxCycles <= 0 || cycle < maxCycles; cycle += 1) {
       await domClick(token, macro.sort_point || [0.796, 0.919]);
-      await domDelay(macro.sort_delay_seconds || 0.9);
+      await domWait(token, Number(macro.sort_delay_seconds || 0.9));
       await domClick(token, macro.first_item_point || [0.342, 0.229]);
-      await domDelay(macro.detail_delay_seconds || 0.7);
-      await domClick(token, macro.discard_point || [0.710, 0.502]);
-      await domDelay(macro.confirm_delay_seconds || 0.7);
+      await domWait(token, Number(macro.detail_delay_seconds || 0.7));
+      const { image, source } = await readGameScreen();
+      const found = findText(image, VUT_BO_TEXT, area);
+      appendDiagnostic("discard_find", {
+        flow: "discard_items",
+        message: `Vứt bỏ: ${source}, điểm ${found.score.toFixed(2)} tại ${found.point.map((v) => v.toFixed(3)).join(",")}`,
+      });
+      if (found.score < minScore) {
+        throw new Error(`Không thấy nút "Vứt bỏ" (giống nhất ${Math.round(found.score * 100)}%) - popup món đồ chưa mở?`);
+      }
+      await domClick(token, found.point);
+      await domWait(token, Number(macro.confirm_delay_seconds || 0.7));
       await domClick(token, macro.confirm_point || [0.685, 0.631]);
       updateDomFlow("discard_items", `Đã vứt: ${cycle + 1} vật phẩm`);
-      await domDelay(macro.refresh_delay_seconds || 1);
+      await domWait(token, Number(macro.refresh_delay_seconds || 1));
     }
   }
 
@@ -1250,6 +1364,12 @@
     const clicks = [];
     const mapBefore = latestWorld?.mapId ?? "?";
     const trail = () => `đã bấm: ${clicks.map(describeClick).join(" | ")}`;
+    // A door refused while "in combat" reloads the map, and the client only
+    // says so once it is done: H.Trang clicked meanwhile does nothing and Chọn
+    // NV never opens (Hà Đông 450, 2026-09-24 10:18: clicked at :25.4, loaded
+    // at :26.0). So give a reload a moment to show, then let the map settle.
+    await domWait(token, Number(switcher.settle_seconds ?? 2));
+    await waitMapReady(token, macro);
     // Opens Chọn NV and proves it by the character list the game sends.
     const openPicker = async () => {
       const listedBefore = latestWorld?.actorsAt || 0;
@@ -1377,9 +1497,16 @@
   // that began the second the exit put us on map 448 stuck there for minutes).
   // Returns when it clicked, for closeMap.
   async function openMap(token, macro, clicks) {
-    // Ready = the client said LOADING_FINISHED for the new map, and a moment
-    // since: 4 s after the switch alone was not enough (Hà Đông 448, 21:57:
-    // two Map clicks right after exit + reset did nothing, C.Phúc again).
+    await waitMapReady(token, macro);
+    const openedAt = Date.now();
+    clicks.push(await domClick(token, macro.map_button_point || [0.85, 0.07]));
+    return openedAt;
+  }
+
+  // Ready = the client said LOADING_FINISHED for the new map, and a moment
+  // since: 4 s after the switch alone was not enough (Hà Đông 448, 21:57:
+  // two Map clicks right after exit + reset did nothing, C.Phúc again).
+  async function waitMapReady(token, macro) {
     if (mapSwitchedAt) {
       const deadline = Date.now() + Number(macro.map_load_wait_seconds ?? 20) * 1000;
       while (!((latestWorld?.mapLoadedAt || 0) >= mapSwitchedAt - 1000) && Date.now() < deadline) {
@@ -1389,9 +1516,6 @@
     const loadedAt = Math.max(mapSwitchedAt, latestWorld?.mapLoadedAt || 0);
     const readyAt = loadedAt + Number(macro.map_ready_seconds ?? 3) * 1000;
     if (Date.now() < readyAt) await domWait(token, (readyAt - Date.now()) / 1000);
-    const openedAt = Date.now();
-    clicks.push(await domClick(token, macro.map_button_point || [0.85, 0.07]));
-    return openedAt;
   }
 
   // The Map's X - but not once the map has changed since it opened: going to

@@ -37,6 +37,13 @@ async function apiRequest(path, options = {}) {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   void (async () => {
+    // A picture of the game tab, for finding a button by its text when the
+    // page will not hand over its canvas pixels. Only the tab on show can be
+    // captured, and a picture of another tab would find the wrong things.
+    if (message.type === "capture") {
+      if (!sender.tab?.active) throw new Error("Tab game phải đang mở trên màn hình để chụp");
+      return { dataUrl: await chrome.tabs.captureVisibleTab(sender.tab.windowId, { format: "png" }) };
+    }
     if (message.type !== "api") throw new Error("Unknown extension message");
     if (!sender.tab) throw new Error("API request is not associated with a browser tab");
     const context = await sessionContext(message, sender);

@@ -381,7 +381,9 @@ class ExtensionServerTest(unittest.TestCase):
              [99, 4], [93, 6], [69, 23], [79, 21]],
             [step.get("goto") for step in route],
         )
-        self.assertEqual(96, route[2]["monster_radius"])
+        # Wide enough for the "Xe đâm húc" ~102 px from dễ's door (773), short
+        # of khó's statue mid-room at 155 px (2026-09-24).
+        self.assertEqual([128, 128], [route[2]["monster_radius"], route[2]["idle_monster_radius"]])
         # Both clear-before-door steps sweep idle adds out to 250 px: a "Xe đâm
         # húc" at 175-210 px was left and shut door 44,10 (user, 2026-09-23).
         self.assertEqual([250, 250], [route[i]["idle_monster_radius"] for i in (0, 5)])
@@ -578,6 +580,21 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("async function runWarehouseTake", content)
         self.assertIn("macro.amount_confirm_point != null", content)
 
+    def test_discard_items_finds_vut_bo_by_its_text(self):
+        # "Vứt bỏ" moves with the item's kind (user, 2026-09-24): the UI flow
+        # stays, but that one button is found by its text on screen.
+        macro = extension_server.load_config()["activity_macros"]["discard_items"]
+        self.assertNotIn("discard_point", macro)
+        for key in ("sort_point", "first_item_point", "confirm_point"):
+            self.assertEqual(2, len(macro[key]), key)
+        self.assertEqual(4, len(macro["discard_search_area"]))
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const found = findText(image, VUT_BO_TEXT, area);", content)
+        self.assertIn("if (found.score < minScore) {", content)
+        self.assertIn("await domClick(token, found.point);", content)
+        background = (PROJECT_ROOT / "extension" / "background.js").read_text(encoding="utf-8")
+        self.assertIn('if (message.type === "capture") {', background)
+
     def test_default_catalog_contains_ha_dong_dungeon_routes_and_pipeline(self):
         """One Hà Đông card runs n hard + m easy, like Thiên Long trận."""
         flows = {flow["id"]: flow for flow in flow_catalog()}
@@ -587,15 +604,15 @@ class ExtensionServerTest(unittest.TestCase):
         for flow_id in ("ha_dong_hard", "ha_dong_easy"):
             self.assertNotIn(flow_id, flows)
             self.assertEqual("dungeon_route", macros[flow_id]["runner"])
-        self.assertEqual([[77, 16], [57, 114], [19, 25], [30, 13], [22, 8], [66, 22], [59, 14]],
+        self.assertEqual([[77, 16], [57, 114], [19, 25], [30, 13], [30, 13], [22, 8], [66, 22], [59, 14]],
                          [step["goto"] for step in hard["route_steps"]])
-        self.assertEqual(5, sum(1 for step in hard["route_steps"] if "fight_seconds" in step))
+        self.assertEqual(6, sum(1 for step in hard["route_steps"] if "fight_seconds" in step))
         # The three camps end once nothing attacks us: the camp's leader dead is
         # enough, idle soldiers are left standing. The inner fight still clears.
         # The monster by the inner door (25,9) is cleared idle ones included.
-        self.assertEqual([True, True, True, None, None],
+        self.assertEqual([True, True, True, None, None, None],
                          [step.get("ignore_idle_monsters") for step in hard["route_steps"] if "fight_seconds" in step])
-        self.assertTrue(hard["route_steps"][4]["portal"])
+        self.assertTrue(hard["route_steps"][5]["portal"])
         self.assertEqual([992, 992], hard["route_steps"][0]["map_size"])
         # Easy shares the inner fight and the way out at 59,14 (map data 59,12).
         # Hà Đông does not get stuck like Thiên Long, so no character switch.
@@ -640,7 +657,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual(1, content.count("macro.map_button_point || [0.85, 0.07]"))
         # Each step names its map(s); the map we stand on picks the first step
         # (user, 2026-09-23): in the quan nha a run starts at its fight.
-        self.assertEqual([[448], [448], [450, 449], [450, 449], [450, 449], [450, 449], [450, 449], [432, 433], [432, 433]],
+        self.assertEqual([[448], [448], [450, 449], [450, 449], [450, 449], [450, 449], [450, 449], [450, 449], [432, 433], [432, 433]],
                          [step["maps"] for step in hard["entry_steps"] + hard["route_steps"]])
         self.assertEqual([[448], [432, 433], [432, 433]],
                          [step["maps"] for step in easy["entry_steps"] + easy["route_steps"]])
@@ -750,7 +767,15 @@ class ExtensionServerTest(unittest.TestCase):
         # The inner door shut with nothing left alive: log the same character in
         # again, then retry (user, 2026-09-23). One login, no spare character.
         hard = macros["ha_dong_hard"]
-        inner_door = hard["route_steps"][4]
+        # Always switch at 30,13 and clear once more before the door: a door
+        # refused reloads the map, and Chọn NV will not open while it loads
+        # (user, 2026-09-24).
+        relog = hard["route_steps"][4]
+        self.assertEqual([30, 13], relog["goto"])
+        self.assertTrue(relog["switch_actor_before"])
+        self.assertTrue(relog["fight_seconds"])
+        self.assertIn("await waitMapReady(token, macro);\n    // Opens Chọn NV", content)
+        inner_door = hard["route_steps"][5]
         self.assertEqual([22, 8], inner_door["goto"])
         self.assertTrue(inner_door["switch_actor_if_stuck"])
         self.assertFalse(hard["actor_switch"]["via_spare"])

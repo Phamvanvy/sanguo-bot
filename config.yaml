@@ -299,9 +299,11 @@ activity_macros:
       #   idle_monster_radius: 250 phòng 352x256 px, đứng ở 20,18 góc xa nhất ~221 px
       #                            nên phải bằng monster_radius mới quét hết phòng.
       # Vừa vào phòng boss 1 có một con quái ở ngay cửa: đánh tại chỗ cho xong con
-      # đó rồi mới ra giữa phòng (user, 2026-09-23). Chỉ quét quanh cửa (96 px,
-      # phòng rộng 352) để không kéo cả xe / tượng giữa phòng - việc của bước sau.
-      - {label: "Đánh quái ở cửa phòng boss 1 (tại chỗ)", map_size: &co_mo_boss1 [352, 256], maps: &co_mo_boss1_maps [1141, 773], fight_seconds: 60, monster_radius: 96, idle_monster_radius: 96}
+      # đó rồi mới ra giữa phòng (user, 2026-09-23). Chỉ quét quanh cửa (128 px,
+      # phòng rộng 352) để không kéo cả tượng giữa phòng - việc của bước sau.
+      # Bản dễ (773) con ở cửa là "Xe đâm húc" cách ~102 px: 96 px bỏ sót nó,
+      # đánh 0 vòng rồi đi (2026-09-24 16:59, 17:05); tượng bản khó cách 155 px.
+      - {label: "Đánh quái ở cửa phòng boss 1 (tại chỗ)", map_size: &co_mo_boss1 [352, 256], maps: &co_mo_boss1_maps [1141, 773], fight_seconds: 60, monster_radius: 128, idle_monster_radius: 128}
       - {label: "Đánh boss 1 (20,18)", goto: [20, 18], map_size: *co_mo_boss1, maps: *co_mo_boss1_maps, fight_seconds: 180, idle_monster_radius: 250, clear_room: true, ignore_monster_names: ["Lữ Bố"]}
       - {label: "Ra cửa 31,24", goto: [31, 24], map_size: *co_mo_boss1, maps: *co_mo_boss1_maps, portal: true}
       - {label: "Dọn quái trước cửa boss 2 (90,30)", goto: [90, 30], map_size: *co_mo_main, maps: *co_mo_main_maps, fight_seconds: 180, idle_monster_radius: 250}
@@ -496,7 +498,12 @@ activity_macros:
       # 30,13 cách 24,8 sáu ô (~60 px trên Map).
       - {label: "Dọn quái trước cửa trong (30,13)", goto: [30, 13], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, fight_seconds: 90}
       # Hết quái mà vẫn dính hiệu ứng bị đánh thì cửa không cho vào; chỉ vào
-      # lại nhân vật (chính nhân vật đó) mới hết (user, 2026-09-23).
+      # lại nhân vật (chính nhân vật đó) mới hết (user, 2026-09-23). Nên LUÔN
+      # đổi NV ngay tại 30,13 rồi dọn lại một lượt, xong mới vào cửa - không
+      # đâm vào cửa trước: cửa từ chối thì game tải lại map, đổi NV giữa lúc
+      # đó thì màn Chọn NV không mở (user, 2026-09-24 10:18).
+      - {label: "Đổi NV rồi dọn lại (30,13)", goto: [30, 13], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, switch_actor_before: true, fight_seconds: 90}
+      # switch_actor_if_stuck còn giữ phòng khi vẫn kẹt.
       - {label: "Vào phó bản trong (22,8)", goto: [22, 8], map_size: *ha_dong_outer, maps: *ha_dong_outer_maps, portal: true, switch_actor_if_stuck: true}
       - &ha_dong_inner_fight {label: "Đánh ở 66,22", goto: [66, 22], map_size: &ha_dong_inner [608, 464], maps: &ha_dong_inner_maps [432, 433], fight_seconds: 240}
       # Lối ra trong quan nha ở 59,14 (user, 2026-09-23); dữ liệu map 432 ghi
@@ -551,7 +558,12 @@ activity_macros:
     # Tọa độ theo viewport của tab game như các flow không-chuột khác.
     sort_point: [0.796, 0.919]
     first_item_point: [0.342, 0.229]
-    discard_point: [0.710, 0.502]
+    # Nút "Vứt bỏ" KHÔNG có tọa độ cố định: nó đổi chỗ theo loại đồ (trang bị:
+    # nút thứ 4, dưới Mặc / Nâng cấp / Siêu cấp sao - user, 2026-09-24). Flow
+    # tìm chữ "Vứt bỏ" trên màn hình trong vùng cột nút của popup (phân số
+    # canvas: x0, y0, x1, y1) rồi bấm vào đó; giống dưới 0.65 thì dừng.
+    discard_search_area: [0.64, 0.15, 0.82, 0.92]
+    discard_min_score: 0.65
     confirm_point: [0.685, 0.631]
     sort_delay_seconds: 0.9
     detail_delay_seconds: 0.7
