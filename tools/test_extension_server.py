@@ -311,7 +311,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("frame[0] = 0x55;", probe)
         self.assertIn("frame[1] = 0x41;", probe)
         self.assertIn("const total = 8 + body.reduce(", probe)
-        self.assertIn('[["i32", serial]]', content)
+        self.assertIn('[["i32", serial], ...fields]', content)
         # The game's answers: 535 done, ERROR (-1) carries the refusal text.
         self.assertIn("const OP_INSTANCE_CLEAR_SERVER = 535;", probe)
         self.assertIn("const OP_ERROR = 0xffff;", probe)
@@ -580,9 +580,9 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("async function runWarehouseTake", content)
         self.assertIn("macro.amount_confirm_point != null", content)
 
-    def test_dungeon_tour_runs_ticked_pipelines_and_travels_by_world_map(self):
+    def test_dungeon_tour_runs_ticked_pipelines_and_teleports_to_lobbies(self):
         # user, 2026-09-26: tick Cổ Mộ / Thiên Long / Hà Đông, run them one after
-        # another; empty the Trang bị tab, then T.Giới Map to the next lobby.
+        # another; empty the Trang bị tab, then T.Giới Map's teleport to the next lobby.
         macros = extension_server.load_config()["activity_macros"]
         tour = macros["dungeon_tour"]
         self.assertEqual("dungeon_tour", tour["runner"])
@@ -594,8 +594,11 @@ class ExtensionServerTest(unittest.TestCase):
             self.assertIn(stop["lobby_map"], stop["maps"])
         self.assertEqual(macros["discard_items"]["confirm_point"], tour["discard"]["confirm_point"])
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
-        for key in ("co_mo", "thien_long", "ha_dong"):
-            self.assertIn(f"    {key}: {{", content)
+        # T.Giới Map's own teleport packet, not a click on the place's name.
+        self.assertIn("const OP_WORLD_TELEPORT = 615;", content)
+        self.assertIn('sendGameCommand(token, tour, OP_WORLD_TELEPORT, [["i32", lobby]])', content)
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        self.assertIn("opcode === OP_WORLD_TELEPORT_SERVER", probe)
         self.assertIn('"dungeon_tour",', content)
         self.assertIn('if (flow.runner === "dungeon_tour") return renderTourCard(flow, running);', content)
         self.assertIn("await emptyEquipmentTab(token, macro, flow);", content)

@@ -93,6 +93,7 @@
   const OP_LOADING_FINISHED1 = 2452;
   // Answers to a command we send ourselves (see sendGamePacket below).
   const OP_INSTANCE_CLEAR_SERVER = 535;  // 清除所有副本进度 done: int serial
+  const OP_WORLD_TELEPORT_SERVER = 617;  // T.Giới Map teleport done: int serial
   const OP_ERROR = 0xffff;               // OpCode.ERROR (-1): int serial | short type | UTF message
   // Who we are and who else is on the account, so a flow never has to be told
   // which card in "Chọn NV" to click. Both shapes are the ones already ported
@@ -479,7 +480,7 @@
         reader.i32();
         // Keep a few: several targets can fail between two fight checks.
         world.attackFails = [...world.attackFails.slice(-19), { reason, target: reader.i32(), at: Date.now() }];
-      } else if (opcode === OP_INSTANCE_CLEAR_SERVER) {
+      } else if (opcode === OP_INSTANCE_CLEAR_SERVER || opcode === OP_WORLD_TELEPORT_SERVER) {
         world.replies = [...world.replies.slice(-9),
           { serial: reader.i32(), ok: true, type: opcode, message: "", at: Date.now() }];
       } else if (opcode === OP_ERROR) {
