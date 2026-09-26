@@ -151,6 +151,14 @@
     }
   }
 
+  // The screen stays on from a flow's start to its end (user, 2026-09-26):
+  // background.js holds chrome.power's display keep-awake for this tab.
+  function keepScreenOn(on) {
+    send({ type: "keep-awake", on }).catch((error) => {
+      appendDiagnostic("keep_awake_error", { message: String(error?.message || error) });
+    });
+  }
+
   function stopTimerKeepAlive() {
     if (!timerKeepAlive) return;
     const state = timerKeepAlive;
@@ -2375,6 +2383,7 @@
     void (async () => {
       try {
         await startTimerKeepAlive();
+        keepScreenOn(true);
         if (flow === "blessing") await runBlessing(token, macro);
         else if (flow === "code_redeem" || flow === "mch5exp_redeem") {
           await runCodeRedeem(token, macro, flow);
@@ -2398,6 +2407,7 @@
       } finally {
         token.cancelled = true;
         stopTimerKeepAlive();
+        keepScreenOn(false);
         appendDiagnostic("flow_end", { flow, state: domFlow.state, message: domFlow.message });
         if (domToken === token) domToken = null;
         showStatus(domFlow);

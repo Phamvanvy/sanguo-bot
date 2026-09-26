@@ -35,8 +35,35 @@ async function apiRequest(path, options = {}) {
   return data;
 }
 
+// Keeps the screen on while any tab runs a flow (user, 2026-09-26): a
+// display that sleeps mid-run can stop the game drawing and taking clicks.
+// Tabs holding it are kept in session storage, since this worker can be
+// stopped and started again between two messages.
+const AWAKE_KEY = "sanguo-awake-tabs";
+
+async function holdAwake(tabId, on) {
+  const stored = await chrome.storage.session.get(AWAKE_KEY);
+  const tabs = new Set(stored[AWAKE_KEY] || []);
+  if (on) tabs.add(tabId);
+  else tabs.delete(tabId);
+  await chrome.storage.session.set({ [AWAKE_KEY]: [...tabs] });
+  if (tabs.size) chrome.power.requestKeepAwake("display");
+  else chrome.power.releaseKeepAwake();
+  return { awake: tabs.size > 0 };
+}
+
+// A tab closed or reloaded mid-flow never says it is done.
+chrome.tabs.onRemoved.addListener((tabId) => { void holdAwake(tabId, false); });
+chrome.tabs.onUpdated.addListener((tabId, change) => {
+  if (change.status === "loading") void holdAwake(tabId, false);
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   void (async () => {
+    if (message.type === "keep-awake") {
+      if (!sender.tab?.id) throw new Error("keep-awake is not associated with a browser tab");
+      return holdAwake(sender.tab.id, Boolean(message.on));
+    }
     // A picture of the game tab, for finding a button by its text when the
     // page will not hand over its canvas pixels. Only the tab on show can be
     // captured, and a picture of another tab would find the wrong things.

@@ -580,6 +580,17 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("async function runWarehouseTake", content)
         self.assertIn("macro.amount_confirm_point != null", content)
 
+    def test_flows_keep_the_screen_on_until_they_end(self):
+        # user, 2026-09-26: the display must not sleep before a flow is done.
+        manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertIn("power", manifest["permissions"])
+        background = (PROJECT_ROOT / "extension" / "background.js").read_text(encoding="utf-8")
+        self.assertIn('chrome.power.requestKeepAwake("display")', background)
+        self.assertIn("chrome.power.releaseKeepAwake()", background)
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("keepScreenOn(true);", content)
+        self.assertIn("keepScreenOn(false);", content)
+
     def test_screen_door_click_skips_tiles_under_a_unit(self):
         # Thiên Long lobby 2026-09-24: the screen click on door 56,15 hit
         # "Thái Trường Trị" and its panel took every click after it.

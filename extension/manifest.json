@@ -4,7 +4,7 @@
   "name": "Sanguo Flow Controller",
   "version": "0.16.0",
   "description": "Chạy các flow nhiệm vụ Sanguo từ panel nổi trong game.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "power"],
   "host_permissions": [
     "http://127.0.0.1:8765/*",
     "https://play.minhchauh5.com/*",
