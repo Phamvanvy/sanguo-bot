@@ -550,7 +550,7 @@ activity_macros:
     # LƯU Ý: server chỉ xóa khi mình KHÔNG đứng trong phó bản
     # (player.getVMap().instance == null) - đứng ở thành/sảnh rồi hãy bấm.
     reply_seconds: 8
-  discard_items:
+  discard_items: &discard_items
     label: "Vứt đồ"
     description: "Sắp xếp rồi vứt ô đầu tiên liên tục"
     icon: "🗑"
@@ -571,6 +571,39 @@ activity_macros:
     refresh_delay_seconds: 1.0
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
+  dungeon_tour:
+    label: "Chạy liên tiếp"
+    description: "Tick phó bản; số lượt lấy từ thẻ từng phó bản; tự vứt trang bị rồi đi sảnh"
+    icon: "⇶"
+    runner: "dungeon_tour"
+    # Chạy nhiều phó bản trên cùng nhân vật (user, 2026-09-26). Phó bản của sảnh
+    # (hoặc bên trong) đang đứng chạy trước; sang phó bản khác thì: vứt hết tab
+    # Trang bị trong H.Trang -> Map -> T.Giới Map -> bấm tên nơi đó trên bản đồ
+    # thế giới -> chờ tới map sảnh. maps: map id sảnh + bên trong phó bản.
+    tour:
+      - {pipeline: "co_mo_pipeline", label: "Cổ Mộ", world_label: "co_mo", lobby_map: 768, maps: [768, 769, 770, 771, 772, 773, 1137, 1138, 1139, 1140, 1141]}
+      - {pipeline: "thien_long_pipeline", label: "Thiên Long trận", world_label: "thien_long", lobby_map: 976, maps: [976, 977, 978]}
+      - {pipeline: "ha_dong_pipeline", label: "Hà Đông", world_label: "ha_dong", lobby_map: 448, maps: [448, 449, 450, 432, 433]}
+    # Vứt trang bị: nút H.Trang, tab "Trang bị" (1765,528 trên màn 1920x1080),
+    # nút Back góc trên trái (88,165); phần vứt dùng y hệt thẻ Vứt đồ.
+    hanh_trang_point: [0.780, 0.07]
+    equip_tab_point: [0.920, 0.466]
+    bag_back_point: [0.045, 0.088]
+    discard: *discard_items
+    max_discards: 120
+    # Nút "T.Giới Map" góc dưới trái khi Map mở (ảnh user 2026-09-26), X của
+    # bản đồ thế giới (1612,135). Bản đồ thế giới chỉ cuộn lên xuống: tìm chữ
+    # tên nơi cần tới, không thấy thì kéo một chút (top -> bottom = xem phía
+    # trên) rồi tìm lại; giống dưới world_min_score thì dừng.
+    world_map_point: [0.0245, 0.953]
+    world_close_point: [0.840, 0.056]
+    world_drag_top: [0.5, 0.35]
+    world_drag_bottom: [0.5, 0.8]
+    world_min_score: 0.7
+    # Tối đa bao lâu từ lúc bấm tên nơi tới lúc đứng ở map sảnh.
+    travel_seconds: 600
+    travel_attempts: 2
+    finish_chime: true
   use_inventory_item:
     label: "Dùng vật phẩm"
     description: "Chọn ô trái hoặc ô phải rồi dùng tối đa 99 lần"

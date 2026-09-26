@@ -580,6 +580,27 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("async function runWarehouseTake", content)
         self.assertIn("macro.amount_confirm_point != null", content)
 
+    def test_dungeon_tour_runs_ticked_pipelines_and_travels_by_world_map(self):
+        # user, 2026-09-26: tick Cổ Mộ / Thiên Long / Hà Đông, run them one after
+        # another; empty the Trang bị tab, then T.Giới Map to the next lobby.
+        macros = extension_server.load_config()["activity_macros"]
+        tour = macros["dungeon_tour"]
+        self.assertEqual("dungeon_tour", tour["runner"])
+        stops = {stop["pipeline"]: stop for stop in tour["tour"]}
+        self.assertEqual({"co_mo_pipeline": 768, "thien_long_pipeline": 976, "ha_dong_pipeline": 448},
+                         {pipeline: stop["lobby_map"] for pipeline, stop in stops.items()})
+        for pipeline, stop in stops.items():
+            self.assertEqual("dungeon_pipeline", macros[pipeline]["runner"])
+            self.assertIn(stop["lobby_map"], stop["maps"])
+        self.assertEqual(macros["discard_items"]["confirm_point"], tour["discard"]["confirm_point"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        for key in ("co_mo", "thien_long", "ha_dong"):
+            self.assertIn(f"    {key}: {{", content)
+        self.assertIn('"dungeon_tour",', content)
+        self.assertIn('if (flow.runner === "dungeon_tour") return renderTourCard(flow, running);', content)
+        self.assertIn("await emptyEquipmentTab(token, macro, flow);", content)
+        self.assertIn("if (macro.until_empty) return cycle;", content)
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))

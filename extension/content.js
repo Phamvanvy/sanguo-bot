@@ -40,6 +40,7 @@
     "dungeon_route",
     "instance_reset_once",
     "dungeon_pipeline",
+    "dungeon_tour",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -241,6 +242,55 @@
 
   // A pipeline card: one count box per stage (0 skips it) and a run button, so
   // one card runs hard only, easy only, or n hard + m easy (user, 2026-09-23).
+  // A pipeline stage's count: what was typed on its card, else the default.
+  function stageTimes(flow, stage) {
+    const saved = Number(stageCounts[`${flow.id}:${stage.macro}`]);
+    return Number.isInteger(saved) && saved >= 0 ? saved : stage.times;
+  }
+
+  // Several dungeons one after another on the one character (user,
+  // 2026-09-26): a tick per pipeline card; each runs the counts typed on its
+  // own card, and the tour walks between their lobbies by T.Giới Map.
+  const TOUR_PICKS_KEY = "sanguo-tour-picks";
+  function renderTourCard(flow, running) {
+    const card = document.createElement("div");
+    card.className = "sg-flow sg-item-flow";
+    card.innerHTML = `<span></span><strong></strong><small></small><div class="sg-stage-counts"></div>`;
+    card.querySelector("span").textContent = flow.icon;
+    card.querySelector("strong").textContent = flow.label;
+    card.querySelector("small").textContent = flow.description;
+    const box = card.querySelector(".sg-stage-counts");
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(TOUR_PICKS_KEY) || "{}") || {}; } catch (_) { saved = {}; }
+    const pipelines = flows.filter((item) => item.stages?.length);
+    for (const pipeline of pipelines) {
+      const label = document.createElement("label");
+      const tick = document.createElement("input");
+      tick.type = "checkbox";
+      tick.checked = saved[pipeline.id] !== false;
+      tick.disabled = running;
+      tick.addEventListener("change", () => {
+        saved[pipeline.id] = tick.checked;
+        try { localStorage.setItem(TOUR_PICKS_KEY, JSON.stringify(saved)); } catch (_) { /* a convenience only */ }
+      });
+      label.append(tick, ` ${pipeline.icon} ${pipeline.label.replace(/^Phó bản /, "")}`);
+      box.append(label);
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.disabled = running;
+    button.textContent = "Chạy";
+    button.addEventListener("click", () => {
+      const picks = pipelines.filter((pipeline) => saved[pipeline.id] !== false).map((pipeline) => ({
+        pipeline: pipeline.id,
+        stages: pipeline.stages.map((stage) => ({ macro: stage.macro, times: stageTimes(pipeline, stage) })),
+      }));
+      runFlow(flow, { picks });
+    });
+    box.append(button);
+    return card;
+  }
+
   function renderPipelineCard(flow, running) {
     const card = document.createElement("div");
     card.className = "sg-flow sg-item-flow";
@@ -249,10 +299,7 @@
     card.querySelector("strong").textContent = flow.label;
     card.querySelector("small").textContent = flow.description;
     const box = card.querySelector(".sg-stage-counts");
-    const countOf = (stage) => {
-      const saved = Number(stageCounts[`${flow.id}:${stage.macro}`]);
-      return Number.isInteger(saved) && saved >= 0 ? saved : stage.times;
-    };
+    const countOf = (stage) => stageTimes(flow, stage);
     for (const stage of flow.stages) {
       const label = document.createElement("label");
       label.textContent = stage.label;
@@ -295,6 +342,7 @@
     renderedKey = key;
     flowsNode.replaceChildren(...flows.map((flow) => {
       if (flow.stages?.length) return renderPipelineCard(flow, running);
+      if (flow.runner === "dungeon_tour") return renderTourCard(flow, running);
       // A flow that can run a chosen number of times gets a button per count
       // (the first is the default), e.g. the Thiên Long pipeline: 5 / 3 / 1.
       if (flow.run_options?.length) {
@@ -652,6 +700,7 @@
   // yellow button, cut from the user's screenshot (2026-09-24) in a 1918x959
   // game canvas. One hex string per pixel row, 94 x 22.
   const VUT_BO_TEXT = {
+    ink: "red",
     width: 94,
     rows: [
       "f00078078003000380000fc0", "f0007807800f0003800001e0", "f800f00e000f0003800001e0",
@@ -666,6 +715,70 @@
   };
   // The canvas size the text above was cut at; any other size is scaled to it.
   const TEXT_CANVAS = [1918, 959];
+
+  // Place names on T.Giới Map, cut from the user's screenshots (2026-09-26):
+  // dark grey letters with a light halo. The world map only scrolls up and
+  // down, so each name is searched in its own column (x0, x1 as canvas
+  // fractions): "Ngoài Phế Thành Hà Đông" is written twice, and the lobby is
+  // the western one, where the arrow pointed while we stood in it.
+  const WORLD_LABELS = {
+    co_mo: {
+      ink: "grey",
+      width: 62,
+      column: [0.4, 0.55],
+      rows: [
+        "1fc03c001e0f03c0", "3fe03c003e0f83c0", "7ff038003e1f8180", "f07000003e1f8000",
+        "e0007e003f1f87e0", "e000ff003f1f8ff0", "e001ff803fff9ff8", "e001c3803fffdc38",
+        "e001c3c03ffffc3c", "e003c3c03dfffc1c", "e023c3c039f7fc3c", "f071c38039f7dc3c",
+        "7ff1e78039e39e78", "3fe0ff0039e38ff0", "1fc07e0010e107f0", "0000000000000180",
+        "0000000000000000", "0000000000000080",
+      ],
+    },
+    thien_long: {
+      ink: "grey",
+      width: 166,
+      column: [0.17, 0.38],
+      rows: [
+        "ffe600101c000000200008400000003ff000380000", "ffe700101c000000f00000000000003ff000780000",
+        "1f07000000000000f000000000000007c000000000", "0e07800000000000f0000000000000078000000000",
+        "0e07f8003f003800f001f803c07b000300f07e00f0", "0e07fe387f07fe00f003fc3ff1ff800303f9ff0ffc",
+        "0e07de38ff87fe00f007fe3df1ff800303f07f0f7c", "0e078e38f3878e00f0070e3c71c7800303c00f0f1c",
+        "0e070e38f3878e00f00707387383800303c00f0e1c", "0e070638ff870e00f00707387383800303c0ff0e1c",
+        "0e070638ff870600f0070738738380030381ff0e1c", "0e070638e1070600f0070f3871c780030381c70e1c",
+        "0e070638fb070600ff87de3871ff80030381ef0e1c", "0e0706387f070600ffc3fc3870ff80030181ff0e1c",
+        "040206103f0206007fe1f81030ff80030100ff040c", "000000000000000000000000000780000000000000",
+        "00000000000000000000000000c780000000000000", "00000000000000000000000000ff00000000100000",
+        "00000000000000000000000000fe00000000000000",
+      ],
+    },
+    ha_dong: {
+      ink: "grey",
+      width: 209,
+      column: [0.36, 0.6],
+      rows: [
+        "00000000000000000000000070000000000000000000000000000",
+        "78180000000001001ff8300078003ff180000000060000c030000",
+        "f83c0000000603803ffc380078007ff3c0010000070000f078300",
+        "fc3c0000000000003e3c380000000783c0000000070000f078000",
+        "fe380000000000003c1e3c0000000703e0000000078000f078000",
+        "fe387fc3f83f81003c1e3fe0fc000703fe0fe0ff87fc00f0f8fe0",
+        "ff38ffc7fc3fc3803e3c3ff1fe000703ff0ff0ffc7fe00fff8fe0",
+        "fff8f3cfbe03c3c03ffc3cf3ce000703ef80f0f3c79e00fff00f0",
+        "fff9e1cf0e01c3c03ff8387387000703c38070f1c70e00fff0070",
+        "fbf9c1ce0e1fc3c03ff03873ff000703c387f0e1c70e00f9f06f0",
+        "f1f9c1ce0e7fc3c03e007873ff000703c38ff0e1c70e00f079ff0",
+        "f1f9e3ce0e7dc3c03e007873fe000703c39ef0e1c70e00f079ef0",
+        "f0f8e3cf1e71c3c03e007873c4000703c39c70e1c70e00f079cf0",
+        "f078ffc7fc79e3c03e007871fc000703c39ef0e1c70e00f079ef0",
+        "70787fc3f87fe3c03e007871fe000703839ff8e1c70e00f079ff8",
+        "00307fc1f01d0000000000007c000000000700000000000000e00",
+        "000073c0000000000000000000000000000000000000000000000",
+        "0000e3c0000000000000000000000000000000000000000000000",
+        "00007f80000000000000000000000000000000000000000000000",
+        "00007f00000000000000000000000000000000000000000008000",
+      ],
+    },
+  };
 
   // The game canvas as pixels, scaled to TEXT_CANVAS. Read straight off the
   // canvas; if the page will not give its pixels (blank or tainted), from a
@@ -693,13 +806,21 @@
     return { image: context.getImageData(0, 0, width, height), source: "ảnh chụp tab" };
   }
 
+  // What counts as a letter pixel: the brown-red of button text (red < 135),
+  // or the dark grey of place names on the world map.
+  const TEXT_INKS = {
+    red: (r) => r < 135,
+    grey: (r, g, b) => Math.max(r, g, b) < 140 && Math.max(r, g, b) - Math.min(r, g, b) < 45,
+  };
+
   // Where a text's dark letters best overlap the dark pixels on screen, inside
   // area ([x0, y0, x1, y1], canvas fractions). Score = overlap / union of the
   // two masks, 1 for a perfect match; the popup's plain brown panel scores ~0.2.
   function findText(image, text, area) {
     const { width, height, data } = image;
     const dark = new Uint8Array(width * height);
-    for (let i = 0; i < dark.length; i += 1) dark[i] = data[i * 4] < 135 ? 1 : 0;
+    const ink = TEXT_INKS[text.ink || "red"];
+    for (let i = 0; i < dark.length; i += 1) dark[i] = ink(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]) ? 1 : 0;
     // Summed dark counts, so a window's total costs four lookups.
     const sums = new Int32Array((width + 1) * (height + 1));
     for (let y = 0; y < height; y += 1) {
@@ -767,14 +888,18 @@
         message: `Vứt bỏ: ${source}, điểm ${found.score.toFixed(2)} tại ${found.point.map((v) => v.toFixed(3)).join(",")}`,
       });
       if (found.score < minScore) {
+        // Emptying a tab (before a trip, dungeon_tour): no item left to open
+        // means no "Vứt bỏ" - that tab is done.
+        if (macro.until_empty) return cycle;
         throw new Error(`Không thấy nút "Vứt bỏ" (giống nhất ${Math.round(found.score * 100)}%) - popup món đồ chưa mở?`);
       }
       await domClick(token, found.point);
       await domWait(token, Number(macro.confirm_delay_seconds || 0.7));
       await domClick(token, macro.confirm_point || [0.685, 0.631]);
-      updateDomFlow("discard_items", `Đã vứt: ${cycle + 1} vật phẩm`);
+      updateDomFlow(macro.flow_name || "discard_items", `Đã vứt: ${cycle + 1} vật phẩm`);
       await domWait(token, Number(macro.refresh_delay_seconds || 1));
     }
+    return maxCycles;
   }
 
   async function runUseInventoryItem(token, macro) {
@@ -1472,6 +1597,106 @@
       }
     }
     updateDomFlow(flow, `Xong ${plan.length} lượt phó bản`, "done");
+    if (macro.finish_chime !== false) playChime();
+  }
+
+  // Before a trip the bag's equipment goes (user, 2026-09-26): H.Trang, tab
+  // Trang bị, the discard loop until no "Vứt bỏ" comes up, then Back.
+  async function emptyEquipmentTab(token, tour, flow) {
+    await domClick(token, tour.hanh_trang_point || [0.78, 0.07]);
+    await domWait(token, Number(tour.panel_seconds ?? 1.5));
+    await domClick(token, tour.equip_tab_point || [0.920, 0.466]);
+    await domWait(token, Number(tour.tab_seconds ?? 1));
+    const thrown = await runDiscardItems(token, {
+      ...(tour.discard || {}), until_empty: true, flow_name: flow,
+      max_cycles: Number(tour.max_discards ?? 120),
+    });
+    await domClick(token, tour.bag_back_point || [0.045, 0.088]);
+    await domWait(token, Number(tour.panel_seconds ?? 1.5));
+    appendDiagnostic("tour_discard", { flow, message: `đã vứt ${thrown} trang bị; ${describeWorld()}` });
+    return thrown;
+  }
+
+  // To a dungeon's lobby the way the user goes (2026-09-26): Map -> T.Giới
+  // Map -> the place's name on the world map. That map only scrolls up and
+  // down and opens wherever it likes, so the name is looked for, dragging a
+  // little between looks, and clicked where it is found; then the tour waits
+  // for the lobby's map id.
+  async function travelToLobby(token, tour, stop, flow) {
+    const label = WORLD_LABELS[stop.world_label];
+    if (!label) throw new Error(`Chưa có mẫu chữ cho "${stop.world_label}" trên T.Giới Map`);
+    const lobby = Number(stop.lobby_map);
+    const minScore = Number(tour.world_min_score ?? 0.7);
+    const area = [label.column[0], 0.06, label.column[1], 0.96];
+    // Reveal the top first (Cổ Mộ and Thiên Long sit above Hà Đông), a bit at
+    // a time and never all the way (user), then the other way down.
+    const up = [tour.world_drag_top || [0.5, 0.35], tour.world_drag_bottom || [0.5, 0.8]];
+    const drags = [up, up, [up[1], up[0]], [up[1], up[0]], [up[1], up[0]], [up[1], up[0]]];
+    const clicks = [];
+    const seen = [];
+    for (let attempt = 1; attempt <= Number(tour.travel_attempts ?? 2); attempt += 1) {
+      await openMap(token, tour, clicks);
+      await domWait(token, Number(tour.map_open_delay_seconds ?? 1.2));
+      await domClick(token, tour.world_map_point || [0.0245, 0.953]);
+      await domWait(token, Number(tour.world_open_seconds ?? 1.5));
+      let found = findText((await readGameScreen()).image, label, area);
+      for (const [from, to] of drags) {
+        if (found.score >= minScore) break;
+        await domDrag(token, from, to);
+        await domWait(token, Number(tour.world_drag_seconds ?? 0.8));
+        found = findText((await readGameScreen()).image, label, area);
+      }
+      appendDiagnostic("tour_world_map", {
+        flow, message: `${stop.world_label}: điểm ${found.score.toFixed(2)} tại ${found.point.map((v) => v.toFixed(3)).join(",")} (lần ${attempt})`,
+      });
+      if (found.score < minScore) {
+        await domClick(token, tour.world_close_point || [0.840, 0.056]);
+        throw new Error(`Không thấy chữ "${stop.label}" trên T.Giới Map (giống nhất ${Math.round(found.score * 100)}%)`);
+      }
+      const since = Date.now();
+      await domClick(token, found.point);
+      // Walked there map by map, or taken at once: wait for the lobby's id.
+      const deadline = since + Number(tour.travel_seconds ?? 600) * 1000;
+      let lastMap = latestWorld?.mapId;
+      while (Date.now() < deadline) {
+        const here = latestWorld?.mapId;
+        if (here !== lastMap && here != null) { seen.push(here); lastMap = here; }
+        if (here === lobby && (latestWorld?.mapLoadedAt || 0) >= mapSwitchedAt - 1000) {
+          await domWait(token, Number(tour.arrive_settle_seconds ?? 3));
+          return `tới sảnh ${lobby} qua map ${seen.join(" → ") || "-"}`;
+        }
+        await domWait(token, 1);
+      }
+    }
+    throw new Error(`Đi tới sảnh ${stop.label} (map ${lobby}) mà vẫn chưa tới; đi qua map ${seen.join(" → ") || "không đổi map"}, đang ở ${latestWorld?.mapId ?? "?"}`);
+  }
+
+  // Runs the ticked dungeons one after another (user, 2026-09-26), each with
+  // the counts typed on its own card; the one whose lobby (or inside) we
+  // stand in goes first, so the first trip is saved.
+  async function runDungeonTour(token, macro, flow) {
+    const picks = (macro.picks || []).filter((pick) => pick.stages.some((stage) => Number(stage.times) > 0));
+    const here = latestWorld?.mapId;
+    const stops = (macro.tour || [])
+      .filter((stop) => picks.some((pick) => pick.pipeline === stop.pipeline))
+      .sort((a, b) => Number((b.maps || []).includes(here)) - Number((a.maps || []).includes(here)));
+    if (!stops.length) throw new Error("Chưa tick phó bản nào (hoặc số lượt trên thẻ đều là 0)");
+    appendDiagnostic("tour_start", { flow, message: `${stops.map((stop) => stop.label).join(" → ")}; ${describeWorld()}` });
+    for (const [index, stop] of stops.entries()) {
+      const title = `Phó bản ${index + 1}/${stops.length}: ${stop.label}`;
+      if (!(stop.maps || []).includes(latestWorld?.mapId)) {
+        updateDomFlow(flow, `${title} - vứt trang bị trước khi đi`, "tour_discard");
+        await emptyEquipmentTab(token, macro, flow);
+        updateDomFlow(flow, `${title} - đi tới sảnh bằng T.Giới Map`, "tour_travel");
+        const note = await travelToLobby(token, macro, stop, flow);
+        appendDiagnostic("tour_arrived", { flow, message: `${stop.label}: ${note}` });
+      }
+      const pick = picks.find((item) => item.pipeline === stop.pipeline);
+      const config = await api(`/macro?id=${encodeURIComponent(stop.pipeline)}`);
+      updateDomFlow(flow, title, "tour_run");
+      await runDungeonPipeline(token, { ...config.macro, stages: pick.stages, finish_chime: false }, flow);
+    }
+    updateDomFlow(flow, `Xong ${stops.length} phó bản`, "done");
     if (macro.finish_chime !== false) playChime();
   }
 
@@ -2398,6 +2623,7 @@
         else if (macro.runner === "dungeon_route") await runDungeonRoute(token, macro, flow);
         else if (macro.runner === "instance_reset_once") await runInstanceReset(token, macro, flow);
         else if (macro.runner === "dungeon_pipeline") await runDungeonPipeline(token, macro, flow);
+        else if (macro.runner === "dungeon_tour") await runDungeonTour(token, macro, flow);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {
