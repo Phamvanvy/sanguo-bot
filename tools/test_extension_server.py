@@ -1109,7 +1109,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.16.0"', manifest)
+        self.assertIn('"version": "0.16.1"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
