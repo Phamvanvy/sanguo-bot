@@ -593,6 +593,16 @@ activity_macros:
         - "Thanh thông mã"
         - "Tuyệt ảnh"
         - "Ống quyển giải đố"
+        # Phù + sách cổ (user, 2026-09-29). GIỮ "Phù giám định lại cấp sao" và
+        # "Tinh cấp giám định phù" (thẻ Giám định lại cấp sao dùng).
+        - "Phù mở rộng Hành Trang"
+        - "Phù cấp sao cao cấp"
+        - "Đỉnh cấp đục lỗ phù"
+        - "Phù làm phép vị trí kĩ năng"
+        - "Thần Nông Bản Thảo"
+        - "Cửu Chương Toán Thuật"
+        - "Hán Thư"
+        - "Tam Lược"
         # Bánh bao / đồ ăn
         - "Tinh chế màn thầu"
         - "Bánh bao"
