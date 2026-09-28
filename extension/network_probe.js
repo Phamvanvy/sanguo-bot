@@ -339,10 +339,11 @@
   }
 
   // Minh Châu ends every item the same way, whatever sits before it: int
-  // instanceId | byte 1 | UTF source ("Rơi thế giới, tiệm tạp hóa") | 3 bytes
-  // (2026-09-29 samples). Read from the grid's end backwards, that gives the
-  // instance of equipment too, whose middle (mask-driven stats plus the
-  // server's own additions) is not decoded here.
+  // instanceId | byte flag | UTF source when the flag is 1 ("Rơi thế giới,
+  // tiệm tạp hóa") | 3 bytes (2026-09-29 samples; equipment: "003dd78e 00
+  // 010000", Túi Chiến Công "ffffffff 00 000000"). Read from the grid's end
+  // backwards, that gives the instance of equipment too, whose middle
+  // (mask-driven stats plus the server's own additions) is not decoded here.
   const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
   function tailInstance(reader, start, end) {
     for (let p = end - 6; p >= start + 6; p -= 1) {
@@ -352,6 +353,11 @@
       if (after < 0 || after > 8) continue;
       try { STRICT_UTF8.decode(reader.bytes(p + 3, p + 3 + length)); } catch (_) { continue; }
       return (reader.byteAt(p - 4) << 24) | (reader.byteAt(p - 3) << 16) | (reader.byteAt(p - 2) << 8) | reader.byteAt(p - 1);
+    }
+    const flag = end - 4;                    // no source: instance | 0 | 3 bytes
+    if (flag - 4 >= start && reader.byteAt(flag) === 0) {
+      return (reader.byteAt(flag - 4) << 24) | (reader.byteAt(flag - 3) << 16)
+        | (reader.byteAt(flag - 2) << 8) | reader.byteAt(flag - 1);
     }
     return null;
   }
