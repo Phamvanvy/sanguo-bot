@@ -636,6 +636,12 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("const OP_REMOVE_ITEM = 148;", content)
         self.assertIn('["u8", item.grid], ["i32", item.itemId], ["i32", item.instanceId], ["u8", item.count],', content)
         self.assertIn("if (thrown == null) await emptyEquipmentTab(token, macro, flow);", content)
+        # Its own card too, to try the list out or clear the bag without a tour.
+        card = extension_server.load_config()["activity_macros"]["throw_away_items"]
+        self.assertEqual("throw_away_once", card["runner"])
+        self.assertEqual(rules, card["throw_away"])
+        self.assertIn('"throw_away_once",', content)
+        self.assertIn('else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);', content)
 
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
@@ -1142,7 +1148,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.18.0"', manifest)
+        self.assertIn('"version": "0.18.1"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

@@ -41,6 +41,7 @@
     "instance_reset_once",
     "dungeon_pipeline",
     "dungeon_tour",
+    "throw_away_once",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -1608,6 +1609,16 @@
     return picks.length - left.length;
   }
 
+  // The same throw-away as before a trip, from its own card: to try the list
+  // out, or to clear the bag without a tour (user, 2026-09-29).
+  async function runThrowAway(token, macro, flow) {
+    const thrown = await throwAwayItems(token, macro, flow);
+    if (thrown == null) {
+      throw new Error("Không đọc được túi đồ từ gói tin - reload extension rồi F5 tab game");
+    }
+    updateDomFlow(flow, `Đã vứt ${thrown} ô đồ`, "done");
+  }
+
   // Before a trip the bag's equipment goes (user, 2026-09-26): H.Trang, tab
   // Trang bị, the discard loop until no "Vứt bỏ" comes up, then Back. Now the
   // fallback for when the bag cannot be read off the traffic.
@@ -2633,6 +2644,7 @@
         else if (macro.runner === "instance_reset_once") await runInstanceReset(token, macro, flow);
         else if (macro.runner === "dungeon_pipeline") await runDungeonPipeline(token, macro, flow);
         else if (macro.runner === "dungeon_tour") await runDungeonTour(token, macro, flow);
+        else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {
