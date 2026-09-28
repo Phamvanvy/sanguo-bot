@@ -174,6 +174,10 @@ activity_macros:
       - [0.927, 0.653]
       - [0.774, 0.820]
       - [0.845, 0.820]
+    # Game báo "Mục tiêu không nằm trong tầm nhìn" (ATTACK_FAIL 14) thì bấm nút
+    # "Chuyển đổi" (đổi mục tiêu, mép phải; 1845,410 trên màn 1920x1080) trước
+    # lượt kỹ năng kế, mỗi lần báo một lần (user, 2026-09-29). null = tắt.
+    switch_target_point: &switch_target_point [0.955, 0.344]
     # Keep the renderer responsive so the site's debugger-latency guard does
     # not false-positive and close the game WebSocket under sustained load.
     button_delay_seconds: 0.2
@@ -193,6 +197,7 @@ activity_macros:
     # nơi thì làm bước sau luôn. fight_seconds / wait_seconds chỉ là giới hạn tối đa
     # (dùng khi không đọc được dữ liệu game). Tọa độ click đo trên canvas game.
     skill_points: *combat_skill_points
+    switch_target_point: *switch_target_point
     button_delay_seconds: 0.2
     round_delay_seconds: 0.4
     map_button_point: [0.85, 0.07]

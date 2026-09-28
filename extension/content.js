@@ -926,9 +926,27 @@
     }
   }
 
+  // "Mục tiêu không nằm trong tầm nhìn" (ATTACK_FAIL 14): the target is out
+  // of reach, so press "Chuyển đổi" (switch target, right edge) before the
+  // skills, once per new refusal (user, 2026-09-29). switch_target_point:
+  // null turns it off.
+  const ATTACK_FAIL_OUT_OF_SIGHT = 14;
+  let switchedTargetAt = 0;
+  async function switchTargetIfOutOfSight(token, macro) {
+    const point = macro.switch_target_point === undefined ? [0.955, 0.344] : macro.switch_target_point;
+    if (!point) return;
+    const refused = (latestWorld?.attackFails || [])
+      .some((fail) => fail.reason === ATTACK_FAIL_OUT_OF_SIGHT && fail.at > switchedTargetAt);
+    if (!refused) return;
+    switchedTargetAt = Date.now();
+    await domClick(token, point);
+    await domDelay(macro.button_delay_seconds || 0.18);
+  }
+
   // Only the skill buttons: the Đánh button is left alone unless a macro still
   // gives an attack_point (user, 2026-09-21 - no more pressing Đánh).
   async function attackRound(token, macro) {
+    await switchTargetIfOutOfSight(token, macro);
     const skillPoints = macro.skill_points || [
       [0.927, 0.517], [0.853, 0.566], [0.799, 0.670], [0.875, 0.710],
       [0.927, 0.653], [0.774, 0.820], [0.845, 0.820],

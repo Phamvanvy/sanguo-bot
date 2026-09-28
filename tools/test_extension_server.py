@@ -663,6 +663,15 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual(2, macro["door_step_out_near"])
         self.assertEqual(2, macro["door_step_outs"])
 
+    def test_fights_switch_target_when_it_is_out_of_sight(self):
+        # user, 2026-09-29: "Mục tiêu không nằm trong tầm nhìn" -> press Chuyển đổi.
+        macros = extension_server.load_config()["activity_macros"]
+        for name in ("auto_attack", "co_mo_easy", "thien_long_easy", "ha_dong_easy"):
+            self.assertEqual([0.955, 0.344], macros[name]["switch_target_point"], name)
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const ATTACK_FAIL_OUT_OF_SIGHT = 14;", content)
+        self.assertIn("    await switchTargetIfOutOfSight(token, macro);", content)
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -1168,7 +1177,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.0"', manifest)
+        self.assertIn('"version": "0.19.1"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
