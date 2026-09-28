@@ -672,6 +672,12 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("const ATTACK_FAIL_OUT_OF_SIGHT = 14;", content)
         self.assertIn("    await switchTargetIfOutOfSight(token, macro);", content)
 
+    def test_instance_reset_throws_items_away_first(self):
+        # user, 2026-09-29: throw the list away before every dungeon reset.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("    await throwAwayBeforeReset(token, macro, flow);", content)
+        self.assertIn('(await api("/macro?id=throw_away_items")).macro', content)
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -1177,7 +1183,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.1"', manifest)
+        self.assertIn('"version": "0.19.2"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

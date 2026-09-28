@@ -1363,7 +1363,29 @@
     throw new Error(`${note}; nhưng vẫn ở map ${latestWorld?.mapId ?? "?"} sau ${step.wait_seconds ?? 15}s`);
   }
 
+  // The bag is emptied by the "Vứt đồ theo danh sách" list before every reset
+  // (user, 2026-09-29): between pipeline runs and from the Reset card alike.
+  // The list lives on that card; a throw-away that fails is logged and the
+  // reset goes on. throw_away_before_reset: false turns it off.
+  async function throwAwayBeforeReset(token, macro, flow) {
+    if (macro.throw_away_before_reset === false) return;
+    try {
+      const card = (await api("/macro?id=throw_away_items")).macro || {};
+      if (!card.throw_away) return;
+      updateDomFlow(flow, "Vứt đồ theo danh sách trước khi reset phó bản", "throw_away");
+      const result = await throwAwayItems(token, { ...card, flow_name: flow }, flow);
+      if (result == null) {
+        appendDiagnostic("tour_discard", { flow, message: "trước reset: không đọc được túi đồ, bỏ qua vứt đồ" });
+      }
+    } catch (error) {
+      // A stop or a dropped socket still ends / resumes the run as usual.
+      if (token.cancelled || error.message === "FLOW_STOPPED" || error.socketClosed) throw error;
+      appendDiagnostic("tour_discard", { flow, message: `trước reset: vứt đồ lỗi (${error.message}), vẫn reset` });
+    }
+  }
+
   async function runInstanceReset(token, macro, flow) {
+    await throwAwayBeforeReset(token, macro, flow);
     updateDomFlow(flow, "Đang gửi lệnh xóa tiến độ phó bản", "send");
     appendDiagnostic("instance_reset_send", {
       flow, message: `gửi OpCode ${OP_INSTANCE_CLEAR}; ${describeWorld()}`,
