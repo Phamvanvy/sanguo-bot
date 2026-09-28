@@ -1554,6 +1554,9 @@
   const OP_BAG = 146;
   const OP_REMOVE_ITEM = 148;
 
+  // A fresh bag when the server answers our request; else the one read at
+  // login, if any - stale is safe here, since a remove whose grid, item and
+  // instance no longer match is refused, never applied to something else.
   async function readBag(token, macro) {
     const before = latestWorld?.bagAt || 0;
     const error = await postGamePacket(OP_BAG, []);
@@ -1562,6 +1565,10 @@
     while (Date.now() < deadline) {
       if ((latestWorld?.bagAt || 0) > before) return latestWorld.bag || [];
       await domWait(token, 0.2);
+    }
+    if (before) {
+      appendDiagnostic("tour_discard", { flow: macro.flow_name || "", message: `game không gửi lại túi đồ; dùng túi đọc ${Math.round((Date.now() - before) / 1000)}s trước` });
+      return latestWorld.bag || [];
     }
     return null;
   }
@@ -1614,7 +1621,7 @@
   async function runThrowAway(token, macro, flow) {
     const thrown = await throwAwayItems(token, macro, flow);
     if (thrown == null) {
-      throw new Error("Không đọc được túi đồ từ gói tin - reload extension rồi F5 tab game");
+      throw new Error("Không đọc được túi đồ từ gói tin (xem bag_read trong log) - reload extension rồi F5 tab game");
     }
     updateDomFlow(flow, `Đã vứt ${thrown} ô đồ`, "done");
   }

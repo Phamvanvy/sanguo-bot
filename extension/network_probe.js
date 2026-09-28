@@ -271,6 +271,9 @@
       },
       skip: (count) => { take(count); },
       pos: () => pos,
+      length: segment.length,
+      hex: (at, count) => Array.from(segment.subarray(at, Math.min(segment.length, at + count)),
+        (byte) => byte.toString(16).padStart(2, "0")).join(""),
       seek: (at) => { if (at > segment.length) throw new RangeError("short segment"); pos = at; },
       // UASegment.readString: modified UTF-8, or raw UTF-16 when the length's high bit is set.
       str: () => {
@@ -333,33 +336,62 @@
     world.meMovedAt = Date.now();
   }
 
+  // One bad grid must not cost the whole bag: the item details are read only
+  // to tell equipment apart, and whatever cannot be read there leaves the
+  // grid's id, item, name and instance - all a remove needs - still usable.
+  // Every bag read is logged (bag_read), with the raw bytes of the first grid
+  // that did not decode, so a server that writes items differently shows how.
   function readBag(reader) {
-    const size = reader.u8();
     const bag = [];
-    for (let n = 0; n < size; n += 1) {
-      const length = reader.i32();
-      const end = reader.pos() + length;
-      const grid = reader.u8();
-      const count = reader.u8();
-      if (count > 0) {
-        const itemId = reader.i32();
-        const name = reader.str();
-        reader.skip(1 + 2);                      // maxCount, show/bind
-        const level = reader.u8();
-        reader.skip(1 + 4);                      // quality, price
-        const use = reader.u8();                 // UseType: bit 0 = usable, then its details
-        if (use & 1) {
-          reader.skip(2 + 2 + 4 + 1 + 1 + 1);    // spellTime, cooldown id/time, distance, useCount, useClazz
-          reader.str();                          // useConfirm
+    let size = 0;
+    let failed = 0;
+    let firstFail = "";
+    try {
+      size = reader.u8();
+      for (let n = 0; n < size; n += 1) {
+        const length = reader.i32();
+        const start = reader.pos();
+        const end = start + length;
+        if (length < 2 || end > reader.length) throw new RangeError(`ô ${n}: độ dài ${length} vượt gói`);
+        const grid = reader.u8();
+        const count = reader.u8();
+        if (count > 0) {
+          const item = { grid, count, itemId: 0, name: "", level: 0, equip: null, kind: null, instanceId: 0 };
+          try {
+            item.itemId = reader.i32();
+            item.name = reader.str();
+            reader.skip(1);                          // maxCount
+            item.kind = reader.u16() >> 2;           // show type: 1 red potion, 2 blue, 8 mount, 10 book...
+            item.level = reader.u8();
+            reader.skip(1 + 4);                      // quality, price
+            const use = reader.u8();                 // UseType: bit 0 = usable, then its details
+            if (use & 1) {
+              reader.skip(2 + 2 + 4 + 1 + 1 + 1);    // spellTime, cooldown id/time, distance, useCount, useClazz
+              reader.str();                          // useConfirm
+            }
+            item.equip = reader.u8() === ITEM_TYPE_EQUIP;
+          } catch (error) {
+            failed += 1;
+            if (!firstFail) firstFail = `ô ${grid} "${item.name}": ${error.message}; ${reader.hex(start, Math.min(length, 96))}`;
+          }
+          reader.seek(end - 4);
+          item.instanceId = reader.i32();
+          if (item.itemId) bag.push(item);
         }
-        const equip = reader.u8() === ITEM_TYPE_EQUIP;
-        reader.seek(end - 4);
-        bag.push({ grid, count, itemId, name, level, equip, instanceId: reader.i32() });
+        reader.seek(end);
       }
-      reader.seek(end);
+    } catch (error) {
+      remember({ type: "bag_read", message: `lỗi đọc túi sau ${bag.length} món: ${error.message}; đầu gói ${reader.hex(2, 64)}` });
+      return;
     }
     world.bag = bag;
     world.bagAt = Date.now();
+    remember({
+      type: "bag_read",
+      message: `${size} ô, ${bag.length} ô có đồ (${bag.filter((item) => item.equip).length} trang bị)`
+        + (failed ? `; ${failed} ô không đọc hết: ${firstFail}` : "")
+        + `; vd ${bag.slice(0, 4).map((item) => `${item.grid}:${item.name}`).join(", ")}`,
+    });
   }
 
   function readOwnSync(reader) {
