@@ -1590,7 +1590,11 @@
     const rules = tour.throw_away || {};
     const bag = await readBag(token, tour);
     if (!bag) return null;
-    const picks = bag.filter((item) => throwAwayReason(item, rules));
+    // Only what the probe read an instance for (a stack's is -1): a wrong one
+    // is dropped by the server without a word. Equipment it cannot place yet
+    // on Minh Châu, so that goes through the Trang bị tab (the caller).
+    const wanted = bag.filter((item) => throwAwayReason(item, rules));
+    const picks = wanted.filter((item) => item.sure || item.instanceId === -1);
     const since = Date.now();
     for (const [n, item] of picks.entries()) {
       updateDomFlow(flow, `Vứt ${n + 1}/${picks.length}: ${item.name}`, "tour_discard");
@@ -1605,25 +1609,27 @@
       && reply.at >= since).map((reply) => reply.message);
     const after = await readBag(token, tour);
     const left = (after || []).filter((item) => throwAwayReason(item, rules));
+    const byHand = left.filter((item) => !(item.sure || item.instanceId === -1));
     const names = (items) => [...new Set(items.map((item) => item.name))].join(", ");
     appendDiagnostic("tour_discard", {
       flow,
-      message: `túi ${bag.length} ô có đồ, vứt ${picks.length - left.length}/${picks.length} ô [${names(picks)}]`
+      message: `túi ${bag.length} ô có đồ, cần vứt ${wanted.length} ô, gửi lệnh ${picks.length} ô [${names(picks)}]`
         + (left.length ? `; còn lại ${left.length} ô [${names(left)}]` : "")
         + (refused.length ? `; game từ chối: ${[...new Set(refused)].join(" | ")}` : "")
         + `; ${describeWorld()}`,
     });
-    return picks.length - left.length;
+    return { thrown: wanted.length - left.length, byHand: byHand.length, left: left.length };
   }
 
   // The same throw-away as before a trip, from its own card: to try the list
   // out, or to clear the bag without a tour (user, 2026-09-29).
   async function runThrowAway(token, macro, flow) {
-    const thrown = await throwAwayItems(token, macro, flow);
-    if (thrown == null) {
+    const result = await throwAwayItems(token, macro, flow);
+    if (result == null) {
       throw new Error("Không đọc được túi đồ từ gói tin (xem bag_read trong log) - reload extension rồi F5 tab game");
     }
-    updateDomFlow(flow, `Đã vứt ${thrown} ô đồ`, "done");
+    updateDomFlow(flow, `Đã vứt ${result.thrown} ô đồ`
+      + (result.left ? `; còn ${result.left} ô (${result.byHand} ô trang bị phải vứt ở tab Trang bị)` : ""), "done");
   }
 
   // Before a trip the bag's equipment goes (user, 2026-09-26): H.Trang, tab
@@ -1700,7 +1706,7 @@
       if (!(stop.maps || []).includes(latestWorld?.mapId)) {
         updateDomFlow(flow, `${title} - vứt trang bị trước khi đi`, "tour_discard");
         const thrown = await throwAwayItems(token, macro, flow);
-        if (thrown == null) await emptyEquipmentTab(token, macro, flow);
+        if (thrown == null || thrown.byHand) await emptyEquipmentTab(token, macro, flow);
         updateDomFlow(flow, `${title} - đi tới sảnh bằng T.Giới Map`, "tour_travel");
         const note = await travelToLobby(token, macro, stop, flow);
         appendDiagnostic("tour_arrived", { flow, message: `${stop.label}: ${note}` });

@@ -346,6 +346,7 @@
     let size = 0;
     let failed = 0;
     let firstFail = "";
+    const samples = new Map();               // raw grids worth a look in the log
     try {
       size = reader.u8();
       for (let n = 0; n < size; n += 1) {
@@ -360,8 +361,14 @@
           try {
             item.itemId = reader.i32();
             item.name = reader.str();
-            reader.skip(1);                          // maxCount
-            item.kind = reader.u16() >> 2;           // show type: 1 red potion, 2 blue, 8 mount, 10 book...
+            // Minh Châu writes one byte more than the original after maxCount
+            // and one more before a plain item's instance id, and appends a
+            // source after it ("Thương Thành Nguyên Bảo"): Bao hương hoàn hồn,
+            // 2026-09-29, 63 00 00e3 01 02 ffffffff 00 0a 00000000 00000000 00
+            // ffffffff 01 "…" - bind type 3 with bound id 0 (player) and a
+            // stack's instance -1, as the real client sends it back.
+            reader.skip(1 + 1);                      // maxCount, Minh Châu's extra byte
+            item.kind = reader.u16() >> 2;           // show type / icon
             item.level = reader.u8();
             reader.skip(1 + 4);                      // quality, price
             const use = reader.u8();                 // UseType: bit 0 = usable, then its details
@@ -370,12 +377,24 @@
               reader.str();                          // useConfirm
             }
             item.equip = reader.u8() === ITEM_TYPE_EQUIP;
+            if (!item.equip) {
+              if (use & 1) reader.skip(1);           // uses left
+              reader.skip(4 + 4 + 1);                // valid time, bound id, Minh Châu's extra byte
+              item.instanceId = reader.i32();
+              item.sure = true;
+              if ((use & 1) && count === 1 && !samples.has("dùng được")) {
+                samples.set("dùng được", `${item.name} #${item.instanceId}: ${reader.hex(start, Math.min(length, 200))}`);
+              }
+            }
           } catch (error) {
             failed += 1;
             if (!firstFail) firstFail = `ô ${grid} "${item.name}": ${error.message}; ${reader.hex(start, Math.min(length, 96))}`;
           }
-          reader.seek(end - 4);
-          item.instanceId = reader.i32();
+          // A stack has no instance of its own: the real client removes one
+          // with -1 (Hà Đông 2026-09-27: "16 0000062c ffffffff 34").
+          if (count > 1) item.instanceId = -1;
+          if (!item.sure && !samples.has("?")) samples.set("?", reader.hex(start, Math.min(length, 160)));
+          if (item.equip && !samples.has("equip")) samples.set("equip", reader.hex(start, Math.min(length, 200)));
           if (item.itemId) bag.push(item);
         }
         reader.seek(end);
@@ -390,6 +409,7 @@
       type: "bag_read",
       message: `${size} ô, ${bag.length} ô có đồ (${bag.filter((item) => item.equip).length} trang bị)`
         + (failed ? `; ${failed} ô không đọc hết: ${firstFail}` : "")
+        + [...samples].map(([what, hex]) => `; mẫu ${what}: ${hex}`).join("")
         + `; vd ${bag.slice(0, 4).map((item) => `${item.grid}:${item.name}`).join(", ")}`,
     });
   }

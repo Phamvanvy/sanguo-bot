@@ -631,11 +631,14 @@ class ExtensionServerTest(unittest.TestCase):
             self.assertFalse(any(kept.lower().startswith(name.lower()) for name in rules["names"]), kept)
         probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
         self.assertIn("const OP_BAG_SERVER = 147;", probe)
-        self.assertIn("reader.seek(end - 4);", probe)
+        # Minh Châu's item layout: an extra byte after maxCount and before a
+        # plain item's instance; a stack goes out with instance -1.
+        self.assertIn("reader.skip(1 + 1);                      // maxCount, Minh Châu's extra byte", probe)
+        self.assertIn("if (count > 1) item.instanceId = -1;", probe)
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn("const OP_REMOVE_ITEM = 148;", content)
         self.assertIn('["u8", item.grid], ["i32", item.itemId], ["i32", item.instanceId], ["u8", item.count],', content)
-        self.assertIn("if (thrown == null) await emptyEquipmentTab(token, macro, flow);", content)
+        self.assertIn("if (thrown == null || thrown.byHand) await emptyEquipmentTab(token, macro, flow);", content)
         # Its own card too, to try the list out or clear the bag without a tour.
         card = extension_server.load_config()["activity_macros"]["throw_away_items"]
         self.assertEqual("throw_away_once", card["runner"])
@@ -1148,7 +1151,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.18.2"', manifest)
+        self.assertIn('"version": "0.18.3"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
