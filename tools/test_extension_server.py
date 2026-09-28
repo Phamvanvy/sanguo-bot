@@ -651,6 +651,18 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('"throw_away_once",', content)
         self.assertIn('else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);', content)
 
+    def test_refused_doors_are_walked_off_and_into_again(self):
+        # user, 2026-09-29: turned away while attacked, the character freezes on
+        # the door's spot; only walking off a little and back in gets through.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("(stepOut && nearDoor(tileOf(me), goal))", content)
+        self.assertIn("if (shut) stepOut = true;", content)
+        self.assertIn('walk = await walkToCoord(token, macro, stepOut ? { ...step, step_out: true } : step, clicks);', content)
+        self.assertIn('" (đứng im ở cửa: lùi ra rồi vào lại)"', content)
+        macro = extension_server.load_config()["activity_macros"]["co_mo_easy"]
+        self.assertEqual(2, macro["door_step_out_near"])
+        self.assertEqual(2, macro["door_step_outs"])
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -1156,7 +1168,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.18.5"', manifest)
+        self.assertIn('"version": "0.19.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

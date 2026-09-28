@@ -257,6 +257,13 @@ activity_macros:
     # đang chiến đấu (cờ STATE_ATTACK, gói 144) -> đánh tới khi game bỏ cờ, kể cả
     # con đứng yên trong door_idle_radius px, rồi mới qua cửa (user, 2026-09-28).
     door_idle_radius: 250
+    # Bị cửa từ chối lúc đang bị đánh thì nhân vật đứng im ngay chỗ vào, bấm lại
+    # cửa từ đó không qua; phải lùi ra một chút rồi vào lại (user, 2026-09-29).
+    # Đánh xong ở cửa, hoặc đi tới cửa mà đứng im cách cửa <= door_step_out_near
+    # ô: lùi về ô tiếp cận (3-4 ô trước cửa) rồi đi vào lại, tối đa
+    # door_step_outs lần mỗi lượt đi.
+    door_step_out_near: 2
+    door_step_outs: 2
     # Bước portal: đứng ở cổng quá ngần này giây mà map không đổi = cổng còn khóa
     # (còn quái đánh mình) -> đánh hết rồi vào lại, quá max_rewalks lần thì báo lỗi.
     portal_settle_seconds: 2.5

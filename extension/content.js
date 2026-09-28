@@ -1025,6 +1025,7 @@
       const crossed = Boolean(step.portal) && mapSwitchedAt > mapMark;
       if (crossed) notes.push(`đã sang map ${latestWorld.mapId ?? "?"} từ trước nên bỏ qua`);
       let relogged = false;
+      let stepOut = false;
       // Fights at a door: every monster that still has us on its threat list
       // must die first, idle-looking ones and ones a bit further out too, and
       // the game's own combat mark says when that is done (user, 2026-09-28).
@@ -1042,7 +1043,8 @@
         const since = Date.now();
         let walk;
         if (step.goto) {
-          walk = await walkToCoord(token, macro, step, clicks);
+          walk = await walkToCoord(token, macro, stepOut ? { ...step, step_out: true } : step, clicks);
+          stepOut = false;
         } else {
           if (step.map_point) notes.push(`đóng map: ${await walkByMap(token, macro, step, clicks)}`);
           else clicks.push(await domClick(token, step.click_point));
@@ -1059,6 +1061,9 @@
             relogged ? Number(step.extra_rounds_after_relog ?? macro.extra_rounds_after_relog ?? 6) : 0)
           : await fightUntilClear(token, macro, macro.ambush_fight_seconds || 60);
         notes.push(describeFight(fought));
+        // Frozen on the door's spot after being turned away: walk off it
+        // before trying the door again (user, 2026-09-29).
+        if (shut) stepOut = true;
         appendDiagnostic("dungeon_ambush", { flow, message: `${title}: ${notes.slice(-2).join(" → ")}` });
         // Cleared and the door still shut: the game keeps the "being attacked"
         // mark with nothing left alive, and only logging in again drops it -
@@ -2048,6 +2053,15 @@
     let stalls = 0;
     let shrink = 1;
     let doorIndex = 0;
+    // A door that turned us away while monsters hit us leaves the character
+    // frozen on its spot: clicking it again from there does nothing, walking
+    // off a little and back in does (user, 2026-09-29). step_out (set by the
+    // route after a door fight) and a stuck final leg next to the door back us
+    // out to the approach tile first, then the door is walked into again.
+    let stepOut = Boolean(step.step_out);
+    let stepOuts = 0;
+    const nearDoor = (tile, door) => Math.max(Math.abs(tile.x - door.x), Math.abs(tile.y - door.y))
+      <= Number(step.door_step_out_near ?? macro.door_step_out_near ?? 2);
     let strayPopups = 0;
     let strayBlessings = 0;
     const summary = () => `đi tới ${step.goto.join(",")}: ${legs.join(" → ") || "đã đứng sẵn ở đó"}`;
@@ -2147,7 +2161,8 @@
       const doorKey = `${latestWorld?.mapId}:${goal.x},${goal.y}`;
       const panel = mapPanel(macro, grid ? grid.size : step.map_size, me);
       // Standing on the door and it did not take us: back out the way we came.
-      const backOff = Boolean(doors) && leg === 0 && same(tileOf(me), goal);
+      const backOff = Boolean(doors) && ((leg === 0 && same(tileOf(me), goal)) || (stepOut && nearDoor(tileOf(me), goal)));
+      stepOut = false;
       const route = backOff ? [tileOf(me)] : planRoute(grid, tileOf(me), goal, tolerance);
       if (!route) {
         return { how: "blocked", note: `không có đường tới ${goal.x},${goal.y} từ ${where(me)}; ${summary()}` };
@@ -2241,6 +2256,15 @@
       const stalled = lastEnd && Math.hypot(after.x - lastEnd.x, after.y - lastEnd.y) <= 1.5 * unit;
       stalls = stalled && !["timeout", "idle"].includes(walk.how) ? stalls + 1 : 0;
       lastEnd = { ...after };
+      if (doors && final && walk.how === "stuck" && nearDoor(tileOf(after), goal)
+        && stepOuts < Number(step.door_step_outs ?? macro.door_step_outs ?? 2)) {
+        stepOuts += 1;
+        stepOut = true;
+        stalls = 0;
+        lastEnd = null;
+        legs[legs.length - 1] += " (đứng im ở cửa: lùi ra rồi vào lại)";
+        continue;
+      }
       const there = doors ? same(tileOf(after), goal) : reached(after);
       if (stalls >= 2 && !there) {
         // A door tile we cannot even stand on - something parked on it, or the
