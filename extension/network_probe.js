@@ -272,6 +272,8 @@
       skip: (count) => { take(count); },
       pos: () => pos,
       length: segment.length,
+      byteAt: (at) => segment[at],
+      bytes: (from, to) => segment.subarray(from, to),
       hex: (at, count) => Array.from(segment.subarray(at, Math.min(segment.length, at + count)),
         (byte) => byte.toString(16).padStart(2, "0")).join(""),
       seek: (at) => { if (at > segment.length) throw new RangeError("short segment"); pos = at; },
@@ -336,6 +338,24 @@
     world.meMovedAt = Date.now();
   }
 
+  // Minh Châu ends every item the same way, whatever sits before it: int
+  // instanceId | byte 1 | UTF source ("Rơi thế giới, tiệm tạp hóa") | 3 bytes
+  // (2026-09-29 samples). Read from the grid's end backwards, that gives the
+  // instance of equipment too, whose middle (mask-driven stats plus the
+  // server's own additions) is not decoded here.
+  const STRICT_UTF8 = new TextDecoder("utf-8", { fatal: true });
+  function tailInstance(reader, start, end) {
+    for (let p = end - 6; p >= start + 6; p -= 1) {
+      if (reader.byteAt(p) !== 1) continue;
+      const length = (reader.byteAt(p + 1) << 8) | reader.byteAt(p + 2);
+      const after = end - (p + 3 + length);
+      if (after < 0 || after > 8) continue;
+      try { STRICT_UTF8.decode(reader.bytes(p + 3, p + 3 + length)); } catch (_) { continue; }
+      return (reader.byteAt(p - 4) << 24) | (reader.byteAt(p - 3) << 16) | (reader.byteAt(p - 2) << 8) | reader.byteAt(p - 1);
+    }
+    return null;
+  }
+
   // One bad grid must not cost the whole bag: the item details are read only
   // to tell equipment apart, and whatever cannot be read there leaves the
   // grid's id, item, name and instance - all a remove needs - still usable.
@@ -347,6 +367,7 @@
     let failed = 0;
     let firstFail = "";
     const samples = new Map();               // raw grids worth a look in the log
+    let mismatched = 0;
     try {
       size = reader.u8();
       for (let n = 0; n < size; n += 1) {
@@ -390,6 +411,14 @@
             failed += 1;
             if (!firstFail) firstFail = `ô ${grid} "${item.name}": ${error.message}; ${reader.hex(start, Math.min(length, 96))}`;
           }
+          const tail = tailInstance(reader, start, end);
+          if (item.equip && tail != null && tail > 0) {
+            item.instanceId = tail;
+            item.sure = true;
+          } else if (item.sure && tail != null && tail !== item.instanceId) {
+            mismatched += 1;
+            if (!samples.has("lệch")) samples.set("lệch", `${item.name} đọc ${item.instanceId}, đuôi ${tail}: ${reader.hex(start, Math.min(length, 200))}`);
+          }
           // A stack has no instance of its own: the real client removes one
           // with -1 (Hà Đông 2026-09-27: "16 0000062c ffffffff 34").
           if (count > 1) item.instanceId = -1;
@@ -409,6 +438,7 @@
       type: "bag_read",
       message: `${size} ô, ${bag.length} ô có đồ (${bag.filter((item) => item.equip).length} trang bị)`
         + (failed ? `; ${failed} ô không đọc hết: ${firstFail}` : "")
+        + (mismatched ? `; ${mismatched} ô instance lệch với đuôi` : "")
         + [...samples].map(([what, hex]) => `; mẫu ${what}: ${hex}`).join("")
         + `; vd ${bag.slice(0, 4).map((item) => `${item.grid}:${item.name}`).join(", ")}`,
     });

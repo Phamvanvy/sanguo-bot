@@ -1590,9 +1590,9 @@
     const rules = tour.throw_away || {};
     const bag = await readBag(token, tour);
     if (!bag) return null;
-    // Only what the probe read an instance for (a stack's is -1): a wrong one
-    // is dropped by the server without a word. Equipment it cannot place yet
-    // on Minh Châu, so that goes through the Trang bị tab (the caller).
+    // Only what the probe read an instance for (a stack's is -1; equipment's
+    // from the item's tail): a wrong one is dropped by the server without a
+    // word. Whatever is left unsure goes through the Trang bị tab (the caller).
     const wanted = bag.filter((item) => throwAwayReason(item, rules));
     const picks = wanted.filter((item) => item.sure || item.instanceId === -1);
     const since = Date.now();
