@@ -253,6 +253,10 @@ activity_macros:
     fight_on_the_way: false
     ambush_radius: 150
     ambush_fight_seconds: 60
+    # Cửa từ chối "Trạng thái chiến đấu không thể thông qua": game còn đánh dấu ta
+    # đang chiến đấu (cờ STATE_ATTACK, gói 144) -> đánh tới khi game bỏ cờ, kể cả
+    # con đứng yên trong door_idle_radius px, rồi mới qua cửa (user, 2026-09-28).
+    door_idle_radius: 250
     # Bước portal: đứng ở cổng quá ngần này giây mà map không đổi = cổng còn khóa
     # (còn quái đánh mình) -> đánh hết rồi vào lại, quá max_rewalks lần thì báo lỗi.
     portal_settle_seconds: 2.5

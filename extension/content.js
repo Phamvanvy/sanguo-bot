@@ -1024,7 +1024,20 @@
       const crossed = Boolean(step.portal) && mapSwitchedAt > mapMark;
       if (crossed) notes.push(`đã sang map ${latestWorld.mapId ?? "?"} từ trước nên bỏ qua`);
       let relogged = false;
+      // Fights at a door: every monster that still has us on its threat list
+      // must die first, idle-looking ones and ones a bit further out too, and
+      // the game's own combat mark says when that is done (user, 2026-09-28).
+      const doorFight = (seconds, minRounds = 0) => fightUntilClear(token, macro, seconds, {
+        minRounds, whileFighting: true,
+        idleRadius: step.door_idle_radius ?? macro.door_idle_radius ?? 250,
+      });
       for (let attempt = 0; !crossed && (step.goto || step.map_point || step.click_point); attempt += 1) {
+        // Still marked in combat: the door would refuse us, so fight first
+        // instead of walking up to be turned away.
+        if (step.portal && latestWorld?.meFighting === true) {
+          updateDomFlow(flow, `${title} (game báo đang chiến đấu: đánh trước khi qua cửa)`, `step_${index + 1}`);
+          notes.push(`trước cửa: ${describeFight(await doorFight(macro.ambush_fight_seconds || 60))}`);
+        }
         const since = Date.now();
         let walk;
         if (step.goto) {
@@ -1040,17 +1053,18 @@
         const shut = walk.how === "stuck"
           || (step.portal && ["timeout", "blocked"].includes(walk.how) && latestWorld?.frames);
         if (walk.how !== "ambush" && !shut) break;
-        const doorFight = await fightUntilClear(token, macro, macro.ambush_fight_seconds || 60, {
-          minRounds: relogged ? Number(step.extra_rounds_after_relog ?? macro.extra_rounds_after_relog ?? 6) : 0,
-        });
-        notes.push(describeFight(doorFight));
+        const fought = shut
+          ? await doorFight(macro.ambush_fight_seconds || 60,
+            relogged ? Number(step.extra_rounds_after_relog ?? macro.extra_rounds_after_relog ?? 6) : 0)
+          : await fightUntilClear(token, macro, macro.ambush_fight_seconds || 60);
+        notes.push(describeFight(fought));
         appendDiagnostic("dungeon_ambush", { flow, message: `${title}: ${notes.slice(-2).join(" → ")}` });
         // Cleared and the door still shut: the game keeps the "being attacked"
         // mark with nothing left alive, and only logging in again drops it -
         // the same character will do (user, 2026-09-23, Hà Đông khó 22,8).
         // Nothing there to fight at all = cleared already and still marked:
         // log in again at once (user, 2026-09-24).
-        if (shut && step.switch_actor_if_stuck && !relogged && (attempt >= 1 || doorFight.rounds === 0)) {
+        if (shut && step.switch_actor_if_stuck && !relogged && (attempt >= 1 || fought.rounds === 0)) {
           relogged = true;
           updateDomFlow(flow, `${title} (hết quái mà cửa vẫn khóa: vào lại nhân vật)`, `step_${index + 1}`);
           const mapBefore = latestWorld?.mapId;
@@ -2205,8 +2219,19 @@
   // give-up shortcuts apply - no dropping a target the game refuses, no
   // dropping one that will not lose health. maxSeconds is the only cap.
   async function fightUntilClear(token, macro, maxSeconds,
-    { idle = true, radius, idleRadius, ignoreNames, clearRoom = false, minRounds = 0, bossAt = null } = {}) {
+    { idle = true, radius, idleRadius, ignoreNames, clearRoom = false, minRounds = 0, bossAt = null,
+      whileFighting = false } = {}) {
     const startedAt = Date.now();
+    // whileFighting: not done while the game still marks us in combat - a
+    // monster has us on its threat list, maybe one the unit list does not show
+    // or an idle-looking cart, and every door stays shut until it dies (user,
+    // 2026-09-28: Cổ Mộ 31,24 refused three times, "0 quái" each time, 168 s).
+    // Once the game has told us, its mark decides - off means the door will not
+    // refuse us for a fight, whatever idle monster still stands near; before
+    // that (probe reloaded mid-fight) the unit list does, as it always did.
+    const quiet = () => (whileFighting && latestWorld?.meFighting != null
+      ? latestWorld.meFighting === false
+      : last.state === "clear");
     const deadline = startedAt + Number(maxSeconds) * 1000;
     const needed = Math.max(1, Number(macro.clear_checks_needed || 3));
     let rounds = 0;
@@ -2304,14 +2329,14 @@
           last = combatState(macro, skipped(), { idle, radius, idleRadius, ignoreNames });
         }
         health = new Map((last.near || []).map((monster) => [monster.id, monster.hp]));
-        streak = last.state === "clear" && !hitting ? streak + 1 : 0;
+        streak = quiet() && !hitting ? streak + 1 : 0;
         if (streak >= needed && rounds >= minRounds) break;
         // No monster left: only wait out the checks. Pressing Đánh now picks
         // something that is no monster (the button turns into "Chat").
         // minRounds: skill rounds thrown anyway - at a door still shut after
         // logging in again, for a monster the list does not show (user,
         // 2026-09-23: "nếu vẫn không được thì đánh thêm vài cái").
-        if (last.state === "clear" && !hitting && rounds >= minRounds) {
+        if (quiet() && !hitting && rounds >= minRounds) {
           await domDelay(macro.round_delay_seconds || 0.4);
           continue;
         }
@@ -2346,6 +2371,7 @@
       // at all (user, 2026-09-16: boss 5 reported done at over half health).
       seen: monstersNear(latestWorld, Infinity).slice(0, 5),
       landed,
+      fighting: latestWorld?.meFighting,
     };
   }
 
@@ -2356,6 +2382,7 @@
       + (fight.bossClicks ? `, bấm vào chỗ boss ${fight.bossClicks} lần` : "")
       + (fight.untouched ? `, bỏ hẳn ${fight.untouched} con còn đầy máu` : "")
       + (fight.last ? ` [${fight.last.state}: ${fight.last.detail}]` : "")
+      + (fight.fighting == null ? "" : (fight.fighting ? ", game vẫn báo đang chiến đấu" : ", game báo hết chiến đấu"))
       + (fight.landed
         ? `, đòn cuối trúng #${fight.landed.target} -${fight.landed.damage} `
           + `(${((Date.now() - fight.landed.at) / 1000).toFixed(1)}s trước)`

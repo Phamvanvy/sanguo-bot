@@ -94,6 +94,15 @@
   // Answers to a command we send ourselves (see sendGamePacket below).
   const OP_INSTANCE_CLEAR_SERVER = 535;  // 清除所有副本进度 done: int serial
   const OP_WORLD_TELEPORT_SERVER = 617;  // T.Giới Map teleport done: int serial
+  // Our own property changes (Changed.sendAndClean): byte count | count items,
+  // then the notify half. Items go out grouped by type, ints (type 0: byte 0 |
+  // byte id | int value) first, so the leading ints are read and the rest is
+  // left alone. STATE (id 38) carries STATE_ATTACK (2): set while any monster
+  // has us on its threat list, and a door refuses us then - "Trạng thái chiến
+  // đấu không thể thông qua" (PlayerPacketHandler touchExit: threatCount > 0).
+  const OP_SYNC_PLAYER_SERVER = 144;
+  const SYNC_STATE = 38;
+  const STATE_ATTACK = 2;
   const OP_ERROR = 0xffff;               // OpCode.ERROR (-1): int serial | short type | UTF message
   // Who we are and who else is on the account, so a flow never has to be told
   // which card in "Chọn NV" to click. Both shapes are the ones already ported
@@ -123,6 +132,7 @@
     messages: 0, frames: 0, desync: 0, badSegments: 0, firstBytes: "",
     mapId: null, mapInstanceId: -1, mapChangedAt: 0, mapLoadedAt: 0,
     me: null, meMoving: false, meMovedAt: 0,
+    meFighting: null, meFightingAt: 0, // the game's own "in combat" mark on us; null = not heard yet
     creatures: new Map(),              // instanceId -> { x, y, hp (0-200), state, name }
     npcIds: new Set(),                 // creatures the server flags as functional NPCs
     attackFails: [],                   // recent ATTACK_FAILs: { reason, target, at } (14 = target out of sight)
@@ -310,6 +320,19 @@
     world.meMovedAt = Date.now();
   }
 
+  function readOwnSync(reader) {
+    const count = reader.u8();
+    for (let n = 0; n < count; n += 1) {
+      if (reader.u8() !== 0) return;             // past the ints: nothing more we read
+      const id = reader.u8();
+      const value = reader.i32();
+      if (id !== SYNC_STATE) continue;
+      const fighting = (value & STATE_ATTACK) !== 0;
+      if (fighting !== world.meFighting) world.meFightingAt = Date.now();
+      world.meFighting = fighting;
+    }
+  }
+
   // Tool.recvUnitView: byte type(|0x80 out of view) | int id | int instanceId | [short imageId]
   function readUnitRefresh(reader) {
     const head = reader.u8();
@@ -480,6 +503,8 @@
         reader.i32();
         // Keep a few: several targets can fail between two fight checks.
         world.attackFails = [...world.attackFails.slice(-19), { reason, target: reader.i32(), at: Date.now() }];
+      } else if (opcode === OP_SYNC_PLAYER_SERVER) {
+        readOwnSync(reader);
       } else if (opcode === OP_INSTANCE_CLEAR_SERVER || opcode === OP_WORLD_TELEPORT_SERVER) {
         world.replies = [...world.replies.slice(-9),
           { serial: reader.i32(), ok: true, type: opcode, message: "", at: Date.now() }];

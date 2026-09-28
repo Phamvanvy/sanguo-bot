@@ -525,7 +525,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("unhittable.has(fail.reason)", route_runner)
         self.assertIn("Mật thư", macro["ignore_monster_names"])
         # With no monster left the fight only waits out its checks, no Đánh.
-        self.assertIn('if (last.state === "clear" && !hitting && rounds >= minRounds) {', route_runner)
+        self.assertIn('if (quiet() && !hitting && rounds >= minRounds) {', route_runner)
         self.assertEqual(40, macro["monster_path_tiles"])
         self.assertIn("walkDistances(grid", route_runner)
         # A door is hit exactly (no tolerance), then the game data's exit next to it.
@@ -603,6 +603,21 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('if (flow.runner === "dungeon_tour") return renderTourCard(flow, running);', content)
         self.assertIn("await emptyEquipmentTab(token, macro, flow);", content)
         self.assertIn("if (macro.until_empty) return cycle;", content)
+
+    def test_refused_doors_fight_until_the_game_drops_combat(self):
+        # user, 2026-09-28: a door refused while monsters attack us opens only
+        # once they are dead - the game's own combat mark (STATE_ATTACK in
+        # SYNC_PLAYER_SERVER 144, STATE id 38) says when.
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        self.assertIn("const OP_SYNC_PLAYER_SERVER = 144;", probe)
+        self.assertIn("const SYNC_STATE = 38;", probe)
+        self.assertIn("world.meFighting = fighting;", probe)
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("minRounds, whileFighting: true,", content)
+        self.assertIn("if (step.portal && latestWorld?.meFighting === true) {", content)
+        self.assertIn("streak = quiet() && !hitting ? streak + 1 : 0;", content)
+        macros = extension_server.load_config()["activity_macros"]
+        self.assertEqual(250, macros["co_mo_pipeline"].get("door_idle_radius", 250))
 
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
@@ -822,13 +837,13 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual([22, 8], inner_door["goto"])
         self.assertTrue(inner_door["switch_actor_if_stuck"])
         self.assertFalse(hard["actor_switch"]["via_spare"])
-        self.assertIn("if (shut && step.switch_actor_if_stuck && !relogged && (attempt >= 1 || doorFight.rounds === 0)) {", content)
+        self.assertIn("if (shut && step.switch_actor_if_stuck && !relogged && (attempt >= 1 || fought.rounds === 0)) {", content)
         # A refused door is handed back at once, not clicked again and again.
         self.assertIn("if (walk.refused) return { ...walk, note:", content)
         self.assertIn("if (switcher.via_spare) {", content)
         # Still shut after that: a few skill rounds even with no monster seen.
-        self.assertIn("minRounds: relogged ? Number(step.extra_rounds_after_relog ?? macro.extra_rounds_after_relog ?? 6) : 0,", content)
-        self.assertIn("if (last.state === \"clear\" && !hitting && rounds >= minRounds) {", content)
+        self.assertIn("relogged ? Number(step.extra_rounds_after_relog ?? macro.extra_rounds_after_relog ?? 6) : 0)", content)
+        self.assertIn("if (quiet() && !hitting && rounds >= minRounds) {", content)
         # The NPC's answer is read off the wire when the server sends one, so
         # the log carries the popup's own words. The client can draw the popup
         # by itself, so the touch does not fail on a silent server: the answer
@@ -1109,7 +1124,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.16.1"', manifest)
+        self.assertIn('"version": "0.17.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
