@@ -1544,8 +1544,73 @@
     if (macro.finish_chime !== false) playChime();
   }
 
+  // OpCode.BAG_CLIENT (146, no body) makes the server send the whole bag
+  // (BAG_SERVER 147, decoded by network_probe.js); REMOVEITEM_CLIENT (148):
+  // byte grid | int itemId | int instanceId | byte count, the packet the
+  // popup's "Vứt bỏ" sends. The server only removes it when grid, item and
+  // instance all match (TransactionBag.removeGridGameItem), and refuses mounts
+  // with ERROR "Vật phẩm không thể vứt bỏ" (PlayerPacketHandler.removeItem).
+  const OP_BAG = 146;
+  const OP_REMOVE_ITEM = 148;
+
+  async function readBag(token, macro) {
+    const before = latestWorld?.bagAt || 0;
+    const error = await postGamePacket(OP_BAG, []);
+    if (error) throw new Error(error);
+    const deadline = Date.now() + Number(macro.bag_reply_seconds ?? 6) * 1000;
+    while (Date.now() < deadline) {
+      if ((latestWorld?.bagAt || 0) > before) return latestWorld.bag || [];
+      await domWait(token, 0.2);
+    }
+    return null;
+  }
+
+  // What goes, by the name the game gives the item: equipment as a whole, and
+  // names that start with one of the listed ones ("Sách" = every book). All
+  // else stays (user, 2026-09-29: keep Bao hương hoàn hồn, túi châu báu...).
+  function throwAwayReason(item, rules) {
+    if (rules.equipment && item.equip) return "trang bị";
+    const plain = (text) => String(text || "").normalize("NFC").trim().toLowerCase();
+    const name = plain(item.name);
+    return (rules.names || []).find((prefix) => name.startsWith(plain(prefix))) || "";
+  }
+
+  // Throws away what the rules name with the game's own packet, then reads
+  // the bag again to say what is left. null = the bag never came (probe not
+  // loaded): the caller clicks through the popup instead.
+  async function throwAwayItems(token, tour, flow) {
+    const rules = tour.throw_away || {};
+    const bag = await readBag(token, tour);
+    if (!bag) return null;
+    const picks = bag.filter((item) => throwAwayReason(item, rules));
+    const since = Date.now();
+    for (const [n, item] of picks.entries()) {
+      updateDomFlow(flow, `Vứt ${n + 1}/${picks.length}: ${item.name}`, "tour_discard");
+      const error = await postGamePacket(OP_REMOVE_ITEM, [
+        ["u8", item.grid], ["i32", item.itemId], ["i32", item.instanceId], ["u8", item.count],
+      ]);
+      if (error) throw new Error(error);
+      await domWait(token, Number(tour.throw_delay_seconds ?? 0.25));
+    }
+    await domWait(token, 1);
+    const refused = (latestWorld?.replies || []).filter((reply) => !reply.ok && reply.type === OP_REMOVE_ITEM
+      && reply.at >= since).map((reply) => reply.message);
+    const after = await readBag(token, tour);
+    const left = (after || []).filter((item) => throwAwayReason(item, rules));
+    const names = (items) => [...new Set(items.map((item) => item.name))].join(", ");
+    appendDiagnostic("tour_discard", {
+      flow,
+      message: `túi ${bag.length} ô có đồ, vứt ${picks.length - left.length}/${picks.length} ô [${names(picks)}]`
+        + (left.length ? `; còn lại ${left.length} ô [${names(left)}]` : "")
+        + (refused.length ? `; game từ chối: ${[...new Set(refused)].join(" | ")}` : "")
+        + `; ${describeWorld()}`,
+    });
+    return picks.length - left.length;
+  }
+
   // Before a trip the bag's equipment goes (user, 2026-09-26): H.Trang, tab
-  // Trang bị, the discard loop until no "Vứt bỏ" comes up, then Back.
+  // Trang bị, the discard loop until no "Vứt bỏ" comes up, then Back. Now the
+  // fallback for when the bag cannot be read off the traffic.
   async function emptyEquipmentTab(token, tour, flow) {
     await domClick(token, tour.hanh_trang_point || [0.78, 0.07]);
     await domWait(token, Number(tour.panel_seconds ?? 1.5));
@@ -1616,7 +1681,8 @@
       const title = `Phó bản ${index + 1}/${stops.length}: ${stop.label}`;
       if (!(stop.maps || []).includes(latestWorld?.mapId)) {
         updateDomFlow(flow, `${title} - vứt trang bị trước khi đi`, "tour_discard");
-        await emptyEquipmentTab(token, macro, flow);
+        const thrown = await throwAwayItems(token, macro, flow);
+        if (thrown == null) await emptyEquipmentTab(token, macro, flow);
         updateDomFlow(flow, `${title} - đi tới sảnh bằng T.Giới Map`, "tour_travel");
         const note = await travelToLobby(token, macro, stop, flow);
         appendDiagnostic("tour_arrived", { flow, message: `${stop.label}: ${note}` });

@@ -591,7 +591,35 @@ activity_macros:
       - {pipeline: "co_mo_pipeline", label: "Cổ Mộ", lobby_map: 768, maps: [768, 769, 770, 771, 772, 773, 1137, 1138, 1139, 1140, 1141]}
       - {pipeline: "thien_long_pipeline", label: "Thiên Long trận", lobby_map: 976, maps: [976, 977, 978]}
       - {pipeline: "ha_dong_pipeline", label: "Hà Đông", lobby_map: 448, maps: [448, 449, 450, 432, 433]}
-    # Vứt trang bị: nút H.Trang, tab "Trang bị" (1765,528 trên màn 1920x1080),
+    # Trước mỗi chuyến: đọc túi đồ từ gói tin (BAG 146/147) rồi vứt bằng lệnh của
+    # game (REMOVEITEM 148) mọi trang bị và món có tên BẮT ĐẦU bằng một mục dưới
+    # (không phân biệt hoa thường; "Sách" = mọi sách). Món không có tên ở đây thì
+    # giữ: Bao hương hoàn hồn, túi châu báu, Lương thực thú cưỡi... (user,
+    # 2026-09-29). Game không cho vứt thú cưỡi thì log ghi "game từ chối".
+    throw_away:
+      equipment: true
+      names:
+        - "Sách"
+        - "Thanh thông mã"
+        - "Tuyệt ảnh"
+        - "Ống quyển giải đố"
+        # Bánh bao / đồ ăn
+        - "Tinh chế màn thầu"
+        - "Bánh bao"
+        - "Nướng thịt heo rừng"
+        - "Song hoàng đản"
+        - "Đĩa thịt bò"
+        - "Chân gấu hấp"
+        # Bình thuốc hồi máu / mana
+        - "Cửu chuyển hoàn hồn đan"
+        - "Hành quân đan"
+        - "Kim sang dược"
+        - "Đại bổ tán"
+        - "Quỳnh tương lộ"
+        - "Thanh tâm lộ"
+        - "Vong ưu lộ"
+    # Không đọc được túi đồ (chưa F5 sau khi reload extension) thì làm như cũ:
+    # vứt trang bị: nút H.Trang, tab "Trang bị" (1765,528 trên màn 1920x1080),
     # nút Back góc trên trái (88,165); phần vứt dùng y hệt thẻ Vứt đồ.
     hanh_trang_point: [0.780, 0.07]
     equip_tab_point: [0.920, 0.466]

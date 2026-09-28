@@ -601,7 +601,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("opcode === OP_WORLD_TELEPORT_SERVER", probe)
         self.assertIn('"dungeon_tour",', content)
         self.assertIn('if (flow.runner === "dungeon_tour") return renderTourCard(flow, running);', content)
-        self.assertIn("await emptyEquipmentTab(token, macro, flow);", content)
+        self.assertIn("await throwAwayItems(token, macro, flow);", content)
         self.assertIn("if (macro.until_empty) return cycle;", content)
 
     def test_refused_doors_fight_until_the_game_drops_combat(self):
@@ -618,6 +618,24 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("streak = quiet() && !hitting ? streak + 1 : 0;", content)
         macros = extension_server.load_config()["activity_macros"]
         self.assertEqual(250, macros["co_mo_pipeline"].get("door_idle_radius", 250))
+
+    def test_tour_throws_items_away_by_name_with_the_game_packet(self):
+        # user, 2026-09-29: before a trip throw away equipment, books, the
+        # horses, Ống quyển giải đố, food and HP/MP potions - keep the rest.
+        tour = extension_server.load_config()["activity_macros"]["dungeon_tour"]
+        rules = tour["throw_away"]
+        self.assertTrue(rules["equipment"])
+        for name in ("Sách", "Thanh thông mã", "Tuyệt ảnh", "Ống quyển giải đố", "Bánh bao", "Kim sang dược", "Vong ưu lộ"):
+            self.assertIn(name, rules["names"])
+        for kept in ("Bao hương hoàn hồn", "túi châu báu", "Lương thực thú cưỡi"):
+            self.assertFalse(any(kept.lower().startswith(name.lower()) for name in rules["names"]), kept)
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        self.assertIn("const OP_BAG_SERVER = 147;", probe)
+        self.assertIn("reader.seek(end - 4);", probe)
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const OP_REMOVE_ITEM = 148;", content)
+        self.assertIn('["u8", item.grid], ["i32", item.itemId], ["i32", item.instanceId], ["u8", item.count],', content)
+        self.assertIn("if (thrown == null) await emptyEquipmentTab(token, macro, flow);", content)
 
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
@@ -1124,7 +1142,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.17.0"', manifest)
+        self.assertIn('"version": "0.18.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

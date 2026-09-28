@@ -101,6 +101,16 @@
   // has us on its threat list, and a door refuses us then - "Trạng thái chiến
   // đấu không thể thông qua" (PlayerPacketHandler touchExit: threatCount > 0).
   const OP_SYNC_PLAYER_SERVER = 144;
+  // The bag, so a flow can throw items away by name with the game's own
+  // "remove item" packet instead of clicking through the H.Trang popup
+  // (user, 2026-09-29). Player.sendBagInfo: byte size | size * (int length |
+  // grid) - every grid carries its own length, so an item we do not decode in
+  // full (equipment) is simply stepped over. BagGrid.toClientByte: byte id |
+  // byte count | GameItem when count > 0: ItemTemplate (int id | UTF name |
+  // byte maxCount | short show/bind | byte useLevel | byte quality | int price
+  // | UseType | byte itemType, 1 = equipment) ... | int instanceId (last).
+  const OP_BAG_SERVER = 147;
+  const ITEM_TYPE_EQUIP = 1;
   const SYNC_STATE = 38;
   const STATE_ATTACK = 2;
   const OP_ERROR = 0xffff;               // OpCode.ERROR (-1): int serial | short type | UTF message
@@ -133,6 +143,7 @@
     mapId: null, mapInstanceId: -1, mapChangedAt: 0, mapLoadedAt: 0,
     me: null, meMoving: false, meMovedAt: 0,
     meFighting: null, meFightingAt: 0, // the game's own "in combat" mark on us; null = not heard yet
+    bag: null, bagAt: 0,               // [{ grid, count, itemId, name, level, equip, instanceId }], filled grids only
     creatures: new Map(),              // instanceId -> { x, y, hp (0-200), state, name }
     npcIds: new Set(),                 // creatures the server flags as functional NPCs
     attackFails: [],                   // recent ATTACK_FAILs: { reason, target, at } (14 = target out of sight)
@@ -259,6 +270,8 @@
         return (segment[at] << 24) | (segment[at + 1] << 16) | (segment[at + 2] << 8) | segment[at + 3];
       },
       skip: (count) => { take(count); },
+      pos: () => pos,
+      seek: (at) => { if (at > segment.length) throw new RangeError("short segment"); pos = at; },
       // UASegment.readString: modified UTF-8, or raw UTF-16 when the length's high bit is set.
       str: () => {
         const at = take(2);
@@ -318,6 +331,35 @@
     world.me = { x, y };
     world.meMoving = (state & STATE_MOVING) !== 0;
     world.meMovedAt = Date.now();
+  }
+
+  function readBag(reader) {
+    const size = reader.u8();
+    const bag = [];
+    for (let n = 0; n < size; n += 1) {
+      const length = reader.i32();
+      const end = reader.pos() + length;
+      const grid = reader.u8();
+      const count = reader.u8();
+      if (count > 0) {
+        const itemId = reader.i32();
+        const name = reader.str();
+        reader.skip(1 + 2);                      // maxCount, show/bind
+        const level = reader.u8();
+        reader.skip(1 + 4);                      // quality, price
+        const use = reader.u8();                 // UseType: bit 0 = usable, then its details
+        if (use & 1) {
+          reader.skip(2 + 2 + 4 + 1 + 1 + 1);    // spellTime, cooldown id/time, distance, useCount, useClazz
+          reader.str();                          // useConfirm
+        }
+        const equip = reader.u8() === ITEM_TYPE_EQUIP;
+        reader.seek(end - 4);
+        bag.push({ grid, count, itemId, name, level, equip, instanceId: reader.i32() });
+      }
+      reader.seek(end);
+    }
+    world.bag = bag;
+    world.bagAt = Date.now();
   }
 
   function readOwnSync(reader) {
@@ -503,6 +545,8 @@
         reader.i32();
         // Keep a few: several targets can fail between two fight checks.
         world.attackFails = [...world.attackFails.slice(-19), { reason, target: reader.i32(), at: Date.now() }];
+      } else if (opcode === OP_BAG_SERVER) {
+        readBag(reader);
       } else if (opcode === OP_SYNC_PLAYER_SERVER) {
         readOwnSync(reader);
       } else if (opcode === OP_INSTANCE_CLEAR_SERVER || opcode === OP_WORLD_TELEPORT_SERVER) {
