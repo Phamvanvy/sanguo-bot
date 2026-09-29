@@ -678,6 +678,13 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("    await throwAwayBeforeReset(token, macro, flow);", content)
         self.assertIn('(await api("/macro?id=throw_away_items")).macro', content)
 
+    def test_npc_map_click_is_retried_on_other_parts_of_the_sprite(self):
+        # Thiên Long 976, 2026-09-29: standing on the NPC, our own Map marker
+        # took the click twice in a row; retry elsewhere on the sprite.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("[[0, 0], [0, -16], [14, 0], [-14, 0], [0, 14]]", content)
+        self.assertIn("client không gửi lệnh bấm NPC nào sau ${tried.length} lần bấm", content)
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -1183,7 +1190,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.2"', manifest)
+        self.assertIn('"version": "0.19.3"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

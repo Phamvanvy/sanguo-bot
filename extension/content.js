@@ -1313,18 +1313,35 @@
     const said = near
       ? `bấm NPC ${near.name} #${near.id} trên Map`
       : `bấm ô ${step.npc_tile.join(",")} của NPC ${step.touch_npc_by_map} trên Map (không có trong dữ liệu game)`;
-    const openedAt = await openMap(token, macro, clicks);
-    await domWait(token, macro.map_open_delay_seconds || 1.2);
-    const touchedSince = Date.now();
-    clicks.push(await domClick(token, panel.toFraction(aim)));
+    // Standing right on the NPC, our own marker on the Map covers it and takes
+    // the click (Thiên Long 976, 2026-09-29 11:55: from 52,15 two runs in a
+    // row sent no touch; from 53,17 it always worked). So a miss is tried
+    // again on another part of the sprite, the Map opened afresh each time.
+    const offsets = near
+      ? (step.npc_click_offsets || macro.npc_click_offsets || [[0, 0], [0, -16], [14, 0], [-14, 0], [0, 14]])
+      : [[0, 0]];
+    let openedAt = 0;
     let touch = null;
-    for (let deadline = Date.now() + Number(step.dialog_seconds ?? 4) * 1000; !touch && Date.now() < deadline;) {
-      await domWait(token, 0.2);
-      touch = (latestWorld?.touches || []).find((item) => item.at >= touchedSince && (!near || item.target === near.id));
+    const tried = [];
+    for (const [dx, dy] of offsets.map((pair) => pair.map(Number))) {
+      const spot = { x: aim.x + dx, y: aim.y + dy };
+      if (!panel.shows(spot)) continue;
+      openedAt = await openMap(token, macro, clicks);
+      await domWait(token, macro.map_open_delay_seconds || 1.2);
+      const touchedSince = Date.now();
+      clicks.push(await domClick(token, panel.toFraction(spot)));
+      tried.push(`${Math.round(spot.x)},${Math.round(spot.y)}`);
+      for (let deadline = Date.now() + Number(step.dialog_seconds ?? 4) * 1000; !touch && Date.now() < deadline;) {
+        await domWait(token, 0.2);
+        touch = (latestWorld?.touches || []).find((item) => item.at >= touchedSince && (!near || item.target === near.id));
+      }
+      if (touch) break;
+      await closeMap(token, panel.closePoint, openedAt, clicks);
+      await domWait(token, 0.6);
     }
     if (!touch) {
-      await closeMap(token, panel.closePoint, openedAt, clicks);
-      throw new Error(`${said}: client không gửi lệnh bấm NPC nào - bấm trượt NPC trên Map`);
+      throw new Error(`${said}: client không gửi lệnh bấm NPC nào sau ${tried.length} lần bấm (điểm map ${tried.join(" | ")}; `
+        + `ta ${Math.round(me.x)},${Math.round(me.y)}) - bấm trượt NPC trên Map; click: ${clicks.map(describeClick).join(" | ")}`);
     }
     // Let the popup draw before clicking its option.
     await domWait(token, step.popup_delay_seconds ?? 1);
