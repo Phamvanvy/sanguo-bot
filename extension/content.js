@@ -1852,7 +1852,12 @@
     const openedAt = await openMap(token, macro, clicks);
     await domWait(token, macro.map_open_delay_seconds || 1.2);
     clicks.push(await domClick(token, step.map_point));
-    await domWait(token, macro.map_close_delay_seconds || 0.6);
+    // A step may close it at once (Cổ Mộ boss 1's door, user 2026-09-29):
+    // standing beside the door, the character is on it and refused within the
+    // usual 0.6 s, the map reloads, closeMap takes that for the Map closing
+    // and skips the X - but there the Map stays open and covers every skill
+    // for the whole door fight (15:18: 39 rounds, all three still at 100%).
+    await domWait(token, Number(step.map_close_delay_seconds ?? macro.map_close_delay_seconds ?? 0.6));
     // The game's close key does not reach the Map from here: always its X button.
     return closeMap(token, step.map_close_point, openedAt, clicks);
   }
@@ -2240,6 +2245,7 @@
       const closed = await walkByMap(token, macro, {
         map_point: panel.toFraction(point),
         map_close_point: closePoint,
+        map_close_delay_seconds: step.map_close_delay_seconds,
       }, clicks);
       const walk = await waitForArrival(token, macro, {
         ...step,

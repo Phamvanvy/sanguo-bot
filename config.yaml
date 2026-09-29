@@ -302,7 +302,10 @@ activity_macros:
       # mặc định 160, nên bị bỏ qua rồi xông vào đánh lúc mình ra cửa 44,10 - cửa
       # khóa (user, 2026-09-23 23:41). Hai bước dọn trước cửa quét 250 px.
       - {label: "Dọn quái trước cửa boss 1 (38,12)", goto: [38, 12], map_size: &co_mo_main [800, 608], maps: &co_mo_main_maps [1137, 769], fight_seconds: 180, idle_monster_radius: 250}
-      - {label: "Vào cửa boss 1 (44,10)", goto: [44, 10], map_size: *co_mo_main, maps: *co_mo_main_maps, portal: true}
+      # Bấm điểm đến trên Map xong bấm X NGAY (user, 2026-09-29): đứng sát cửa thì
+      # trong 0.6s chờ mặc định nhân vật đã bước lên cửa, bị từ chối, map tải lại
+      # -> bot tưởng Map tự đóng, không bấm X, Map che hết nút kỹ năng.
+      - {label: "Vào cửa boss 1 (44,10)", goto: [44, 10], map_size: *co_mo_main, maps: *co_mo_main_maps, portal: true, map_close_delay_seconds: 0.05}
       # Phòng boss 1: PHẢI phá hết xe và tượng thì boss mới xuất hiện (user,
       # 2026-09-21) - trước đây flow không thấy gì để đánh nên đi luôn, chưa kịp ra
       # boss. Nên bước này:

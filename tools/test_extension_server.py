@@ -685,6 +685,17 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("[[0, 0], [0, -16], [14, 0], [-14, 0], [0, 14]]", content)
         self.assertIn("client không gửi lệnh bấm NPC nào sau ${tried.length} lần bấm", content)
 
+    def test_co_mo_boss_1_door_closes_the_map_at_once(self):
+        # user, 2026-09-29: the Map stayed open over the skills after the boss 1
+        # door refused us; click the destination, then the X straight away.
+        macros = extension_server.load_config()["activity_macros"]
+        for name in ("co_mo_hard", "co_mo_easy"):
+            door = next(step for step in macros[name]["route_steps"] if step["label"].startswith("Vào cửa boss 1"))
+            self.assertEqual(0.05, door["map_close_delay_seconds"])
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("map_close_delay_seconds: step.map_close_delay_seconds,", content)
+        self.assertIn("Number(step.map_close_delay_seconds ?? macro.map_close_delay_seconds ?? 0.6)", content)
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -1190,7 +1201,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.3"', manifest)
+        self.assertIn('"version": "0.19.4"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
