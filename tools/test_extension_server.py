@@ -696,6 +696,15 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("map_close_delay_seconds: step.map_close_delay_seconds,", content)
         self.assertIn("Number(step.map_close_delay_seconds ?? macro.map_close_delay_seconds ?? 0.6)", content)
 
+    def test_silent_npc_click_logs_in_again_and_retries(self):
+        # Thiên Long 976, 2026-09-29: after a tour teleport the client answered
+        # no NPC click at all until the game logged in again.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("if (!touch && macro.actor_switch && step.relog_if_npc_silent !== false) {", content)
+        self.assertIn("notes.push(await touchNpcByMap(token, macro, step, clicks, flow));", content)
+        macros = extension_server.load_config()["activity_macros"]
+        self.assertIn("actor_switch", macros["thien_long_hard"])
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -1201,7 +1210,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.4"', manifest)
+        self.assertIn('"version": "0.19.5"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

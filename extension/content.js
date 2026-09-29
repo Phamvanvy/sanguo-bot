@@ -1102,7 +1102,7 @@
         }
       }
       if (step.touch_npc) notes.push(await touchNpcByName(token, step));
-      if (step.touch_npc_by_map) notes.push(await touchNpcByMap(token, macro, step, clicks));
+      if (step.touch_npc_by_map) notes.push(await touchNpcByMap(token, macro, step, clicks, flow));
       if (step.answer_question != null) notes.push(await answerQuestion(token, macro, step));
       if (step.portal) mapMark = Math.max(mapMark, mapSwitchedAt);
       if (step.fight_seconds) {
@@ -1288,59 +1288,77 @@
   // Opens Map, clicks the NPC on it (user: that opens the popup too), clicks
   // the popup's option, closes Map. The client's own packets prove each click:
   // a TOUCHNPC for that NPC after the Map click, a NOTIFY after the option.
-  async function touchNpcByMap(token, macro, step, clicks) {
+  async function touchNpcByMap(token, macro, step, clicks, flow) {
     // Not every NPC comes down in the unit list: Hà Đông's "Chiêu thảo sứ" on
     // map 448 never did (2026-09-23 21:13, "0 NPC đang thấy"), yet a Map click
     // on its tile made the client walk up and touch it. So with npc_tile set,
     // an NPC missing from the list is clicked there, and any touch the client
     // sends after that click counts; it walks the 80 px itself.
-    let near = null;
-    try {
-      near = nearestNpc(step.touch_npc_by_map, Infinity);
-    } catch (error) {
-      if (!step.npc_tile || !/Không thấy NPC/.test(error.message)) throw error;
-    }
-    const me = latestWorld.me;
-    const panel = mapPanel(macro, step.map_size, me);
-    const unit = Number(macro.coord_unit || 8);
-    // The sprite stands on its point; its body is drawn above it.
-    const aim = near
-      ? { x: near.x, y: near.y - Number(step.npc_click_lift ?? 20) }
-      : { x: (Number(step.npc_tile[0]) + 0.5) * unit, y: (Number(step.npc_tile[1]) + 0.5) * unit };
-    if (!panel.shows(aim)) {
-      throw new Error(`NPC "${step.touch_npc_by_map}" ở ${Math.round(aim.x)},${Math.round(aim.y)} không nằm trong Map lúc mở`);
-    }
-    const said = near
-      ? `bấm NPC ${near.name} #${near.id} trên Map`
-      : `bấm ô ${step.npc_tile.join(",")} của NPC ${step.touch_npc_by_map} trên Map (không có trong dữ liệu game)`;
-    // Standing right on the NPC, our own marker on the Map covers it and takes
-    // the click (Thiên Long 976, 2026-09-29 11:55: from 52,15 two runs in a
-    // row sent no touch; from 53,17 it always worked). So a miss is tried
-    // again on another part of the sprite, the Map opened afresh each time.
-    const offsets = near
-      ? (step.npc_click_offsets || macro.npc_click_offsets || [[0, 0], [0, -16], [14, 0], [-14, 0], [0, 14]])
-      : [[0, 0]];
-    let openedAt = 0;
-    let touch = null;
-    const tried = [];
-    for (const [dx, dy] of offsets.map((pair) => pair.map(Number))) {
-      const spot = { x: aim.x + dx, y: aim.y + dy };
-      if (!panel.shows(spot)) continue;
-      openedAt = await openMap(token, macro, clicks);
-      await domWait(token, macro.map_open_delay_seconds || 1.2);
-      const touchedSince = Date.now();
-      clicks.push(await domClick(token, panel.toFraction(spot)));
-      tried.push(`${Math.round(spot.x)},${Math.round(spot.y)}`);
-      for (let deadline = Date.now() + Number(step.dialog_seconds ?? 4) * 1000; !touch && Date.now() < deadline;) {
-        await domWait(token, 0.2);
-        touch = (latestWorld?.touches || []).find((item) => item.at >= touchedSince && (!near || item.target === near.id));
+    // One pass: find the NPC, open Map, click it, try other parts of the sprite.
+    const attempt = async () => {
+      let near = null;
+      try {
+        near = nearestNpc(step.touch_npc_by_map, Infinity);
+      } catch (error) {
+        if (!step.npc_tile || !/Không thấy NPC/.test(error.message)) throw error;
       }
-      if (touch) break;
-      await closeMap(token, panel.closePoint, openedAt, clicks);
-      await domWait(token, 0.6);
+      const me = latestWorld.me;
+      const panel = mapPanel(macro, step.map_size, me);
+      const unit = Number(macro.coord_unit || 8);
+      // The sprite stands on its point; its body is drawn above it.
+      const aim = near
+        ? { x: near.x, y: near.y - Number(step.npc_click_lift ?? 20) }
+        : { x: (Number(step.npc_tile[0]) + 0.5) * unit, y: (Number(step.npc_tile[1]) + 0.5) * unit };
+      if (!panel.shows(aim)) {
+        throw new Error(`NPC "${step.touch_npc_by_map}" ở ${Math.round(aim.x)},${Math.round(aim.y)} không nằm trong Map lúc mở`);
+      }
+      const said = near
+        ? `bấm NPC ${near.name} #${near.id} trên Map`
+        : `bấm ô ${step.npc_tile.join(",")} của NPC ${step.touch_npc_by_map} trên Map (không có trong dữ liệu game)`;
+      // Standing right on the NPC, our own marker on the Map covers it and takes
+      // the click (Thiên Long 976, 2026-09-29 11:55: from 52,15 two runs in a
+      // row sent no touch; from 53,17 it always worked). So a miss is tried
+      // again on another part of the sprite, the Map opened afresh each time.
+      const offsets = near
+        ? (step.npc_click_offsets || macro.npc_click_offsets || [[0, 0], [0, -16], [14, 0], [-14, 0], [0, 14]])
+        : [[0, 0]];
+      let openedAt = 0;
+      let touch = null;
+      const tried = [];
+      for (const [dx, dy] of offsets.map((pair) => pair.map(Number))) {
+        const spot = { x: aim.x + dx, y: aim.y + dy };
+        if (!panel.shows(spot)) continue;
+        openedAt = await openMap(token, macro, clicks);
+        await domWait(token, macro.map_open_delay_seconds || 1.2);
+        const touchedSince = Date.now();
+        clicks.push(await domClick(token, panel.toFraction(spot)));
+        tried.push(`${Math.round(spot.x)},${Math.round(spot.y)}`);
+        for (let deadline = Date.now() + Number(step.dialog_seconds ?? 4) * 1000; !touch && Date.now() < deadline;) {
+          await domWait(token, 0.2);
+          touch = (latestWorld?.touches || []).find((item) => item.at >= touchedSince && (!near || item.target === near.id));
+        }
+        if (touch) break;
+        await closeMap(token, panel.closePoint, openedAt, clicks);
+        await domWait(token, 0.6);
+      }
+      return { touch, near, said, panel, openedAt, tried, me };
+    };
+    let { touch, said, panel, openedAt, tried, me } = await attempt();
+    // The client sometimes stops answering NPC clicks at all - every spot, no
+    // touch, the unit list even stops flagging the lobby's NPCs (Thiên Long
+    // 976, 2026-09-29: 11:55-11:59 and 22:06-22:08, both right after a tour
+    // teleport; the F5 at 11:59 fixed it, 5 runs in a row went in after).
+    // So log in again and try once more before giving up.
+    let relogged = false;
+    if (!touch && macro.actor_switch && step.relog_if_npc_silent !== false) {
+      updateDomFlow(flow, `NPC ${step.touch_npc_by_map} không phản hồi: vào lại nhân vật rồi bấm lại`, "npc_relog");
+      await switchActorAndBack(token, macro, flow);
+      await waitMapReady(token, macro);
+      relogged = true;
+      ({ touch, said, panel, openedAt, tried, me } = await attempt());
     }
     if (!touch) {
-      throw new Error(`${said}: client không gửi lệnh bấm NPC nào sau ${tried.length} lần bấm (điểm map ${tried.join(" | ")}; `
+      throw new Error(`${said}: client không gửi lệnh bấm NPC nào sau ${tried.length} lần bấm${relogged ? " (đã vào lại nhân vật)" : ""} (điểm map ${tried.join(" | ")}; `
         + `ta ${Math.round(me.x)},${Math.round(me.y)}) - bấm trượt NPC trên Map; click: ${clicks.map(describeClick).join(" | ")}`);
     }
     // Let the popup draw before clicking its option.
