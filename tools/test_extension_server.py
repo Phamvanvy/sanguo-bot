@@ -705,6 +705,16 @@ class ExtensionServerTest(unittest.TestCase):
         macros = extension_server.load_config()["activity_macros"]
         self.assertIn("actor_switch", macros["thien_long_hard"])
 
+    def test_activity_panel_popped_up_on_login_is_closed(self):
+        # 2026-09-29 22:17: after an F5 in event hours the game opened H.Động by
+        # itself; it covered the Map button, the NPC and H.Trang.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const ACTIVITY_PANEL_TEXT = {", content)
+        self.assertIn("async function closeActivityPanel(token, macro, clicks, force = false) {", content)
+        self.assertIn("    await waitMapReady(token, macro);\n    await closeActivityPanel(token, macro, clicks);\n", content)
+        self.assertEqual(content.count("await closeActivityPanel(token, macro, clicks, true)"), 3)
+        self.assertIn("if (!latestWorld?.mapLoadedAt && performance.now() < 90000) {", content)
+
     def test_flows_keep_the_screen_on_until_they_end(self):
         # user, 2026-09-26: the display must not sleep before a flow is done.
         manifest = json.loads((PROJECT_ROOT / "extension" / "manifest.json").read_text(encoding="utf-8"))
@@ -918,7 +928,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual([30, 13], relog["goto"])
         self.assertTrue(relog["switch_actor_before"])
         self.assertTrue(relog["fight_seconds"])
-        self.assertIn("await waitMapReady(token, macro);\n    // Opens Chọn NV", content)
+        self.assertIn("await waitMapReady(token, macro);\n    // H.Động over the screen takes the H.Trang click", content)
         inner_door = hard["route_steps"][5]
         self.assertEqual([22, 8], inner_door["goto"])
         self.assertTrue(inner_door["switch_actor_if_stuck"])
@@ -1210,7 +1220,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.5"', manifest)
+        self.assertIn('"version": "0.19.6"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

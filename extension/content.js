@@ -796,6 +796,51 @@
     return { point: [(best.x + text.width / 2) / width, (best.y + textH / 2) / height], score: best.score };
   }
 
+  // "Chỉ dẫn hoạt động" on the H.Động panel, cut from the user's screenshot
+  // (2026-09-29 22:22) like VUT_BO_TEXT: 266 x 33 in the 1918x959 canvas.
+  const ACTIVITY_PANEL_TEXT = {
+    width: 266,
+    rows: [
+      "00000000000000000001f3800000000000000000000000000000000000000000000", "00000000000000000001ff800000000000000000000000000000000000000000000", "00000000000000000003df800000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000", "0000000000000000000000000000000000000000000000000000000000000000000", "03fe01f000fe00001f00fc00000000780000000000006000003e01f800000000000",
+      "0fff81f0001e00001f00fe0000000078000000000001e00003ff03f800000000000", "0fffc1f0001e00001f01fe0000000078000000000001e00007ff83fc00000000000", "3f07e1f0003e00001f01ff0000000078000000000001e00007ff87fc00000000000",
+      "3e03e1f0000000001f00000000000078000000000001e000007e000000000000000", "7c01e1f0000000001f00000000000078000000000003f000003e000000000000000", "7801e1ffe07c000fff03ff03ffc0007ff003fc01ff07fc001ffe03fc0fff007ff04",
+      "780001fff07c001fff0fff83ffe0007ffc0ffe07ff87fc007ffe0ffe0fff81fff04", "f80001fff87c003fff0fff83ffe0007ffc1fff07ffc7f8007ffe1fff0fffc3fff04", "f80001f8f87c003c3f1f0783f1e0007c3c1f1f0f83c1e00078fe1f1f0fc7c3e3f00",
+      "f80001f0787c007c1f000783e1e000783c3e0f8003c1e000f87e3e0f8f83c7c1f00", "f80001f0787c00781f000f83c1e000783c3c078007c1e001f03e7c078f83c7c0f00", "f80001f0787c00f81f003fc3c1f000783e7c07801fe1e001f03e7c078f83e780f00",
+      "f80001f0787c00f81f07ffc3c1f000783e7c0783ffe1e001f03e7c078f83e780f00", "780001f0787c00f81f0fffc3c1f000783e7c0787ffe1e001f03e7c078f83e780f00", "7800f1f0787c00f81f1fc7c3c1f000783e7c078fe3e1e001f03e7c078f83e780f00",
+      "7c01f1f0787c00781f1e07c3c1f000783e3c078f03e1e001f03e7c078f83e7c0f00", "3e03e1f0787c007c1f1e0fc3c1f000783e3e0f9f07e1e000f87e3e0f8f83e7c1f00", "3f07e1f0787c003e3f1f1fc3c1f000783e1f1f1f8fe1e0007cfe1f1f0f83e3e3f00",
+      "1fffc1f0787c003fff1fffc3c1f000783e1fff0fffe1f8007ffe1fff0f83e3fff04", "0fff81f0787c001fff0fffc3c1f000783e0ffe0fffe1fc003ffe0ffe0f83e1fff04", "03ff01f0787c000fff07ffe3c1f000783e03fc03ffe0fc001ffe03fc0f83e0fff04",
+      "0000000000000000000000000000000000000000000000000000000000000001f00", "0000000000000000000000000000000000000000000000000000000000000001f00", "000000000000000000000000000000000000000078000000000000f0000007c1f00",
+      "000000000000000000000000000000000000000078000000000000f0000003ffe00", "000000000000000000000000000000000000000038000000000000f0000003ffc00", "00000000000000000000000000000000000000000000000000000000000000ff800",
+    ],
+  };
+  let activityCheckedAt = 0;
+
+  // The game opens H.Động by itself on login while an event runs (22:00-23:00
+  // Chiến Dịch Ô Sào): after an F5 at 22:17 (2026-09-29) it covered the screen,
+  // so the Map button, the NPC on it and H.Trang took no click at all - the
+  // "Map không mở, đóng Cầu phúc" guess clicked beside it. Looks for the panel
+  // by its text and closes it by its big X (user's screenshot). At most every
+  // activity_check_seconds unless forced; true when it closed one.
+  async function closeActivityPanel(token, macro, clicks, force = false) {
+    if (macro.activity_panel_check === false) return false;
+    if (!force && Date.now() - activityCheckedAt < Number(macro.activity_check_seconds ?? 5) * 1000) return false;
+    activityCheckedAt = Date.now();
+    let found;
+    try {
+      found = findText((await readGameScreen()).image, ACTIVITY_PANEL_TEXT, macro.activity_text_area || [0.45, 0.14, 0.75, 0.34]);
+    } catch (_) {
+      return false;              // no pixels: nothing to go on
+    }
+    if (found.score < Number(macro.activity_min_score ?? 0.6)) return false;
+    clicks.push(await domClick(token, macro.activity_panel_close_point || [0.969, 0.063]));
+    appendDiagnostic("activity_panel", {
+      message: `H.Động đang che màn hình (điểm ${found.score.toFixed(2)}), bấm X đóng; ${describeWorld()}`,
+    });
+    await domWait(token, Number(macro.activity_close_delay_seconds ?? 0.8));
+    return true;
+  }
+
   // Sort, open the first item, "Vứt bỏ", confirm - as before, except that
   // "Vứt bỏ" is found by its text: it moves with the item's kind (the 4th
   // button for equipment, under Mặc / Nâng cấp / Siêu cấp sao - user,
@@ -1528,6 +1573,8 @@
     // at :26.0). So give a reload a moment to show, then let the map settle.
     await domWait(token, Number(switcher.settle_seconds ?? 2));
     await waitMapReady(token, macro);
+    // H.Động over the screen takes the H.Trang click (2026-09-29 22:18).
+    await closeActivityPanel(token, macro, clicks, true);
     // Opens Chọn NV and proves it by the character list the game sends.
     const openPicker = async () => {
       const listedBefore = latestWorld?.actorsAt || 0;
@@ -1557,7 +1604,15 @@
       await openPicker();
       note = `đổi tạm sang ${slots.naming(slots.spare)} rồi ${note}`;
     }
+    const loggedInAt = Date.now();
     await loginAs(slots.mine);
+    // Every login in event hours pops H.Động up again once the map is drawn.
+    for (const deadline = Date.now() + Number(switcher.load_wait_seconds ?? 20) * 1000;
+      !((latestWorld?.mapLoadedAt || 0) >= loggedInAt) && Date.now() < deadline;) {
+      await domWait(token, 0.3);
+    }
+    await domWait(token, Number(switcher.popup_wait_seconds ?? 2));
+    await closeActivityPanel(token, macro, clicks, true);
     appendDiagnostic("actor_switch", {
       flow,
       message: `${note}; map trước ${mapBefore} sau ${latestWorld?.mapId ?? "?"}; `
@@ -1831,6 +1886,7 @@
   // Returns when it clicked, for closeMap.
   async function openMap(token, macro, clicks) {
     await waitMapReady(token, macro);
+    await closeActivityPanel(token, macro, clicks);
     const openedAt = Date.now();
     clicks.push(await domClick(token, macro.map_button_point || [0.85, 0.07]));
     return openedAt;
@@ -1840,11 +1896,18 @@
   // since: 4 s after the switch alone was not enough (Hà Đông 448, 21:57:
   // two Map clicks right after exit + reset did nothing, C.Phúc again).
   async function waitMapReady(token, macro) {
+    const deadline = Date.now() + Number(macro.map_load_wait_seconds ?? 20) * 1000;
     if (mapSwitchedAt) {
-      const deadline = Date.now() + Number(macro.map_load_wait_seconds ?? 20) * 1000;
       while (!((latestWorld?.mapLoadedAt || 0) >= mapSwitchedAt - 1000) && Date.now() < deadline) {
         await domWait(token, 0.3);
       }
+    }
+    // Right after an F5 no map switch is seen (the first map id is no switch),
+    // yet the map is still loading: a flow resumed at once clicked Map into
+    // the loading screen (Thiên Long 976, 2026-09-29 22:17). Only on a fresh
+    // page, so a probe that missed the load cannot stall every Map click.
+    if (!latestWorld?.mapLoadedAt && performance.now() < 90000) {
+      while (!latestWorld?.mapLoadedAt && Date.now() < deadline) await domWait(token, 0.3);
     }
     const loadedAt = Math.max(mapSwitchedAt, latestWorld?.mapLoadedAt || 0);
     const readyAt = loadedAt + Number(macro.map_ready_seconds ?? 3) * 1000;
@@ -2144,6 +2207,7 @@
       <= Number(step.door_step_out_near ?? macro.door_step_out_near ?? 2);
     let strayPopups = 0;
     let strayBlessings = 0;
+    let strayActivity = 0;
     const summary = () => `đi tới ${step.goto.join(",")}: ${legs.join(" → ") || "đã đứng sẵn ở đó"}`;
     // Clicking the door on the Map can leave us standing still beside it
     // (Thiên Long's exit: stuck at 81,57 every time, and nudging on the Map
@@ -2311,6 +2375,13 @@
       // map reloaded) no panel opened, and a "close" there hit Menu instead
       // (Hà Đông 450, 2026-09-24 09:30: the N.Vật panel came up).
       const xClicked = closed === "nút X";
+      // H.Động that the game popped up by itself is seen, not guessed.
+      if (stood && !near && !["map", "ambush"].includes(walk.how) && strayActivity < 3
+        && await closeActivityPanel(token, macro, clicks, true)) {
+        strayActivity += 1;
+        legs[legs.length - 1] += " (không nhúc nhích: H.Động che màn hình, đóng)";
+        continue;
+      }
       if (stood && !near && xClicked && strayPanel && !attacked && !["map", "ambush"].includes(walk.how) && strayBlessings < 2) {
         strayBlessings += 1;
         clicks.push(await domClick(token, strayPanel.close));
