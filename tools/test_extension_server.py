@@ -849,7 +849,7 @@ class ExtensionServerTest(unittest.TestCase):
         # the NPC by NAME in the game's own unit list, and checking each click
         # by the packet the client itself sends.
         hard_entry = macros["thien_long_hard"]["entry_steps"]
-        self.assertEqual([53, 16], hard_entry[0]["goto"])
+        self.assertEqual([53, 18], hard_entry[0]["goto"])
         self.assertNotIn("portal", hard_entry[0])
         self.assertEqual("Thái Trường Trị", hard_entry[1]["touch_npc_by_map"])
         self.assertEqual([512, 512], hard_entry[1]["map_size"])

@@ -422,8 +422,10 @@ activity_macros:
     # cách này cũng ra popup), bấm mục 1, đóng Map. Gói client tự gửi sau mỗi
     # cú bấm (npc_touch_sent / npc_answer_sent) cho biết bấm có trúng không.
     entry_steps:
-      # Game chỉ cho bấm NPC trong 80px nên đi tới sát trước.
-      - {label: "Tới chỗ NPC Thái Trường Trị (53,16)", goto: [53, 16], map_size: &thien_long_lobby [512, 512], maps: &thien_long_lobby_maps [976]}
+      # Game chỉ cho bấm NPC trong 80px nên đi tới sát trước - nhưng đứng PHÍA
+      # NAM NPC: đứng đè lên NPC (52,15 / 53,14) thì dấu nhân vật trên Map che
+      # NPC, bấm trượt (2026-09-29 11:55-11:59); các lần được đều đứng ở 53,17.
+      - {label: "Tới phía nam NPC Thái Trường Trị (53,18)", goto: [53, 18], map_size: &thien_long_lobby [512, 512], maps: &thien_long_lobby_maps [976]}
       # option_point: mục 1 của popup, giữa màn hình (ảnh user 2026-09-23:
       # 960,568 trên màn 1920x1080, canvas bắt đầu ở y 81).
       # portal: chờ đổi map, không đổi thì dừng flow báo lỗi.
