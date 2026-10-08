@@ -186,7 +186,7 @@ activity_macros:
     max_cycles: 0
   farm_spots:
     label: "Farm quái"
-    description: "Đi khắp map trung lập (hoặc giữ 1 bãi) tìm quái mà đánh, đến khi Stop"
+    description: "Chạy qua lại các bãi đông quái ở map trung lập (hoặc khắp map / giữ 1 bãi), đến khi Stop"
     icon: "🌾"
     runner: "farm_spot_loop"
     # Farm Lễ bao lao động (user, 2026-10-08). Mỗi nút trên thẻ = một bãi. Chưa
@@ -209,27 +209,40 @@ activity_macros:
     # nhiều quái nhất theo dữ liệu map gốc. Thêm điểm vào points thì bot đi
     # vòng: điểm này trống spot_wait_seconds thì sang điểm kế.
     #
-    # Tick "Đi khắp map" trên thẻ (mặc định bật; user, 2026-10-08: "hoàn toàn có
-    # thể đi khắp map") = đi lần lượt mọi cụm quái của map (roam_points), bắt đầu
-    # từ cụm gần nhất, đánh cả con gặp trên đường; cụm trống roam_wait_seconds thì
-    # sang cụm kế, hết vòng thì quay lại cụm đầu (quái đã hồi 90-120s). Server chỉ
-    # gửi quái trong vài ô quanh nhân vật nên không thấy quái xa - phải đi theo
-    # cụm. roam_points sinh bằng tools/assets/farm_points.py <map> từ dữ liệu map
-    # gốc (cụm >= 3 quái trong 160px, xếp đường ngắn); Kinh Sở bỏ 4 cụm walk grid
-    # báo không đi bộ tới được (4,52 91,14 168,56 131,128).
+    # "Cách farm" trên thẻ (trình duyệt nhớ lựa chọn):
+    #   Qua lại các bãi (mặc định; user, 2026-10-08: "chạy qua lại các bãi") =
+    #     patrol_points: 3 cụm đông quái nhất nằm gần nhau (trong 480px của cụm
+    #     đông nhất); bãi trống patrol_wait_seconds thì chạy sang bãi kế, hết
+    #     vòng quay lại bãi đầu (quái đã hồi 90-120s).
+    #   Đi khắp map (user: "hoàn toàn có thể đi khắp map") = roam_points: mọi cụm
+    #     quái của map; cụm trống roam_wait_seconds thì sang cụm kế.
+    #   Giữ 1 bãi = points, như trên.
+    # Đang đi giữa các điểm thì đánh cả con gặp trên đường; bắt đầu từ điểm gần
+    # nhân vật nhất. Server chỉ gửi quái trong vài ô quanh nhân vật nên không thấy
+    # quái xa - phải đi theo cụm. patrol_points / roam_points sinh bằng
+    # tools/assets/farm_points.py <map> từ dữ liệu map gốc (cụm >= 3 quái trong
+    # 160px, xếp đường ngắn); Kinh Sở chạy với --skip 4,52 91,14 168,56 131,128
+    # (4 cụm walk grid báo không đi bộ tới được).
     spots:
       - {id: "giang_lang", label: "Giang Lăng", map: 896, points: [[151, 142]],
+         patrol_points: [[141, 130], [151, 161], [166, 97]],
          roam_points: [[141, 130], [171, 134], [166, 97], [172, 77], [126, 90], [27, 100], [55, 140], [20, 163], [46, 165], [85, 175], [108, 141], [122, 169], [151, 161]]}
       - {id: "tay_vuc", label: "Tây Vực", map: 848, points: [[64, 43]],
+         patrol_points: [[34, 33], [43, 63], [70, 51]],
          roam_points: [[34, 33], [3, 31], [10, 84], [51, 115], [88, 69], [143, 106], [172, 111], [120, 19], [81, 32], [70, 51], [43, 63]]}
       - {id: "soc_phuong", label: "Sóc Phương", map: 816, points: [[25, 64]],
+         patrol_points: [[25, 64], [30, 31], [68, 27]],
          roam_points: [[25, 64], [50, 76], [113, 127], [126, 96], [165, 103], [155, 50], [109, 22], [84, 57], [68, 27], [30, 31]]}
       - {id: "hung_no", label: "Hung Nô", map: 1024, points: [[152, 87]],
+         patrol_points: [[162, 27], [156, 61], [106, 23]],
          roam_points: [[162, 27], [106, 23], [86, 36], [20, 21], [14, 57], [39, 82], [66, 123], [123, 86], [157, 99], [156, 61]]}
       - {id: "nam_hai", label: "Nam Hải", map: 864, points: [[90, 158]],
+         patrol_points: [[90, 158], [117, 167], [60, 112]],
          roam_points: [[90, 158], [117, 167], [156, 159], [162, 136], [142, 107], [91, 95], [60, 112], [24, 66], [27, 150], [53, 179]]}
       - {id: "kinh_so", label: "Kinh Sở", map: 1056, points: [[100, 73]],
+         patrol_points: [[81, 69], [59, 40], [129, 79]],
          roam_points: [[81, 69], [77, 102], [59, 40], [141, 36], [168, 19], [163, 100], [129, 79], [99, 56]]}
+    patrol_wait_seconds: 3
     roam_wait_seconds: 4
     farm_radius: 220
     leash_radius: 320

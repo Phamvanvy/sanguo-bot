@@ -660,7 +660,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual("farm_spot_loop", farm["runner"])
         flows = {flow["id"]: flow for flow in extension_server.flow_catalog(cfg)}
         self.assertEqual(
-            [{"id": spot["id"], "label": spot["label"], "roam": True} for spot in farm["spots"]],
+            [{"id": spot["id"], "label": spot["label"], "patrol": True, "roam": True} for spot in farm["spots"]],
             flows["farm_spots"]["farm_spots"],
         )
         self.assertEqual("giang_lang", farm["spots"][0]["id"])
@@ -674,7 +674,7 @@ class ExtensionServerTest(unittest.TestCase):
             bits = base64.b64decode(grid["blocked"])
             w, h = grid["w"], grid["h"]
             is_open = lambda x, y: 0 <= x < w and 0 <= y < h and not (bits[(y * w + x) >> 3] >> ((y * w + x) & 7)) & 1
-            points = spot["points"] + spot["roam_points"]
+            points = spot["points"] + spot["patrol_points"] + spot["roam_points"]
             seen = {tuple(points[0])}
             queue = [tuple(points[0])]
             while queue:
@@ -691,8 +691,10 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('"farm_spot_loop",', content)
         self.assertIn('else if (macro.runner === "farm_spot_loop") await runFarmSpot(token, macro, flow);', content)
         self.assertIn("await giveUp(refused.target, `game báo không đánh được, lý do ${refused.reason}`);", content)
-        self.assertIn("const roam = Boolean(macro.roam && spot.roam_points?.length);", content)
-        self.assertIn("? { ...option.overrides, roam: roamTick.checked } : option.overrides));", content)
+        self.assertIn("const routes = { hold: spot.points, patrol: spot.patrol_points, roam: spot.roam_points };", content)
+        self.assertIn("? { ...option.overrides, mode: modePick.value } : option.overrides));", content)
+        # "Qua lại các bãi" first, so it is the default (user, 2026-10-08).
+        self.assertIn('[["patrol", "Qua lại các bãi"], ["roam", "Đi khắp map"], ["hold", "Giữ 1 bãi"]]', content)
 
     def test_refused_doors_are_walked_off_and_into_again(self):
         # user, 2026-09-29: turned away while attacked, the character freezes on

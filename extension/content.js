@@ -254,7 +254,7 @@
   // 2026-09-26): a tick per pipeline card; each runs the counts typed on its
   // own card, and the tour walks between their lobbies by T.Giới Map.
   const TOUR_PICKS_KEY = "sanguo-tour-picks";
-  const FARM_ROAM_KEY = "sanguo-farm-roam";
+  const FARM_MODE_KEY = "sanguo-farm-mode";
   function renderTourCard(flow, running) {
     const card = document.createElement("div");
     card.className = "sg-flow sg-item-flow";
@@ -359,18 +359,23 @@
         card.querySelector("strong").textContent = flow.label;
         card.querySelector("small").textContent = flow.description;
         const slots = card.querySelector(".sg-item-slots");
-        // Farm: walk every monster cluster of the map, or hold the one spot
-        // (user, 2026-10-08). On by default; this browser keeps the choice.
-        const roamTick = flow.farm_spots?.some((spot) => spot.roam) && document.createElement("input");
-        if (roamTick) {
-          roamTick.type = "checkbox";
-          try { roamTick.checked = localStorage.getItem(FARM_ROAM_KEY) !== "0"; } catch (_) { roamTick.checked = true; }
-          roamTick.disabled = running;
-          roamTick.addEventListener("change", () => {
-            try { localStorage.setItem(FARM_ROAM_KEY, roamTick.checked ? "1" : "0"); } catch (_) { /* a convenience only */ }
+        // Farm: run back and forth between a few full spots (the default,
+        // user 2026-10-08: "chạy qua lại các bãi"), walk every monster cluster
+        // of the map, or hold the one spot. This browser keeps the choice.
+        const modePick = flow.farm_spots && document.createElement("select");
+        if (modePick) {
+          for (const [value, text] of [["patrol", "Qua lại các bãi"], ["roam", "Đi khắp map"], ["hold", "Giữ 1 bãi"]]) {
+            if (value === "hold" || flow.farm_spots.some((spot) => spot[value])) modePick.add(new Option(text, value));
+          }
+          let saved = null;
+          try { saved = localStorage.getItem(FARM_MODE_KEY); } catch (_) { /* private window */ }
+          modePick.value = [...modePick.options].some((option) => option.value === saved) ? saved : modePick.options[0].value;
+          modePick.disabled = running;
+          modePick.addEventListener("change", () => {
+            try { localStorage.setItem(FARM_MODE_KEY, modePick.value); } catch (_) { /* a convenience only */ }
           });
           const label = document.createElement("label");
-          label.append(roamTick, " Đi khắp map (bỏ tick = giữ 1 bãi)");
+          label.append("Cách farm ", modePick);
           slots.append(label);
         }
         for (const option of options) {
@@ -378,8 +383,8 @@
           button.type = "button";
           button.disabled = running;
           button.textContent = option.label;
-          button.addEventListener("click", () => runFlow(flow, roamTick
-            ? { ...option.overrides, roam: roamTick.checked } : option.overrides));
+          button.addEventListener("click", () => runFlow(flow, modePick
+            ? { ...option.overrides, mode: modePick.value } : option.overrides));
           slots.append(button);
         }
         return card;
@@ -1890,18 +1895,25 @@
   // Strayed past leash_radius: walk back by Map. Not on the spot's map: the
   // T.Giới Map teleport (OpCode 615). A 1006 drop waits for the game to log in
   // again and goes on.
-  // roam ("Đi khắp map", user 2026-10-08: "hoàn toàn có thể đi khắp map"): the
-  // spot's roam_points instead - every monster cluster of the map from the
-  // game data (tools/assets/farm_points.py), since the server only sends the
-  // units within a few cells of us. Starts at the nearest, fights whatever is
-  // near us or the cluster, and goes on after roam_wait_seconds with nothing.
+  // mode (user, 2026-10-08): "hold" the spot's points; "patrol" ("Qua lại các
+  // bãi": "chạy qua lại các bãi") its patrol_points - the densest clusters
+  // close to one another; "roam" ("Đi khắp map") its roam_points - every
+  // monster cluster of the map. Both lists come from the game data
+  // (tools/assets/farm_points.py), since the server only sends the units
+  // within a few cells of us. Moving between points, it starts at the nearest,
+  // fights whatever is near us on the way too, and goes on after
+  // patrol_wait_seconds / roam_wait_seconds with nothing left.
   async function runFarmSpot(token, macro, flow) {
     const spots = macro.spots || [];
     const spot = spots.find((item) => item.id === macro.spot) || spots[0];
     if (!spot) throw new Error("Chưa cấu hình bãi farm (spots) trong config.yaml");
     const mapId = Number(spot.map);
-    const roam = Boolean(macro.roam && spot.roam_points?.length);
-    const points = ((roam ? spot.roam_points : spot.points) || []).map((point) => point.map(Number));
+    const routes = { hold: spot.points, patrol: spot.patrol_points, roam: spot.roam_points };
+    const wanted = macro.mode || (macro.roam ? "roam" : "hold");
+    const mode = routes[wanted]?.length ? wanted : "hold";
+    const roam = mode !== "hold";       // on the move between points
+    const place = mode === "roam" ? "cụm" : "bãi";
+    const points = (routes[mode] || []).map((point) => point.map(Number));
     if (!points.length) throw new Error(`Bãi ${spot.label} chưa có tọa độ (points)`);
     const grid = walkGridFor(mapId);
     const mapSize = grid?.size || spot.map_size;
@@ -1914,7 +1926,9 @@
     const ambush = Number(macro.ambush_radius ?? 150);
     const stallMs = Number(macro.target_stall_seconds ?? 8) * 1000;
     const skipMs = Number(macro.skip_seconds ?? 60) * 1000;
-    const emptyMs = Number(roam ? macro.roam_wait_seconds ?? 4 : macro.spot_wait_seconds ?? 20) * 1000;
+    const emptyMs = Number({
+      hold: macro.spot_wait_seconds ?? 20, patrol: macro.patrol_wait_seconds ?? 3, roam: macro.roam_wait_seconds ?? 4,
+    }[mode]) * 1000;
     const reclickMs = Number(macro.reclick_seconds ?? 3) * 1000;
     const refusing = new Set((macro.refuse_reasons || [8, 14]).map(Number));
     const ignore = spot.ignore_monster_names ?? macro.ignore_monster_names ?? [];
@@ -1980,7 +1994,8 @@
       }
     };
     appendDiagnostic("farm_start", {
-      flow, message: `${spot.label} map ${mapId}${roam ? " (đi khắp map)" : ""}, `
+      flow, message: `${spot.label} map ${mapId} (${{ hold: "giữ 1 bãi", patrol: "qua lại các bãi", roam: "đi khắp map" }[mode]}`
+        + `${mode === wanted ? "" : `, không có điểm cho ${wanted}`}), `
         + `điểm ${points.map((point) => point.join(",")).join(" → ")}, `
         + `bán kính ${radius}px; ${describeWorld()}`,
     });
@@ -2046,13 +2061,13 @@
         const kept = target && all.find((monster) => monster.id === target.id);
         const pick = hitNow || kept || attackers[0] || inSpot.sort((a, b) => a.d - b.d)[0];
         if (!attackers.length && !hitNow && !(roam && pick) && fromAnchor(world.me) > leash) {
-          await walkHome(roam ? "tới cụm quái" : "chạy quá xa bãi, quay về");
+          await walkHome(roam ? `tới ${place} quái` : "chạy quá xa bãi, quay về");
           continue;
         }
         if (!pick) {
           target = null;
           if (fromAnchor(world.me) > (roam ? radius / 2 : homeRadius)) {
-            await walkHome(roam ? "tới cụm quái" : "hết quái, về giữa bãi chờ hồi");
+            await walkHome(roam ? `tới ${place} quái` : "hết quái, về giữa bãi chờ hồi");
             emptySince = 0;
             continue;
           }
@@ -2060,10 +2075,10 @@
           if (points.length > 1 && now - emptySince >= emptyMs) {
             pointIndex = (pointIndex + 1) % points.length;
             emptySince = 0;
-            await walkHome(roam ? `hết quái, sang cụm ${pointIndex + 1}/${points.length}` : "hết quái, sang điểm kế");
+            await walkHome(roam ? `hết quái, sang ${place} ${pointIndex + 1}/${points.length}` : "hết quái, sang điểm kế");
             continue;
           }
-          updateDomFlow(flow, `${status()} - ${roam ? `cụm ${pointIndex + 1}/${points.length} trống, chờ chút` : "chờ quái hồi"}`,
+          updateDomFlow(flow, `${status()} - ${roam ? `${place} ${pointIndex + 1}/${points.length} trống, chờ chút` : "chờ quái hồi"}`,
             "farm_wait");
           await domWait(token, 1);
           continue;

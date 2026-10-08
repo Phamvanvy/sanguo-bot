@@ -75,16 +75,29 @@ def main() -> None:
     parser.add_argument("--min", type=int, default=3)
     parser.add_argument("--max-refresh", type=int, default=300)
     parser.add_argument("--ignore", nargs="*", default=["Kế hoạch tam quốc minh châu"])
+    # patrol_points: the densest cluster and the next densest ones within
+    # --patrol-within px of it, at most --patrol of them - a short run back and
+    # forth between a few full spots instead of the whole map.
+    parser.add_argument("--patrol", type=int, default=3)
+    parser.add_argument("--patrol-within", type=int, default=480)
+    parser.add_argument("--skip", nargs="*", default=[], help="x,y tiles to leave out (unreachable on foot)")
     args = parser.parse_args()
+    skip = {tuple(map(int, item.split(","))) for item in args.skip}
     for map_id in args.maps:
         info = (Path(args.data) / "Areas" / str(map_id >> 4) / "info.xml").read_text(encoding="utf-8")
-        found = clusters(monsters(info, args.max_refresh, set(args.ignore)), args.radius, args.min)
+        found = [(c, n) for c, n in clusters(monsters(info, args.max_refresh, set(args.ignore)), args.radius, args.min)
+                 if (c[0] // 8, c[1] // 8) not in skip]
         counts = {centre: count for centre, count in found}
         order = tour([centre for centre, _ in found])
-        tiles = [[x // 8, y // 8] for x, y in order]
-        print(f"{map_id}: {len(tiles)} cụm, {sum(counts.values())} quái")
-        print(f"  roam_points: {tiles}".replace("], [", "], ["))
+        tiles = lambda points: [[x // 8, y // 8] for x, y in points]
+        print(f"{map_id}: {len(order)} cụm, {sum(counts.values())} quái")
+        print(f"  roam_points: {tiles(order)}")
         print(f"  # số quái mỗi cụm: {[counts[c] for c in order]}")
+        best = found[0][0]
+        near = [c for c, _ in found if math.dist(c, best) <= args.patrol_within][:args.patrol]
+        patrol = tour(near)
+        print(f"  patrol_points: {tiles(patrol)}")
+        print(f"  # số quái mỗi bãi: {[counts[c] for c in patrol]}")
 
 
 if __name__ == "__main__":

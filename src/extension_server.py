@@ -110,13 +110,15 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
         # along with the catalogue rather than only living in the macro.
         if macro.get("run_options"):
             flow["run_options"] = [int(times) for times in macro["run_options"]]
-        # The farm card gets a button per spot (map + points to hold), and its
-        # "Đi khắp map" tick when a spot has every cluster of its map listed.
+        # The farm card gets a button per spot (map + points to hold), and a
+        # mode picker offering "Qua lại các bãi" / "Đi khắp map" when a spot
+        # lists patrol_points / roam_points.
         if macro.get("runner") == "farm_spot_loop":
             flow["farm_spots"] = [
                 {
                     "id": str(spot["id"]),
                     "label": str(spot.get("label", spot["id"])),
+                    "patrol": bool(spot.get("patrol_points")),
                     "roam": bool(spot.get("roam_points")),
                 }
                 for spot in macro.get("spots", [])
