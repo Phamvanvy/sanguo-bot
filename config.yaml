@@ -236,9 +236,20 @@ activity_macros:
       - {id: "hung_no", label: "Hung Nô", map: 1024, points: [[152, 87]],
          patrol_points: [[162, 27], [156, 61], [106, 23]],
          roam_points: [[162, 27], [106, 23], [86, 36], [20, 21], [14, 57], [39, 82], [66, 123], [123, 86], [157, 99], [156, 61]]}
-      - {id: "nam_hai", label: "Nam Hải", map: 864, points: [[90, 158]],
-         patrol_points: [[90, 158], [117, 167], [60, 112]],
-         roam_points: [[90, 158], [117, 167], [156, 159], [162, 136], [142, 107], [91, 95], [60, 112], [24, 66], [27, 150], [53, 179]]}
+      # Nam Hải / Nam Việt / Ô Sào: map sau 2011, chỉ có trong
+      # Game/Sanguo1.0-Data (南海 2032, 南越 2016, 乌巢 2000). Nam Hải bản 2011
+      # (864) server không cho dịch chuyển tới ("Map này không thể đến được",
+      # 2026-10-08 - lúc đó đang đứng ở 2032). Điểm sinh bằng farm_points.py
+      # --patrol-within 640, bỏ quái sự kiện hồi < 90s (giáo viên giả, bánh chưng).
+      - {id: "nam_hai", label: "Nam Hải", map: 2032, points: [[160, 71]],
+         patrol_points: [[160, 71], [133, 83], [98, 45]],
+         roam_points: [[160, 71], [133, 83], [58, 113], [33, 85], [98, 45]]}
+      - {id: "nam_viet", label: "Nam Việt", map: 2016, points: [[88, 26]],
+         patrol_points: [[88, 26], [70, 18], [145, 67]],
+         roam_points: [[88, 26], [70, 18], [66, 157], [125, 151], [133, 127], [145, 67]]}
+      - {id: "o_sao", label: "Ô Sào", map: 2000, points: [[112, 137]],
+         patrol_points: [[112, 137], [125, 162], [160, 100]],
+         roam_points: [[112, 137], [125, 162], [88, 172], [75, 139], [56, 126], [25, 77], [53, 62], [90, 47], [122, 25], [158, 52], [160, 100]]}
       - {id: "kinh_so", label: "Kinh Sở", map: 1056, points: [[100, 73]],
          patrol_points: [[81, 69], [59, 40], [129, 79]],
          roam_points: [[81, 69], [77, 102], [59, 40], [141, 36], [168, 19], [163, 100], [129, 79], [99, 56]]}

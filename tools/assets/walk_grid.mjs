@@ -13,7 +13,9 @@
  * spot the game's own pathfinder can reach (see extension/content.js walkToCoord).
  *
  * Usage:
- *   node tools/assets/walk_grid.mjs [--data <dir>] [--out <file>] [mapId ...]
+ *   node tools/assets/walk_grid.mjs [--data <dir>]... [--out <file>] [mapId ...]
+ *   (each --data is searched in turn; default selfhost/runtime/data, then
+ *   Game/Sanguo1.0-Data/data for the maps added after 2011)
  *   node tools/assets/walk_grid.mjs --check 977 "8,89 20,31"   (print blocked of each x,y)
  */
 import fs from 'node:fs';
@@ -34,12 +36,15 @@ const codecs = {
 // Dungeon maps the extension routes walk (live ids = the data files' ids):
 // Cổ Mộ lobby + easy 769-773 + hard 1137-1141, Hà Đông 432/433/448-450,
 // Thiên Long lobby 976 + trận 977/978; plus the neutral maps the "Farm quái"
-// flow holds a spot on: Sóc Phương 816, Tây Vực 848, Nam Hải 864, Giang Lăng
-// 896, Hung Nô 1024, Kinh Sở 1056 (map id = area folder * 16).
+// flow holds a spot on: Sóc Phương 816, Tây Vực 848, Giang Lăng 896, Hung Nô
+// 1024, Kinh Sở 1056, Ô Sào 2000, Nam Việt 2016, Nam Hải 2032 (map id = area
+// folder * 16). The last three are only in Game/Sanguo1.0-Data: the live Nam
+// Hải is 2032 - the 2011 one, 864, the server refuses ("Map này không thể đến
+// được", 2026-10-08).
 const DEFAULT_MAPS = [
   768, 769, 770, 771, 772, 773, 1137, 1138, 1139, 1140, 1141,
   432, 433, 448, 449, 450, 976, 977, 978,
-  816, 848, 864, 896, 1024, 1056,
+  816, 848, 896, 1024, 1056, 2000, 2016, 2032,
 ];
 
 /** GamePackage.loadNPCCollision: per decor animation, its blocking boxes. */
@@ -123,7 +128,15 @@ export function walkGrid(pkg, map) {
   return { w, h, pathW, pathH, blocked };
 }
 
-function findMap(dataDir, mapId) {
+function findMap(dataDirs, mapId) {
+  for (const dataDir of dataDirs) {
+    const found = findMapIn(dataDir, mapId);
+    if (found) return found;
+  }
+  throw new Error(`map ${mapId} not found under ${dataDirs.join(', ')}`);
+}
+
+function findMapIn(dataDir, mapId) {
   const areasDir = path.join(dataDir, 'Areas');
   for (const dir of fs.readdirSync(areasDir).sort()) {
     const file = path.join(areasDir, dir, 'client.pkg');
@@ -137,7 +150,7 @@ function findMap(dataDir, mapId) {
     if (pkg.areaID !== mapId >> 4 || !pkg.localMapIds.includes(mapId & 0x0f)) continue;
     return { pkg, map: pkg.loadMap(mapId & 0x0f) };
   }
-  throw new Error(`map ${mapId} not found under ${areasDir}`);
+  return null;
 }
 
 function toBase64Bits(blocked) {
@@ -147,16 +160,17 @@ function toBase64Bits(blocked) {
 }
 
 function main(argv) {
-  let data = path.join(REPO, 'selfhost/runtime/data');
+  const data = [];
   let out = path.join(REPO, 'extension/walk_grids.js');
   let check = null;
   const ids = [];
   for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--data') data = argv[++i];
+    if (argv[i] === '--data') data.push(argv[++i]);
     else if (argv[i] === '--out') out = argv[++i];
     else if (argv[i] === '--check') check = { id: Number(argv[++i]), points: argv[++i] };
     else ids.push(Number(argv[i]));
   }
+  if (!data.length) data.push(path.join(REPO, 'selfhost/runtime/data'), path.join(REPO, 'Game/Sanguo1.0-Data/data'));
   if (check) {
     const { pkg, map } = findMap(data, check.id);
     const grid = walkGrid(pkg, map);

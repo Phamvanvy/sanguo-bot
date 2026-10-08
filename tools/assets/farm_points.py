@@ -20,13 +20,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 
-def monsters(info: str, max_refresh: int, ignore: set[str]) -> list[tuple[int, int]]:
+def monsters(info: str, min_refresh: int, max_refresh: int, ignore: set[str]) -> list[tuple[int, int]]:
     out = []
     for match in re.finditer(r"<npc ([^>]*)/?>", info):
         attrs = dict(re.findall(r'(\w+)="([^"]*)"', match.group(1)))
         refresh = int(attrs.get("refreshinterval", "-1"))
         if (attrs.get("faction") == "4" and attrs.get("canattack") == "1"
-                and 0 < refresh <= max_refresh and attrs.get("name", "").strip() not in ignore):
+                and min_refresh <= refresh <= max_refresh and attrs.get("name", "").strip() not in ignore):
             out.append((int(attrs["x"]), int(attrs["y"])))
     return out
 
@@ -66,14 +66,32 @@ def tour(spots: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return order
 
 
+def read_info(data_dirs: list[str], map_id: int) -> str:
+    """The first data dir's info.xml for the map's area, in its declared encoding."""
+    for data in data_dirs:
+        path = Path(data) / "Areas" / str(map_id >> 4) / "info.xml"
+        if path.exists():
+            raw = path.read_bytes()
+            declared = re.search(rb'encoding="([^"]+)"', raw[:200])
+            return raw.decode(declared.group(1).decode() if declared else "utf-8", errors="replace")
+    raise SystemExit(f"map {map_id}: no Areas/{map_id >> 4}/info.xml under {', '.join(data_dirs)}")
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser()
     parser.add_argument("maps", nargs="+", type=int, help="live map ids (area folder * 16)")
-    parser.add_argument("--data", default=str(REPO / "selfhost/runtime/data"))
+    # Searched in turn: the 2011 data, then the later one with Ô Sào 2000, Nam
+    # Việt 2016 and the live Nam Hải 2032 (its info.xml is GBK).
+    parser.add_argument("--data", action="append",
+                        help="data dir(s); default selfhost/runtime/data, then Game/Sanguo1.0-Data/data")
     parser.add_argument("--radius", type=int, default=160)
     parser.add_argument("--min", type=int, default=3)
     parser.add_argument("--max-refresh", type=int, default=300)
+    # Faster than 90 s are festival ones (20 s "fake teacher", 60 s zongzi
+    # spirits on Nam Việt / Nam Hải) the live maps may not have; the year-round
+    # ones respawn in 90-120 s.
+    parser.add_argument("--min-refresh", type=int, default=90)
     parser.add_argument("--ignore", nargs="*", default=["Kế hoạch tam quốc minh châu"])
     # patrol_points: the densest cluster and the next densest ones within
     # --patrol-within px of it, at most --patrol of them - a short run back and
@@ -83,9 +101,10 @@ def main() -> None:
     parser.add_argument("--skip", nargs="*", default=[], help="x,y tiles to leave out (unreachable on foot)")
     args = parser.parse_args()
     skip = {tuple(map(int, item.split(","))) for item in args.skip}
+    data = args.data or [str(REPO / "selfhost/runtime/data"), str(REPO / "Game/Sanguo1.0-Data/data")]
     for map_id in args.maps:
-        info = (Path(args.data) / "Areas" / str(map_id >> 4) / "info.xml").read_text(encoding="utf-8")
-        found = [(c, n) for c, n in clusters(monsters(info, args.max_refresh, set(args.ignore)), args.radius, args.min)
+        info = read_info(data, map_id)
+        found = [(c, n) for c, n in clusters(monsters(info, args.min_refresh, args.max_refresh, set(args.ignore)), args.radius, args.min)
                  if (c[0] // 8, c[1] // 8) not in skip]
         counts = {centre: count for centre, count in found}
         order = tour([centre for centre, _ in found])

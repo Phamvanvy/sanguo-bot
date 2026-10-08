@@ -665,6 +665,10 @@ class ExtensionServerTest(unittest.TestCase):
             flows["farm_spots"]["farm_spots"],
         )
         self.assertEqual("giang_lang", farm["spots"][0]["id"])
+        # Live Nam Hai is 2032 (the 2011 864 is refused), plus Nam Viet 2016 and O Sao 2000.
+        maps = {spot["id"]: spot["map"] for spot in farm["spots"]}
+        self.assertEqual({"nam_hai": 2032, "nam_viet": 2016, "o_sao": 2000},
+                         {key: maps[key] for key in ("nam_hai", "nam_viet", "o_sao")})
         self.assertEqual([8, 14], farm["refuse_reasons"])
         # Every point open on the map's walk grid, and the roam clusters all
         # reachable on foot from one another (user: "đi khắp map").
