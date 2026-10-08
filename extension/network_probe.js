@@ -706,8 +706,10 @@
       const creatures = [];
       for (const [id, creature] of world.creatures) {
         if (creature.x == null) continue;
+        // faction last (npc.faction.id: 4 = monster, 1-3 = a nation's soldiers,
+        // -1 = not heard yet), so readers by position stay as they were.
         creatures.push([id, creature.x, creature.y, creature.hp, creature.state,
-          creature.name || "", world.npcIds.has(id) ? 1 : 0]);
+          creature.name || "", world.npcIds.has(id) ? 1 : 0, creature.faction ?? -1]);
       }
       const { creatures: _all, npcIds: _npcs, ...summary } = world;
       window.postMessage({ source: "sanguo-world", ...summary, creatures, at: Date.now() }, location.origin);

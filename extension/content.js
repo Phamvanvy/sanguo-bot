@@ -1932,6 +1932,17 @@
     const reclickMs = Number(macro.reclick_seconds ?? 3) * 1000;
     const refusing = new Set((macro.refuse_reasons || [8, 14]).map(Number));
     const ignore = spot.ignore_monster_names ?? macro.ignore_monster_names ?? [];
+    // Only real monsters: the game sends each unit's faction (npc.faction.id),
+    // 4 for monsters, 1-3 for a nation's soldiers and guards ("Sĩ binh nước
+    // Thục" took 5 switches in a row at Giang Lăng, 2026-10-08 15:14). Names
+    // matching ignore_monster_patterns are left too, for a unit whose faction
+    // has not come yet.
+    const monsterFaction = Number(macro.monster_faction ?? 4);
+    const ignorePatterns = (macro.ignore_monster_patterns || []).map((pattern) => new RegExp(pattern, "i"));
+    // Moving between points: a point down to leave_when_left monsters or
+    // fewer is done - go on instead of grinding the last one or two (user,
+    // 2026-10-08: "hết quái thì nên đi bãi khác thay vì farm cố 1 2 con").
+    const leaveBelow = Number(macro.leave_when_left ?? 2);
     const switchPoint = macro.switch_target_point === undefined ? [0.955, 0.344] : macro.switch_target_point;
     const tileOf = (point) => ({ x: Math.floor(point.x / unit), y: Math.floor(point.y / unit) });
     // Tiles on foot from each point, so a monster behind a wall from the spot
@@ -1954,6 +1965,7 @@
     let pointIndex = 0;
     let placed = false;                 // pointIndex set to the point nearest us
     let failedWalks = 0;
+    let arrivedIndex = -1;              // the point we have stood at since choosing it
     let emptySince = 0;
     let target = null;
     let failsSeen = Date.now();
@@ -2013,6 +2025,13 @@
             throw new Error(`Đang ở map ${world.mapId}, không phải ${spot.label} (map ${mapId})`);
           }
           updateDomFlow(flow, `Farm ${spot.label}: dịch chuyển tới map ${mapId}`, "farm_travel");
+          // "Trạng thái chiến đấu không thể dịch chuyển" (2026-10-08 14:50):
+          // finish what has us in combat first.
+          if (latestWorld?.meFighting === true) {
+            appendDiagnostic("farm_travel", {
+              flow, message: `đánh trước khi dịch chuyển: ${describeFight(await fightUntilClear(token, macro, 60, { whileFighting: true }))}`,
+            });
+          }
           const note = await travelToLobby(token, macro, { label: spot.label, lobby_map: mapId }, flow);
           appendDiagnostic("farm_travel", { flow, message: note });
           target = null;
@@ -2037,7 +2056,16 @@
         killsSeen = Math.max(killsSeen, ...(world.kills || []).map((kill) => kill.at));
         if (now - lastReport >= 60000) {
           lastReport = now;
-          appendDiagnostic("farm_progress", { flow, message: `${status()}; ${describeWorld()}` });
+          // Faction per unit seen, to check the packet's faction against names.
+          const seen = new Map();
+          for (const unit of world.creatures || []) {
+            const key = unit[7] ?? -1;
+            seen.set(key, [...(seen.get(key) || []), unit[5]].slice(0, 3));
+          }
+          appendDiagnostic("farm_progress", {
+            flow, message: `${status()}; ${describeWorld()}; phe: `
+              + [...seen].map(([faction, names]) => `${faction} [${names.join(", ")}]`).join(" | "),
+          });
         }
         // The game refused one: never again for a while, whichever it was.
         let refused = null;
@@ -2051,23 +2079,56 @@
           await giveUp(refused.target, `game báo không đánh được, lý do ${refused.reason}`);
           continue;
         }
-        const all = monstersNear(world, Infinity, ignore).filter((monster) => !skipped(monster));
+        const factions = new Map((world.creatures || []).map((unit) => [unit[0], unit[7] ?? -1]));
+        const monster = (unit) => {
+          const faction = factions.get(unit.id) ?? -1;
+          return (faction < 0 || faction === monsterFaction) && !ignorePatterns.some((pattern) => pattern.test(unit.name || ""));
+        };
+        const all = monstersNear(world, Infinity, ignore).filter((unit) => monster(unit) && !skipped(unit));
+        if (roam && fromAnchor(world.me) <= radius / 2) arrivedIndex = pointIndex;
         const hitNow = blow && now - blow.at <= 3000 && all.find((monster) => monster.id === blow.target);
         const attackers = all.filter((monster) => (monster.state & 2) && monster.d <= ambush);
-        // Roaming, what is near us counts too - on the way, or left of a cluster.
-        const fromMe = roam && grid ? walkDistances(grid, tileOf(world.me), pathLimit) : null;
-        const inSpot = all.filter((monster) => (fromAnchor(monster) <= radius && reachable(onFoot[pointIndex], monster))
-          || (roam && monster.d <= radius && reachable(fromMe, monster)));
-        const kept = target && all.find((monster) => monster.id === target.id);
-        const pick = hitNow || kept || attackers[0] || inSpot.sort((a, b) => a.d - b.d)[0];
-        if (!attackers.length && !hitNow && !(roam && pick) && fromAnchor(world.me) > leash) {
-          await walkHome(roam ? `tới ${place} quái` : "chạy quá xa bãi, quay về");
+        // Only what lives at the point, reachable on foot from it - never one
+        // near us wherever we are: kill by kill that dragged us 480 px off
+        // bãi 3 (2026-10-08 15:14). Roaming, one close by on the way still
+        // counts while it is within leash_radius of the point.
+        const fromMe = mode === "roam" && grid ? walkDistances(grid, tileOf(world.me), pathLimit) : null;
+        const inSpot = all.filter((unit) => (fromAnchor(unit) <= radius && reachable(onFoot[pointIndex], unit))
+          || (fromMe && unit.d <= reach && fromAnchor(unit) <= leash && reachable(fromMe, unit)));
+        const fighting = attackers.length > 0 || Boolean(hitNow);
+        // Down to the last one or two here: leave them, go on to the next point.
+        const few = roam && points.length > 1 && !fighting && inSpot.length <= leaveBelow;
+        const kept = !few && target && inSpot.find((unit) => unit.id === target.id);
+        const pick = hitNow || attackers[0] || kept || (few ? null : inSpot.sort((a, b) => a.d - b.d)[0]);
+        if (!fighting && fromAnchor(world.me) > leash && (!roam || arrivedIndex === pointIndex)) {
+          await walkHome(roam ? `chạy quá xa ${place}, quay về` : "chạy quá xa bãi, quay về");
           continue;
         }
         if (!pick) {
           target = null;
-          if (fromAnchor(world.me) > (roam ? radius / 2 : homeRadius)) {
-            await walkHome(roam ? `tới ${place} quái` : "hết quái, về giữa bãi chờ hồi");
+          if (roam) {
+            // Not there yet: walk to it. There: give its monsters a moment to
+            // show (they come once we stand near), then go on.
+            if (arrivedIndex !== pointIndex) {
+              await walkHome(`tới ${place} ${pointIndex + 1}/${points.length}`);
+              emptySince = 0;
+              continue;
+            }
+            emptySince ||= now;
+            if (now - emptySince >= emptyMs) {
+              const left = inSpot.length;
+              pointIndex = (pointIndex + 1) % points.length;
+              emptySince = 0;
+              await walkHome(`${left ? `còn ${left} con` : "hết quái"}, sang ${place} ${pointIndex + 1}/${points.length}`);
+              continue;
+            }
+            updateDomFlow(flow, `${status()} - ${place} ${pointIndex + 1}/${points.length} `
+              + `${inSpot.length ? `còn ${inSpot.length} con, sắp sang ${place} kế` : "trống, chờ chút"}`, "farm_wait");
+            await domWait(token, 0.5);
+            continue;
+          }
+          if (fromAnchor(world.me) > homeRadius) {
+            await walkHome("hết quái, về giữa bãi chờ hồi");
             emptySince = 0;
             continue;
           }
@@ -2075,11 +2136,10 @@
           if (points.length > 1 && now - emptySince >= emptyMs) {
             pointIndex = (pointIndex + 1) % points.length;
             emptySince = 0;
-            await walkHome(roam ? `hết quái, sang ${place} ${pointIndex + 1}/${points.length}` : "hết quái, sang điểm kế");
+            await walkHome("hết quái, sang điểm kế");
             continue;
           }
-          updateDomFlow(flow, `${status()} - ${roam ? `${place} ${pointIndex + 1}/${points.length} trống, chờ chút` : "chờ quái hồi"}`,
-            "farm_wait");
+          updateDomFlow(flow, `${status()} - chờ quái hồi`, "farm_wait");
           await domWait(token, 1);
           continue;
         }

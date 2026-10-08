@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -695,6 +696,22 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("? { ...option.overrides, mode: modePick.value } : option.overrides));", content)
         # "Qua lại các bãi" first, so it is the default (user, 2026-10-08).
         self.assertIn('[["patrol", "Qua lại các bãi"], ["roam", "Đi khắp map"], ["hold", "Giữ 1 bãi"]]', content)
+        # Down to 1-2 monsters at a spot: go on to the next one (user,
+        # 2026-10-08: "hết quái thì nên đi bãi khác thay vì farm cố 1 2 con"),
+        # and only what lives at the spot - not one near us wherever we are.
+        self.assertEqual(2, farm["leave_when_left"])
+        self.assertIn("const few = roam && points.length > 1 && !fighting && inSpot.length <= leaveBelow;", content)
+        self.assertNotIn("(roam && monster.d <= radius && reachable(fromMe, monster))", content)
+        # Nation soldiers are no monsters: the probe passes each unit's faction
+        # (4 = monster) and names like "Sĩ binh nước Thục" are left too.
+        self.assertEqual(4, farm["monster_faction"])
+        self.assertIn('creature.name || "", world.npcIds.has(id) ? 1 : 0, creature.faction ?? -1]);',
+                      (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8"))
+        patterns = [re.compile(pattern, re.IGNORECASE) for pattern in farm["ignore_monster_patterns"]]
+        for name in ["Sĩ binh nước Thục", "Sĩ binh nước Ngụy", "Ngụy quốc vệ binh", "Thục quốc tinh binh"]:
+            self.assertTrue(any(pattern.search(name) for pattern in patterns), name)
+        for name in ["Bạo đồ quân Kinh Sở", "Xạ thủ quân Kinh Sở", "Tây khương sĩ binh", "Hung nô thị vệ"]:
+            self.assertFalse(any(pattern.search(name) for pattern in patterns), name)
 
     def test_refused_doors_are_walked_off_and_into_again(self):
         # user, 2026-09-29: turned away while attacked, the character freezes on
