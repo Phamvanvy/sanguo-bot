@@ -221,8 +221,9 @@ activity_macros:
     # nhân vật nhất. Server chỉ gửi quái trong vài ô quanh nhân vật nên không thấy
     # quái xa - phải đi theo cụm. patrol_points / roam_points sinh bằng
     # tools/assets/farm_points.py <map> từ dữ liệu map gốc (cụm >= 3 quái trong
-    # 160px, xếp đường ngắn); Kinh Sở chạy với --skip 4,52 91,14 168,56 131,128
-    # (4 cụm walk grid báo không đi bộ tới được).
+    # 160px, xếp đường ngắn). Kinh Sở lấy từ Game/Sanguo1.0-Data (cả grid lẫn quái):
+    # grid bản 2011 chia map làm hai, đứng ở 93,143 / 59,109 thật mà không tới được
+    # bãi nào, bot thử đi liên tục tới mức game đơ và tải lại (2026-10-08 15:47).
     spots:
       - {id: "giang_lang", label: "Giang Lăng", map: 896, points: [[151, 142]],
          patrol_points: [[141, 130], [151, 161], [166, 97]],
@@ -250,9 +251,9 @@ activity_macros:
       - {id: "o_sao", label: "Ô Sào", map: 2000, points: [[112, 137]],
          patrol_points: [[112, 137], [125, 162], [160, 100]],
          roam_points: [[112, 137], [125, 162], [88, 172], [75, 139], [56, 126], [25, 77], [53, 62], [90, 47], [122, 25], [158, 52], [160, 100]]}
-      - {id: "kinh_so", label: "Kinh Sở", map: 1056, points: [[100, 73]],
-         patrol_points: [[81, 69], [59, 40], [129, 79]],
-         roam_points: [[81, 69], [77, 102], [59, 40], [141, 36], [168, 19], [163, 100], [129, 79], [99, 56]]}
+      - {id: "kinh_so", label: "Kinh Sở", map: 1056, points: [[77, 82]],
+         patrol_points: [[77, 82], [99, 56], [59, 40]],
+         roam_points: [[77, 82], [4, 52], [59, 40], [91, 14], [141, 36], [168, 19], [168, 56], [163, 100], [123, 133], [129, 79], [99, 56]]}
     # Qua lại / khắp map: bãi chỉ còn leave_when_left con trở xuống (không con nào
     # đang đánh mình, không đang đánh dở con nào) thì bỏ đi bãi kế, không cố 1-2
     # con (user, 2026-10-08). patrol_wait_seconds = chờ quái hiện ra khi vừa tới bãi

@@ -1965,6 +1965,7 @@
     let pointIndex = 0;
     let placed = false;                 // pointIndex set to the point nearest us
     let failedWalks = 0;
+    let instantFails = 0;               // walks turned down at once, in a row
     let arrivedIndex = -1;              // the point we have stood at since choosing it
     let emptySince = 0;
     let target = null;
@@ -1993,6 +1994,7 @@
       updateDomFlow(flow, `${status()} - ${why} (${goto.join(",")})`, "farm_walk");
       // A spot is a crowd of monsters, not a door: within arrive_tolerance
       // tiles of it is there (user, 2026-10-08: "cứ +-5 vẫn ok").
+      const walkStartedAt = Date.now();
       const walk = await walkToCoord(token, macro, {
         label: `bãi ${goto.join(",")}`, goto, map_size: mapSize,
         goto_tolerance: Number(macro.arrive_tolerance ?? 5),
@@ -2006,6 +2008,21 @@
         appendDiagnostic("farm_walk", { flow, message: `không tới được ${goto.join(",")}, sang điểm kế` });
         pointIndex = (pointIndex + 1) % points.length;
         failedWalks = 0;
+      }
+      // Turned down at once - the walk grid has no way from here to there -
+      // must not spin: Kinh Sở 2026-10-08 15:47, a grid that cut the map in
+      // two sent hundreds of walks a second until the game page froze and
+      // reloaded ("kinh sở bị lag"). Rest, and stop once no point at all can
+      // be reached twice round.
+      if (["timeout", "blocked"].includes(walk.how) && Date.now() - walkStartedAt < 1000) {
+        instantFails += 1;
+        if (instantFails >= points.length * 2) {
+          throw new Error(`${spot.label}: không tìm được đường từ chỗ đang đứng tới bãi nào `
+            + `(${walk.note.split(";")[0]}). Walk grid map ${mapId} có thể không khớp map thật.`);
+        }
+        await domWait(token, Number(macro.no_path_wait_seconds ?? 2));
+      } else {
+        instantFails = 0;
       }
     };
     appendDiagnostic("farm_start", {

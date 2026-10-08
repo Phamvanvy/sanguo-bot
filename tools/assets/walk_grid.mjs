@@ -41,6 +41,12 @@ const codecs = {
 // folder * 16). The last three are only in Game/Sanguo1.0-Data: the live Nam
 // Hải is 2032 - the 2011 one, 864, the server refuses ("Map này không thể đến
 // được", 2026-10-08).
+// Maps whose 2011 layout is not the live one: taken from the later data first.
+// Kinh Sở 1056: the 2011 grid cuts the map in two - from 93,143 and 59,109,
+// where the character really stood, no spot could be reached (2026-10-08) -
+// while the later one joins them all.
+const LIVE_FROM_LATER_DATA = new Set([1056]);
+
 const DEFAULT_MAPS = [
   768, 769, 770, 771, 772, 773, 1137, 1138, 1139, 1140, 1141,
   432, 433, 448, 449, 450, 976, 977, 978,
@@ -170,9 +176,11 @@ function main(argv) {
     else if (argv[i] === '--check') check = { id: Number(argv[++i]), points: argv[++i] };
     else ids.push(Number(argv[i]));
   }
-  if (!data.length) data.push(path.join(REPO, 'selfhost/runtime/data'), path.join(REPO, 'Game/Sanguo1.0-Data/data'));
+  const defaultData = !data.length;
+  if (defaultData) data.push(path.join(REPO, 'selfhost/runtime/data'), path.join(REPO, 'Game/Sanguo1.0-Data/data'));
+  const dataFor = (id) => (defaultData && LIVE_FROM_LATER_DATA.has(id) ? [...data].reverse() : data);
   if (check) {
-    const { pkg, map } = findMap(data, check.id);
+    const { pkg, map } = findMap(dataFor(check.id), check.id);
     const grid = walkGrid(pkg, map);
     for (const point of check.points.trim().split(/\s+/)) {
       const [x, y] = point.split(',').map(Number);
@@ -182,7 +190,7 @@ function main(argv) {
   }
   const grids = {};
   for (const id of ids.length ? ids : DEFAULT_MAPS) {
-    const { pkg, map } = findMap(data, id);
+    const { pkg, map } = findMap(dataFor(id), id);
     const grid = walkGrid(pkg, map);
     const open = grid.blocked.length - grid.blocked.reduce((a, b) => a + b, 0);
     grids[id] = {

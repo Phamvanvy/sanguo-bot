@@ -66,6 +66,11 @@ def tour(spots: list[tuple[int, int]]) -> list[tuple[int, int]]:
     return order
 
 
+# Same as walk_grid.mjs: maps whose 2011 layout is not the live one (Kinh So
+# 1056) come from the later data first.
+LIVE_FROM_LATER_DATA = {1056}
+
+
 def read_info(data_dirs: list[str], map_id: int) -> str:
     """The first data dir's info.xml for the map's area, in its declared encoding."""
     for data in data_dirs:
@@ -103,7 +108,7 @@ def main() -> None:
     skip = {tuple(map(int, item.split(","))) for item in args.skip}
     data = args.data or [str(REPO / "selfhost/runtime/data"), str(REPO / "Game/Sanguo1.0-Data/data")]
     for map_id in args.maps:
-        info = read_info(data, map_id)
+        info = read_info(data[::-1] if not args.data and map_id in LIVE_FROM_LATER_DATA else data, map_id)
         found = [(c, n) for c, n in clusters(monsters(info, args.min_refresh, args.max_refresh, set(args.ignore)), args.radius, args.min)
                  if (c[0] // 8, c[1] // 8) not in skip]
         counts = {centre: count for centre, count in found}

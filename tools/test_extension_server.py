@@ -707,6 +707,8 @@ class ExtensionServerTest(unittest.TestCase):
         # A spot is reached within 5 tiles, not exactly (user, 2026-10-08).
         self.assertEqual(5, farm["arrive_tolerance"])
         self.assertIn("goto_tolerance: Number(macro.arrive_tolerance ?? 5),", content)
+        # A walk turned down at once must not spin (Kinh So 2026-10-08: the page froze).
+        self.assertIn("if (instantFails >= points.length * 2) {", content)
         self.assertIn("const few = roam && points.length > 1 && !fighting && inSpot.length <= leaveBelow;", content)
         self.assertNotIn("(roam && monster.d <= radius && reachable(fromMe, monster))", content)
         # Nation soldiers are no monsters: the probe passes each unit's faction
