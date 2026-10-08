@@ -651,6 +651,27 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('"throw_away_once",', content)
         self.assertIn('else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);', content)
 
+    def test_farm_card_offers_a_button_per_spot_on_a_walk_grid(self):
+        # user, 2026-10-08: hold a monster spot on a neutral map for Lễ bao lao
+        # động, and switch target when the game will not let us hit one.
+        cfg = extension_server.load_config()
+        farm = cfg["activity_macros"]["farm_spots"]
+        self.assertEqual("farm_spot_loop", farm["runner"])
+        flows = {flow["id"]: flow for flow in extension_server.flow_catalog(cfg)}
+        self.assertEqual(
+            [{"id": spot["id"], "label": spot["label"]} for spot in farm["spots"]],
+            flows["farm_spots"]["farm_spots"],
+        )
+        self.assertEqual("giang_lang", farm["spots"][0]["id"])
+        self.assertEqual([8, 14], farm["refuse_reasons"])
+        grids = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
+        for spot in farm["spots"]:
+            self.assertIn(f'"{spot["map"]}": {{', grids)
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('"farm_spot_loop",', content)
+        self.assertIn('else if (macro.runner === "farm_spot_loop") await runFarmSpot(token, macro, flow);', content)
+        self.assertIn("await giveUp(refused.target, `game báo không đánh được, lý do ${refused.reason}`);", content)
+
     def test_refused_doors_are_walked_off_and_into_again(self):
         # user, 2026-09-29: turned away while attacked, the character freezes on
         # the door's spot; only walking off a little and back in gets through.

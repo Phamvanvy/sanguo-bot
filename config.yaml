@@ -184,6 +184,67 @@ activity_macros:
     round_delay_seconds: 0.4
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
+  farm_spots:
+    label: "Farm quái"
+    description: "Giữ bãi quái ở map trung lập, tự tìm quái quanh bãi mà đánh, đến khi Stop"
+    icon: "🌾"
+    runner: "farm_spot_loop"
+    # Farm Lễ bao lao động (user, 2026-10-08). Mỗi nút trên thẻ = một bãi. Chưa
+    # ở map đó thì dịch chuyển bằng T.Giới Map (OpCode 615, acc VIP; teleport:
+    # false = không tự đi), rồi đi bằng Map tới điểm. Tới nơi: đánh con mình
+    # đang đánh, rồi con đang đánh mình, rồi con gần nhất trong farm_radius
+    # quanh điểm (đi bộ từ điểm tới được - con sau tường thì bỏ). Bấm con quái
+    # trên màn hình cho nhân vật tự lại gần, tới tầm attack_reach mới bấm kỹ
+    # năng (không đánh lúc đang đi). Game báo không đánh được (ATTACK_FAIL 8
+    # "không thể tấn công", 14 "không nằm trong tầm nhìn" - refuse_reasons) hoặc
+    # target_stall_seconds không mất máu mà cũng không lại gần được: bỏ con đó
+    # skip_seconds rồi bấm "Chuyển đổi" (user: "tự chuyển đổi nếu target k
+    # đánh được nữa"). Đuổi quái ra xa quá leash_radius thì đi về điểm. Hết
+    # quái thì về giữa bãi đứng chờ hồi. Rớt mạng 1006 thì chờ vào lại rồi farm
+    # tiếp. Đứng gần nhiều người thì quái hồi nhanh hơn: server rút thời gian hồi
+    # theo số người trong ~360x360 px quanh con quái (Creature.getRefreshTime).
+    #
+    # map = mã map lúc chạy (= thư mục Areas x 16; cần walk grid trong
+    # extension/walk_grids.js). points = tọa độ game (pixel / 8) - điểm có
+    # nhiều quái nhất theo dữ liệu map gốc. Thêm điểm vào points thì bot đi
+    # vòng: điểm này trống spot_wait_seconds thì sang điểm kế.
+    spots:
+      - {id: "giang_lang", label: "Giang Lăng", map: 896, points: [[151, 142]]}
+      - {id: "tay_vuc", label: "Tây Vực", map: 848, points: [[64, 43]]}
+      - {id: "soc_phuong", label: "Sóc Phương", map: 816, points: [[25, 64]]}
+      - {id: "hung_no", label: "Hung Nô", map: 1024, points: [[152, 87]]}
+      - {id: "nam_hai", label: "Nam Hải", map: 864, points: [[90, 158]]}
+      - {id: "kinh_so", label: "Kinh Sở", map: 1056, points: [[100, 73]]}
+    farm_radius: 220
+    leash_radius: 320
+    home_radius: 64
+    attack_reach: 120
+    target_stall_seconds: 8
+    skip_seconds: 60
+    refuse_reasons: [8, 14]
+    reclick_seconds: 3
+    spot_wait_seconds: 20
+    ignore_monster_names: ["Kế hoạch tam quốc minh châu"]
+    teleport: true
+    travel_seconds: 30
+    travel_attempts: 3
+    travel_retry_seconds: 5
+    max_resumes: 20
+    skill_points: *combat_skill_points
+    switch_target_point: *switch_target_point
+    button_delay_seconds: 0.2
+    round_delay_seconds: 0.4
+    ambush_radius: 150
+    map_button_point: [0.85, 0.07]
+    map_open_delay_seconds: 1.2
+    map_close_delay_seconds: 0.6
+    coord_unit: 8
+    goto_leg_seconds: 60
+    goto_idle_seconds: 5
+    goto_settle_seconds: 2.5
+    goto_max_legs: 12
+    arrive_settle_seconds: 0.8
+    map_load_seconds: 1.5
   co_mo_hard: &co_mo_hard
     label: "Phó bản Cổ Mộ (khó)"
     description: "Vào bản khó qua NPC rồi đánh 3 boss ở 3 phòng"

@@ -33,10 +33,13 @@ const codecs = {
 
 // Dungeon maps the extension routes walk (live ids = the data files' ids):
 // Cổ Mộ lobby + easy 769-773 + hard 1137-1141, Hà Đông 432/433/448-450,
-// Thiên Long lobby 976 + trận 977/978.
+// Thiên Long lobby 976 + trận 977/978; plus the neutral maps the "Farm quái"
+// flow holds a spot on: Sóc Phương 816, Tây Vực 848, Nam Hải 864, Giang Lăng
+// 896, Hung Nô 1024, Kinh Sở 1056 (map id = area folder * 16).
 const DEFAULT_MAPS = [
   768, 769, 770, 771, 772, 773, 1137, 1138, 1139, 1140, 1141,
   432, 433, 448, 449, 450, 976, 977, 978,
+  816, 848, 864, 896, 1024, 1056,
 ];
 
 /** GamePackage.loadNPCCollision: per decor animation, its blocking boxes. */

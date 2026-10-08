@@ -110,6 +110,12 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
         # along with the catalogue rather than only living in the macro.
         if macro.get("run_options"):
             flow["run_options"] = [int(times) for times in macro["run_options"]]
+        # The farm card gets a button per spot (map + points to hold).
+        if macro.get("runner") == "farm_spot_loop":
+            flow["farm_spots"] = [
+                {"id": str(spot["id"]), "label": str(spot.get("label", spot["id"]))}
+                for spot in macro.get("spots", [])
+            ]
         # A pipeline's stages each get their own count box on the panel (0 skips
         # that stage), so one card runs hard only, easy only, or n + m of both.
         if macro.get("runner") == "dungeon_pipeline":

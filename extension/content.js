@@ -42,6 +42,7 @@
     "dungeon_pipeline",
     "dungeon_tour",
     "throw_away_once",
+    "farm_spot_loop",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -346,7 +347,10 @@
       if (flow.runner === "dungeon_tour") return renderTourCard(flow, running);
       // A flow that can run a chosen number of times gets a button per count
       // (the first is the default), e.g. the Thiên Long pipeline: 5 / 3 / 1.
-      if (flow.run_options?.length) {
+      // The farm card gets a button per spot instead (Giang Lăng, Tây Vực...).
+      const options = flow.run_options?.map((times) => ({ label: `${times} lượt`, overrides: { times } }))
+        || flow.farm_spots?.map((spot) => ({ label: spot.label, overrides: { spot: spot.id } }));
+      if (options?.length) {
         const card = document.createElement("div");
         card.className = "sg-flow sg-item-flow";
         card.innerHTML = `<span></span><strong></strong><small></small><div class="sg-item-slots"></div>`;
@@ -354,12 +358,12 @@
         card.querySelector("strong").textContent = flow.label;
         card.querySelector("small").textContent = flow.description;
         const slots = card.querySelector(".sg-item-slots");
-        for (const times of flow.run_options) {
+        for (const option of options) {
           const button = document.createElement("button");
           button.type = "button";
           button.disabled = running;
-          button.textContent = `${times} lượt`;
-          button.addEventListener("click", () => runFlow(flow, { times }));
+          button.textContent = option.label;
+          button.addEventListener("click", () => runFlow(flow, option.overrides));
           slots.append(button);
         }
         return card;
@@ -1855,6 +1859,218 @@
     if (macro.finish_chime !== false) playChime();
   }
 
+  // "Farm quái" (user, 2026-10-08): hold a spot on a neutral map and fight
+  // what lives around it, for drops like Lễ bao lao động. A spot with several
+  // points walks to the next one once its own stays empty for spot_wait_seconds.
+  // Monsters come from the game's own traffic (network_probe.js): the one we
+  // are hitting stays the target, else whatever attacks us, else the nearest
+  // live one within farm_radius of the point that is reachable on foot from it.
+  // It is clicked on the main screen (the game makes it the target and walks us
+  // up) and only once in reach do the skills go - no fighting while walking.
+  // One the game refuses (ATTACK_FAIL 8 "Mục tiêu không thể tấn công", 14
+  // "không nằm trong tầm nhìn") or that neither loses health nor comes closer
+  // for target_stall_seconds is left alone for skip_seconds, and "Chuyển đổi"
+  // picks another (user, 2026-10-08: "tự chuyển đổi nếu target k đánh được").
+  // Strayed past leash_radius: walk back by Map. Not on the spot's map: the
+  // T.Giới Map teleport (OpCode 615). A 1006 drop waits for the game to log in
+  // again and goes on.
+  async function runFarmSpot(token, macro, flow) {
+    const spots = macro.spots || [];
+    const spot = spots.find((item) => item.id === macro.spot) || spots[0];
+    if (!spot) throw new Error("Chưa cấu hình bãi farm (spots) trong config.yaml");
+    const mapId = Number(spot.map);
+    const points = (spot.points || []).map((point) => point.map(Number));
+    if (!points.length) throw new Error(`Bãi ${spot.label} chưa có tọa độ (points)`);
+    const grid = walkGridFor(mapId);
+    const mapSize = grid?.size || spot.map_size;
+    if (!mapSize) throw new Error(`Map ${mapId} chưa có walk grid hay map_size (chạy tools/assets/walk_grid.mjs)`);
+    const unit = Number(macro.coord_unit || 8);
+    const radius = Number(spot.farm_radius ?? macro.farm_radius ?? 220);
+    const leash = Number(spot.leash_radius ?? macro.leash_radius ?? 320);
+    const homeRadius = Number(macro.home_radius ?? 64);
+    const reach = Number(macro.attack_reach ?? 120);
+    const ambush = Number(macro.ambush_radius ?? 150);
+    const stallMs = Number(macro.target_stall_seconds ?? 8) * 1000;
+    const skipMs = Number(macro.skip_seconds ?? 60) * 1000;
+    const emptyMs = Number(macro.spot_wait_seconds ?? 20) * 1000;
+    const reclickMs = Number(macro.reclick_seconds ?? 3) * 1000;
+    const refusing = new Set((macro.refuse_reasons || [8, 14]).map(Number));
+    const ignore = spot.ignore_monster_names ?? macro.ignore_monster_names ?? [];
+    const switchPoint = macro.switch_target_point === undefined ? [0.955, 0.344] : macro.switch_target_point;
+    const tileOf = (point) => ({ x: Math.floor(point.x / unit), y: Math.floor(point.y / unit) });
+    // Tiles on foot from each point, so a monster behind a wall from the spot
+    // (a long way round) is never picked.
+    const pathLimit = Math.ceil((radius / unit) * 2);
+    const onFoot = points.map(([x, y]) => grid && walkDistances(grid, { x, y }, pathLimit));
+    const reachable = (index, monster) => {
+      const steps = onFoot[index];
+      if (!steps) return true;
+      const tile = tileOf(monster);
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const [x, y] = [tile.x + dx, tile.y + dy];
+          if (x >= 0 && y >= 0 && x < grid.w && y < grid.h && steps[y * grid.w + x] <= pathLimit) return true;
+        }
+      }
+      return false;
+    };
+    const skipUntil = new Map();        // monster id -> left alone until
+    const struck = new Set();           // ids we landed a blow on, to count kills
+    let pointIndex = 0;
+    let emptySince = 0;
+    let target = null;
+    let failsSeen = Date.now();
+    let killsSeen = Date.now();
+    let kills = 0;
+    let switches = 0;
+    let resumes = 0;
+    let lastReport = Date.now();
+    const status = () => `Farm ${spot.label}: ${kills} con đã hạ, đổi mục tiêu ${switches} lần`;
+    // Leave the target alone for a while and let "Chuyển đổi" pick another.
+    const giveUp = async (id, why) => {
+      skipUntil.set(id, Date.now() + skipMs);
+      switches += 1;
+      appendDiagnostic("farm_switch", { flow, message: `bỏ ${target?.name || `#${id}`} (${why}); ${describeWorld()}` });
+      target = null;
+      if (switchPoint) {
+        // attackRound would press it again for the same refusal.
+        switchedTargetAt = Date.now();
+        await domClick(token, switchPoint);
+        await domDelay(macro.button_delay_seconds || 0.18);
+      }
+    };
+    const walkHome = async (why) => {
+      const goto = points[pointIndex];
+      updateDomFlow(flow, `${status()} - ${why} (${goto.join(",")})`, "farm_walk");
+      const walk = await walkToCoord(token, macro, {
+        label: `bãi ${goto.join(",")}`, goto, map_size: mapSize, goto_tolerance: 2,
+      }, []);
+      appendDiagnostic("farm_walk", { flow, message: `${why}: ${walk.note}` });
+      target = null;
+    };
+    appendDiagnostic("farm_start", {
+      flow, message: `${spot.label} map ${mapId}, điểm ${points.map((point) => point.join(",")).join(" → ")}, `
+        + `bán kính ${radius}px; ${describeWorld()}`,
+    });
+    for (;;) {
+      try {
+        ensureDomActive(token);
+        const world = latestWorld;
+        if (!world?.frames || !world.me) {
+          updateDomFlow(flow, `Farm ${spot.label}: chờ dữ liệu game (${describeWorld()})`, "farm_wait");
+          await domWait(token, 1);
+          continue;
+        }
+        if (world.mapId !== mapId) {
+          if (macro.teleport === false) {
+            throw new Error(`Đang ở map ${world.mapId}, không phải ${spot.label} (map ${mapId})`);
+          }
+          updateDomFlow(flow, `Farm ${spot.label}: dịch chuyển tới map ${mapId}`, "farm_travel");
+          const note = await travelToLobby(token, macro, { label: spot.label, lobby_map: mapId }, flow);
+          appendDiagnostic("farm_travel", { flow, message: note });
+          target = null;
+          continue;
+        }
+        const now = Date.now();
+        const [px, py] = points[pointIndex];
+        const anchor = { x: (px + 0.5) * unit, y: (py + 0.5) * unit };
+        const fromAnchor = (point) => Math.hypot(point.x - anchor.x, point.y - anchor.y);
+        const skipped = (monster) => (skipUntil.get(monster.id) || 0) > now;
+        const blow = world.hit;
+        if (blow && blow.at > now - 3000) struck.add(blow.target);
+        for (const kill of world.kills || []) {
+          if (kill.at > killsSeen && struck.delete(kill.id)) kills += 1;
+        }
+        killsSeen = Math.max(killsSeen, ...(world.kills || []).map((kill) => kill.at));
+        if (now - lastReport >= 60000) {
+          lastReport = now;
+          appendDiagnostic("farm_progress", { flow, message: `${status()}; ${describeWorld()}` });
+        }
+        // The game refused one: never again for a while, whichever it was.
+        let refused = null;
+        for (const fail of world.attackFails || []) {
+          if (fail.at <= failsSeen || !refusing.has(fail.reason)) continue;
+          skipUntil.set(fail.target, now + skipMs);
+          if (!target || fail.target === target.id) refused = fail;
+        }
+        failsSeen = Math.max(failsSeen, ...(world.attackFails || []).map((fail) => fail.at));
+        if (refused) {
+          await giveUp(refused.target, `game báo không đánh được, lý do ${refused.reason}`);
+          continue;
+        }
+        const all = monstersNear(world, Infinity, ignore).filter((monster) => !skipped(monster));
+        const hitNow = blow && now - blow.at <= 3000 && all.find((monster) => monster.id === blow.target);
+        const attackers = all.filter((monster) => (monster.state & 2) && monster.d <= ambush);
+        const inSpot = all.filter((monster) => fromAnchor(monster) <= radius && reachable(pointIndex, monster));
+        const kept = target && all.find((monster) => monster.id === target.id);
+        const pick = hitNow || kept || attackers[0] || inSpot.sort((a, b) => a.d - b.d)[0];
+        if (!attackers.length && !hitNow && fromAnchor(world.me) > leash) {
+          await walkHome("chạy quá xa bãi, quay về");
+          continue;
+        }
+        if (!pick) {
+          target = null;
+          emptySince ||= now;
+          if (points.length > 1 && now - emptySince >= emptyMs) {
+            pointIndex = (pointIndex + 1) % points.length;
+            emptySince = 0;
+            await walkHome("hết quái, sang điểm kế");
+            continue;
+          }
+          if (fromAnchor(world.me) > homeRadius) {
+            await walkHome("hết quái, về giữa bãi chờ hồi");
+            continue;
+          }
+          updateDomFlow(flow, `${status()} - chờ quái hồi`, "farm_wait");
+          await domWait(token, 1);
+          continue;
+        }
+        emptySince = 0;
+        if (!target || target.id !== pick.id) {
+          target = { id: pick.id, name: pick.name || `#${pick.id}`, hp: pick.hp, d: pick.d, progressAt: now, clickedAt: 0 };
+        }
+        // Progress: it lost health, we landed a blow on it, or we got closer.
+        if (pick.hp < target.hp || hitNow?.id === pick.id || pick.d < target.d - 16) target.progressAt = now;
+        target.hp = pick.hp;
+        target.d = Math.min(target.d, pick.d);
+        if (now - target.progressAt >= stallMs) {
+          await giveUp(pick.id, `${stallMs / 1000}s không mất máu, không lại gần được`);
+          continue;
+        }
+        updateDomFlow(flow, `${status()} - đánh ${target.name} ${Math.round(pick.d)}px, máu ${Math.round(pick.hp / 2)}%`,
+          "farm_fight");
+        // Click it unless a blow just landed on it: the game walks us up and
+        // makes it the target. Out of reach: wait for the walk, no skills yet.
+        // Off screen (the view is only 160 map px tall each way), or under the
+        // HUD: click the ground on the way to it instead, and click it once
+        // the camera has followed.
+        if (!(hitNow?.id === pick.id) && now - target.clickedAt >= reclickMs) {
+          const aim = screenPointOf(macro, { x: pick.x, y: pick.y - 12 }, world.me, mapSize);
+          const point = clearOfHud(aim) ? aim : towardsOnScreen(aim);
+          if (point) {
+            await domClick(token, point);
+            target.clickedAt = Date.now();
+          }
+        }
+        if (pick.d > reach && !(hitNow?.id === pick.id)) {
+          await domWait(token, Number(macro.approach_wait_seconds ?? 0.6));
+          continue;
+        }
+        await attackRound(token, macro);
+        await domDelay(macro.round_delay_seconds || 0.4);
+      } catch (error) {
+        const closed = error.socketClosed;
+        const codes = (macro.resume_close_codes || [1006]).map(Number);
+        if (!closed || !codes.includes(closed.code) || resumes >= Number(macro.max_resumes ?? 20)) throw error;
+        resumes += 1;
+        appendDiagnostic("farm_resume", { flow, message: `${error.message}; chờ vào lại (lần ${resumes})` });
+        await awaitReconnect(token, macro, flow, closed);
+        target = null;
+        failsSeen = killsSeen = Date.now();
+      }
+    }
+  }
+
   // A bell when a dungeon is done, for a user away from the screen (user,
   // 2026-09-14). Synthesised with Web Audio: no sound file to ship.
   function playChime() {
@@ -2162,6 +2378,18 @@
   // Clear of the HUD: top bar, joystick bottom-left, skills bottom-right.
   function clearOfHud([x, y]) {
     return x > 0.08 && x < 0.92 && y > 0.15 && y < 0.85 && !(x > 0.7 && y > 0.5) && !(x < 0.22 && y > 0.6);
+  }
+
+  // A spot on the main screen in the direction of `aim` (canvas fractions, may
+  // be off screen) from us in the middle, pulled in until it is clear of the
+  // HUD; null when none is (straight under the skills).
+  function towardsOnScreen([x, y]) {
+    const [dx, dy] = [x - 0.5, y - 0.5];
+    for (let scale = Math.min(1, 0.32 / Math.max(Math.abs(dx), Math.abs(dy), 1e-6)); scale > 0.15; scale *= 0.8) {
+      const point = [0.5 + dx * scale, 0.5 + dy * scale];
+      if (clearOfHud(point)) return point;
+    }
+    return null;
   }
 
   // Per door, the tile we last walked in from: a door that did not take us is
@@ -2834,6 +3062,7 @@
         else if (macro.runner === "dungeon_pipeline") await runDungeonPipeline(token, macro, flow);
         else if (macro.runner === "dungeon_tour") await runDungeonTour(token, macro, flow);
         else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);
+        else if (macro.runner === "farm_spot_loop") await runFarmSpot(token, macro, flow);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {
