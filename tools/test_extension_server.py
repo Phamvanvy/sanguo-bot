@@ -700,6 +700,9 @@ class ExtensionServerTest(unittest.TestCase):
         # 2026-10-08: "hết quái thì nên đi bãi khác thay vì farm cố 1 2 con"),
         # and only what lives at the spot - not one near us wherever we are.
         self.assertEqual(2, farm["leave_when_left"])
+        # A spot is reached within 5 tiles, not exactly (user, 2026-10-08).
+        self.assertEqual(5, farm["arrive_tolerance"])
+        self.assertIn("goto_tolerance: Number(macro.arrive_tolerance ?? 5),", content)
         self.assertIn("const few = roam && points.length > 1 && !fighting && inSpot.length <= leaveBelow;", content)
         self.assertNotIn("(roam && monster.d <= radius && reachable(fromMe, monster))", content)
         # Nation soldiers are no monsters: the probe passes each unit's faction

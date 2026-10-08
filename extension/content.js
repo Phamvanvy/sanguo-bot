@@ -1991,8 +1991,11 @@
     const walkHome = async (why) => {
       const goto = points[pointIndex];
       updateDomFlow(flow, `${status()} - ${why} (${goto.join(",")})`, "farm_walk");
+      // A spot is a crowd of monsters, not a door: within arrive_tolerance
+      // tiles of it is there (user, 2026-10-08: "cứ +-5 vẫn ok").
       const walk = await walkToCoord(token, macro, {
-        label: `bãi ${goto.join(",")}`, goto, map_size: mapSize, goto_tolerance: 2,
+        label: `bãi ${goto.join(",")}`, goto, map_size: mapSize,
+        goto_tolerance: Number(macro.arrive_tolerance ?? 5),
       }, []);
       appendDiagnostic("farm_walk", { flow, message: `${why}: ${walk.note}` });
       target = null;

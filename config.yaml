@@ -247,6 +247,9 @@ activity_macros:
     # con (user, 2026-10-08). patrol_wait_seconds = chờ quái hiện ra khi vừa tới bãi
     # (game chỉ gửi quái khi mình đứng gần) rồi mới tính là trống.
     leave_when_left: 2
+    # Đi tới bãi lệch trong arrive_tolerance ô (tọa độ game) là tới rồi, không cần
+    # đứng đúng điểm (user, 2026-10-08: "cứ +-5 vẫn ok").
+    arrive_tolerance: 5
     patrol_wait_seconds: 3
     roam_wait_seconds: 4
     farm_radius: 220
