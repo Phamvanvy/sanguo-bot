@@ -1,6 +1,7 @@
 """Offline tests for the extension flow catalog and configurable macros."""
 from __future__ import annotations
 
+import base64
 import json
 import shutil
 import subprocess
@@ -659,18 +660,39 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual("farm_spot_loop", farm["runner"])
         flows = {flow["id"]: flow for flow in extension_server.flow_catalog(cfg)}
         self.assertEqual(
-            [{"id": spot["id"], "label": spot["label"]} for spot in farm["spots"]],
+            [{"id": spot["id"], "label": spot["label"], "roam": True} for spot in farm["spots"]],
             flows["farm_spots"]["farm_spots"],
         )
         self.assertEqual("giang_lang", farm["spots"][0]["id"])
         self.assertEqual([8, 14], farm["refuse_reasons"])
-        grids = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
+        # Every point open on the map's walk grid, and the roam clusters all
+        # reachable on foot from one another (user: "đi khắp map").
+        source = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
+        grids = json.loads(source[source.index("{"):source.rindex("}") + 1])
         for spot in farm["spots"]:
-            self.assertIn(f'"{spot["map"]}": {{', grids)
+            grid = grids[str(spot["map"])]
+            bits = base64.b64decode(grid["blocked"])
+            w, h = grid["w"], grid["h"]
+            is_open = lambda x, y: 0 <= x < w and 0 <= y < h and not (bits[(y * w + x) >> 3] >> ((y * w + x) & 7)) & 1
+            points = spot["points"] + spot["roam_points"]
+            seen = {tuple(points[0])}
+            queue = [tuple(points[0])]
+            while queue:
+                x, y = queue.pop()
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        step = (x + dx, y + dy)
+                        if step in seen or not is_open(*step) or (dx and dy and not (is_open(x + dx, y) and is_open(x, y + dy))):
+                            continue
+                        seen.add(step)
+                        queue.append(step)
+            self.assertEqual([], [p for p in points if tuple(p) not in seen], spot["id"])
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn('"farm_spot_loop",', content)
         self.assertIn('else if (macro.runner === "farm_spot_loop") await runFarmSpot(token, macro, flow);', content)
         self.assertIn("await giveUp(refused.target, `game báo không đánh được, lý do ${refused.reason}`);", content)
+        self.assertIn("const roam = Boolean(macro.roam && spot.roam_points?.length);", content)
+        self.assertIn("? { ...option.overrides, roam: roamTick.checked } : option.overrides));", content)
 
     def test_refused_doors_are_walked_off_and_into_again(self):
         # user, 2026-09-29: turned away while attacked, the character freezes on

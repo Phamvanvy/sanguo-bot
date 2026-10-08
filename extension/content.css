@@ -78,6 +78,9 @@
 #sanguo-flow-panel .sg-item-slots button:hover { border-color: #d69b3b; background: #463017; }
 #sanguo-flow-panel .sg-item-slots button:disabled { opacity: .45; cursor: default; }
 #sanguo-flow-panel .sg-item-slots button.sg-wide { grid-column: 1 / -1; }
+#sanguo-flow-panel .sg-item-slots label {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: 4px; color: #ffd77b; font-size: 9px; font-weight: 700;
+}
 #sanguo-flow-panel .sg-stage-counts { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px; margin-top: 4px; align-items: center; }
 #sanguo-flow-panel .sg-stage-counts label {
   display: flex; align-items: center; gap: 4px; color: #ffd77b; font-size: 9px; font-weight: 700;
