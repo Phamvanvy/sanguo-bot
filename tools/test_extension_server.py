@@ -912,6 +912,21 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn("stage", flows)
         self.assertEqual([{"macro": "stage", "label": "Lẻ", "times": 2}], flows["pipe"]["stages"])
 
+    def test_panel_bottom_cards_go_last_in_config_order(self):
+        cfg = {"activity_macros": {
+            "dungeon": {"label": "Phó bản", "panel_bottom": True},
+            "farm": {"label": "Farm"},
+            "reset": {"label": "Reset", "panel_bottom": True},
+            "attack": {"label": "Đánh"},
+        }}
+        ids = [flow["id"] for flow in flow_catalog(cfg)]
+        self.assertEqual(["full_auto", "farm", "attack", "dungeon", "reset"], ids)
+        default_ids = [flow["id"] for flow in flow_catalog()]
+        self.assertEqual(
+            ["co_mo_pipeline", "thien_long_pipeline", "ha_dong_pipeline", "instance_reset", "dungeon_tour"],
+            default_ids[-5:],
+        )
+
     def test_default_catalog_contains_thien_long_routes_and_pipeline(self):
         """Easy and hard are stage macros with no card; one card runs n hard + m easy."""
         flows = {flow["id"]: flow for flow in flow_catalog()}

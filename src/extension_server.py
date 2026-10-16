@@ -135,7 +135,12 @@ def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
                 }
                 for stage in macro.get("stages", [])
             ]
+        if macro.get("panel_bottom"):
+            flow["panel_bottom"] = True
         flows.append(flow)
+    # Cards used only now and then (panel_bottom: true) go below the rest, in
+    # the order config.yaml lists them (user, 2026-10-16: the dungeons).
+    flows.sort(key=lambda flow: bool(flow.get("panel_bottom")))
     return flows
 
 
