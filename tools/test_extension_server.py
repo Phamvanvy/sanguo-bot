@@ -66,6 +66,8 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertTrue(is_game_url("https://play.minhchauh5.com/server/1"))
         self.assertFalse(is_game_url("http://play.minhchauh5.com/"))
         self.assertFalse(is_game_url("https://play.minhchauh5.com.evil.example/"))
+        self.assertTrue(is_game_url("https://test.hoiucminhchau.me/"))
+        self.assertFalse(is_game_url("http://test.hoiucminhchau.me/"))
 
     @patch("src.extension_server.NETWORK_LOG_PATH")
     def test_network_event_is_written_as_json_line(self, log_path):
@@ -563,7 +565,8 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn("world.kills = [...world.kills.slice(-19)", probe)
         self.assertTrue(macro["entry_steps"][-1].get("portal"))
         # Clicks map onto the (possibly letterboxed) game canvas, not the viewport.
-        self.assertIn('document.querySelector("#screen")?.getBoundingClientRect()', content)
+        self.assertIn("const rect = gameCanvas()?.getBoundingClientRect();", content)
+        self.assertIn('document.querySelector("canvas#screen, canvas#game")', content)
 
     def test_default_catalog_contains_warehouse_take(self):
         flows = {flow["id"]: flow for flow in flow_catalog()}
@@ -1306,7 +1309,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.6"', manifest)
+        self.assertIn('"version": "0.19.7"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
@@ -1318,6 +1321,10 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('const BLESSING_SPEED_FACTOR = 1.0', content)
         self.assertIn('async function runBlessing', content)
         self.assertIn('flow === "blessing"', content)
+        # The 4.4 web lab's screen width follows the window: its points are
+        # logical pixels from the canvas centre, not fractions.
+        self.assertIn("labPoint(macro.lab_ten_times_point) || macro.ten_times_point", content)
+        self.assertIn("lab_ten_times_point: [208, 507]", (PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
         dom_click = content[content.index("async function domClick"):content.index("function dispatchKey")]
         self.assertIn('dispatchMouse(target, "mousedown"', dom_click)
         self.assertIn('dispatchMouse(target, "mouseup"', dom_click)
@@ -1326,7 +1333,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('"mousemove"', dom_click)
         # The TeaVM canvas must never get a click event; the HTML dialogs the
         # game lays over it (the amount box) act on nothing else.
-        self.assertIn('target.id !== "screen"', dom_click)
+        self.assertIn("target !== gameCanvas()", dom_click)
         self.assertIn('dispatchMouse(target, "click"', dom_click)
         self.assertIn('document.getElementById("__mch5_guard")', content)
         self.assertIn('Rớt do guard: WebSocket 4001/guard', content)

@@ -851,6 +851,11 @@ activity_macros:
     open_point: [0.73, 0.07]
     ten_times_point: [0.66, 0.84]
     ok_point: [0.70, 0.64]
+    # test.hoiucminhchau.me (bản 4.4): [x lệch từ giữa canvas, y], pixel logic
+    # của game (cao 640, rộng 1280-1600 theo cửa sổ). Nút 10 lần đo từ ảnh
+    # chụp 2026-10-19; OK tạm lấy đúng vị trí bản live.
+    lab_ten_times_point: [208, 507]
+    lab_ok_point: [256, 410]
     # Let each animation/result settle before sending the next interaction.
     # This avoids starving the renderer and tripping the site's guard.
     open_delay_seconds: 0.3

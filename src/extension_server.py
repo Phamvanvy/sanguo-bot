@@ -83,9 +83,12 @@ def log_network_event(data: dict[str, Any]) -> dict[str, Any]:
     return event
 
 
+GAME_HOSTS = {"play.minhchauh5.com", "test.hoiucminhchau.me"}
+
+
 def is_game_url(value: str) -> bool:
     parsed = urlparse(value)
-    return parsed.scheme == "https" and parsed.hostname == "play.minhchauh5.com"
+    return parsed.scheme == "https" and parsed.hostname in GAME_HOSTS
 
 
 def flow_catalog(cfg: dict | None = None) -> list[dict[str, str]]:
@@ -376,7 +379,7 @@ def start_flow(
     if flow_id not in valid_ids:
         return {"ok": False, "error": "Flow không tồn tại"}
     if not tab_title.strip() or not is_game_url(tab_url):
-        return {"ok": False, "error": "Hãy chọn tab https://play.minhchauh5.com/ trước khi chạy"}
+        return {"ok": False, "error": "Hãy chọn tab https://play.minhchauh5.com/ hoặc https://test.hoiucminhchau.me/ trước khi chạy"}
     with _lock:
         if key in _workers:
             return {"ok": False, "error": "Cửa sổ này đang chạy một flow khác"}

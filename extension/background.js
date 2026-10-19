@@ -103,8 +103,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+// Live Minh Châu H5 and the 4.4 web lab client both run the extension.
+const GAME_ORIGINS = ["https://play.minhchauh5.com", "https://test.hoiucminhchau.me"];
+
 chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.id || !tab.url?.startsWith("https://play.minhchauh5.com/")) return;
+  if (!tab.id || !GAME_ORIGINS.some((origin) => tab.url?.startsWith(`${origin}/`))) return;
   try {
     await chrome.tabs.sendMessage(tab.id, { type: "toggle-panel" });
   } catch (_) {

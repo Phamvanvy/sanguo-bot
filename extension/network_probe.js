@@ -666,6 +666,9 @@
           type: "npc_dialog",
           message: `${kind} questId ${questId} notifyId ${notifyId}: ${message}${options ? ` [${options}]` : ""}`,
         });
+        // Cầu phúc is the server's own UI, not in sangobuildVn: what the
+        // "10 lần" button sends is only known from a trace around its result.
+        if (/Cầu phúc/i.test(message)) dumpTraceLater("quanh lúc Cầu phúc");
       } else if (opcode === OP_ACTOR_LOGIN_SERVER) {
         reader.i32();                  // serial
         reader.i32();                  // Packet.put(byte[]) writes the blob length first

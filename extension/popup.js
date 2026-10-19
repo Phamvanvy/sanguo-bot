@@ -38,8 +38,8 @@ async function runFlow(flow) {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.title || !tab?.url) throw new Error("Không đọc được tab đang chọn");
-    if (new URL(tab.url).origin !== "https://play.minhchauh5.com") {
-      throw new Error("Hãy mở flow từ tab https://play.minhchauh5.com/");
+    if (!["https://play.minhchauh5.com", "https://test.hoiucminhchau.me"].includes(new URL(tab.url).origin)) {
+      throw new Error("Hãy mở flow từ tab https://play.minhchauh5.com/ hoặc https://test.hoiucminhchau.me/");
     }
     const data = await request("/run", {
       method: "POST",

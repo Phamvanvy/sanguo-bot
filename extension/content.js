@@ -508,11 +508,29 @@
     showStatus(domFlow);
   }
 
+  // The game canvas: #screen on play.minhchauh5.com, #game on the 4.4 web
+  // lab (test.hoiucminhchau.me).
+  function gameCanvas() {
+    return document.querySelector("canvas#screen, canvas#game");
+  }
+
+  // A point on the 4.4 web lab: [x from the canvas centre, y], in its logical
+  // pixels. Its screen is 640 high but 1280-1600 wide to fit the window, and
+  // panels stay centred, so a fraction measured once would drift with the
+  // window. Null on play.minhchauh5.com, whose points stay fractions.
+  function labPoint(point) {
+    const canvas = gameCanvas();
+    if (!point || canvas?.id !== "game") return null;
+    const width = canvas.width || 1280;
+    const height = canvas.height || 640;
+    return [(width / 2 + Number(point[0])) / width, Number(point[1]) / height];
+  }
+
   // Points are fractions of the game canvas. When the tab is wider than the
   // canvas (e.g. Brave's info bar steals height) the game is letterboxed, so
-  // map onto #screen itself; when it fills the tab this equals the viewport.
+  // map onto the canvas itself; when it fills the tab this equals the viewport.
   function eventTargetAt(point) {
-    const rect = document.querySelector("#screen")?.getBoundingClientRect();
+    const rect = gameCanvas()?.getBoundingClientRect();
     const box = rect && rect.width > 0 && rect.height > 0
       ? rect
       : { left: 0, top: 0, width: innerWidth, height: innerHeight };
@@ -521,7 +539,7 @@
     // Our own panel can sit over the game wherever the user dragged it: a
     // click meant for the game under it still goes to the game's canvas.
     const hit = document.elementFromPoint(x, y);
-    const target = hit && panel.contains(hit) ? document.querySelector("#screen") || hit : hit;
+    const target = hit && panel.contains(hit) ? gameCanvas() || hit : hit;
     if (!target) throw new Error(`Không tìm thấy phần tử game tại (${x.toFixed(0)}, ${y.toFixed(0)})`);
     return { target, x, y };
   }
@@ -585,7 +603,7 @@
     // "S.lượng nhập vào" box is a real dialog with a real input - and those
     // buttons only act on a click event (user, 2026-09-18: "Đồng ý" never
     // fired). The canvas still must not get one, see above.
-    if (target.id !== "screen") dispatchMouse(target, "click", x, y, 0);
+    if (target !== gameCanvas()) dispatchMouse(target, "click", x, y, 0);
     return { target, x, y };
   }
 
@@ -664,6 +682,8 @@
   }
 
   async function runBlessing(token, macro) {
+    const tenTimesPoint = labPoint(macro.lab_ten_times_point) || macro.ten_times_point || [0.66, 0.84];
+    const okPoint = labPoint(macro.lab_ok_point) || macro.ok_point || [0.70, 0.64];
     updateFlowContext("blessing", 0, "open_panel");
     await domClick(token, macro.open_point || [0.73, 0.07]);
     await domDelay(macro.open_delay_seconds || 2, BLESSING_SPEED_FACTOR);
@@ -673,12 +693,12 @@
       const cycleNumber = cycle + 1;
       for (let click = 0; click < (cycle === 0 ? 1 : 2); click += 1) {
         updateFlowContext("blessing", cycleNumber, cycle > 0 && click === 0 ? "dismiss_result" : "request_ten");
-        await domClick(token, macro.ten_times_point || [0.66, 0.84]);
+        await domClick(token, tenTimesPoint);
         await domDelay(macro.click_delay_seconds || 1.2, BLESSING_SPEED_FACTOR);
       }
       await domDelay(macro.confirm_delay_seconds || 1.5, BLESSING_SPEED_FACTOR);
       updateFlowContext("blessing", cycleNumber, "confirm_ok");
-      await domClick(token, macro.ok_point || [0.70, 0.64]);
+      await domClick(token, okPoint);
       updateFlowContext("blessing", cycleNumber, "result_wait");
       updateDomFlow("blessing", `Cầu phúc: ${cycleNumber} lượt`, "result_wait");
       if (cycleNumber === 1 || cycleNumber % 10 === 0) {
@@ -750,8 +770,8 @@
     board.width = width;
     board.height = height;
     const context = board.getContext("2d", { willReadFrequently: true });
-    const screen = document.querySelector("#screen");
-    if (!screen) throw new Error("Không thấy canvas #screen của game");
+    const screen = gameCanvas();
+    if (!screen) throw new Error("Không thấy canvas của game");
     try {
       context.drawImage(screen, 0, 0, width, height);
       const image = context.getImageData(0, 0, width, height);
@@ -1076,13 +1096,13 @@
     if (unsized) {
       throw new Error(`Bước "${unsized.label}" đi theo tọa độ nhưng thiếu map_size (cỡ map, pixel)`);
     }
-    const canvas = document.querySelector("#screen")?.getBoundingClientRect();
+    const canvas = gameCanvas()?.getBoundingClientRect();
     appendDiagnostic("dungeon_start", {
       flow,
       message: `${steps.length} bước; viewport ${innerWidth}x${innerHeight}; `
         + (canvas
           ? `canvas ${Math.round(canvas.left)},${Math.round(canvas.top)} ${Math.round(canvas.width)}x${Math.round(canvas.height)}`
-          : "không thấy canvas #screen")
+          : "không thấy canvas game")
         + `; dữ liệu game: ${describeWorld()}`
         + (inside ? "; đã ở trong phó bản nên bỏ qua bước vào cửa" : "")
         + (resumeAt > 0 ? `; đang ở map ${here} nên bắt đầu từ "${steps[0].label}"` : ""),
