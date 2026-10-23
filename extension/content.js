@@ -2305,6 +2305,30 @@
     // cave target, take its door; else the T.Giới Map teleport. stop() is
     // asked between legs, so a quest that turns ready on the way ends the trip.
     const walkFailed = (message) => Object.assign(new Error(message), { walkFailed: true });
+    // An open tile 6-10 steps from where we stand, reachable on the grid, the
+    // nearest to the goal on foot, and not within 4 tiles of a spot we already
+    // got stuck on (our own spot is added here).
+    const detourTile = (mapId, goal, stuck) => {
+      const grid = walkGridFor(mapId);
+      const me = latestWorld?.me;
+      if (!grid || !me) return null;
+      const here = { x: Math.floor(me.x / unit), y: Math.floor(me.y / unit) };
+      stuck.push(here);
+      const toGoal = walkDistances(grid, { x: goal[0], y: goal[1] }, grid.w + grid.h);
+      const fromMe = walkDistances(grid, here, 20);
+      let best = null;
+      for (let dy = -10; dy <= 10; dy += 1) {
+        for (let dx = -10; dx <= 10; dx += 1) {
+          const tile = { x: here.x + dx, y: here.y + dy };
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < 6 || !grid.open(tile.x, tile.y)) continue;
+          const index = tile.y * grid.w + tile.x;
+          if (fromMe[index] > 20 || !Number.isFinite(toGoal[index])) continue;
+          if (stuck.some((spot) => Math.max(Math.abs(spot.x - tile.x), Math.abs(spot.y - tile.y)) <= 4)) continue;
+          if (!best || toGoal[index] < best.score) best = { ...tile, score: toGoal[index] };
+        }
+      }
+      return best;
+    };
     const gotoPlace = async (place, label, stop = () => false) => {
       for (let leg = 0; leg < 8; leg += 1) {
         ensureDomActive(token);
@@ -2317,9 +2341,27 @@
         }
         const size = walkGridFor(here)?.size;
         if (here === place.map) {
-          const walk = await walkToCoord(token, macro, {
-            label, goto: place.at, map_size: size, goto_tolerance: Number(place.tolerance ?? 2),
-          }, []);
+          const step = { label, goto: place.at, map_size: size, goto_tolerance: Number(place.tolerance ?? 2) };
+          // Close enough (an officer only has to be within reach) ends it too.
+          const nearEnough = () => place.near && latestWorld?.me && latestWorld.mapId === place.map
+            && Math.hypot(latestWorld.me.x - place.nearTo.x, latestWorld.me.y - place.nearTo.y) <= place.near;
+          let walk = await walkToCoord(token, macro, step, []);
+          // Stuck where the walk grid sees a way and the game does not (Nam
+          // Việt 127,110 on the way to 183,117; user, 2026-10-24: "đi lệch 1
+          // chút rồi vòng về"): step aside to an open tile nearer the goal,
+          // away from every spot we got stuck on, and try again from there.
+          const stuck = [];
+          for (let detour = 0; ["timeout", "blocked"].includes(walk.how) && !nearEnough()
+            && detour < Number(macro.detour_attempts ?? 3); detour += 1) {
+            const aside = detourTile(here, place.at, stuck);
+            if (!aside) break;
+            say(`${label}: kẹt ở ${stuck[stuck.length - 1].x},${stuck[stuck.length - 1].y}, đi vòng qua ${aside.x},${aside.y}`, "cong_cao_walk");
+            const side = await walkToCoord(token, macro, { label: `đi vòng ${aside.x},${aside.y}`, goto: [aside.x, aside.y], map_size: size, goto_tolerance: 2 }, []);
+            // Not reached either: that way is shut too, pick another next time.
+            if (side.how !== "arrived") stuck.push({ x: aside.x, y: aside.y });
+            walk = await walkToCoord(token, macro, step, []);
+          }
+          if (nearEnough()) return `${walk.note}; đủ gần`;
           if (["timeout", "blocked"].includes(walk.how)) throw walkFailed(`không đi tới ${label} ${place.at.join(",")}: ${walk.note}`);
           return walk.note;
         }
@@ -2421,7 +2463,12 @@
       const npcTile = quest.finish.npc.map(Number);
       const grid = walkGridFor(Number(quest.finish.map));
       const stand = (grid && nearestOpen(grid, { x: npcTile[0], y: npcTile[1] + 3 }, 3)) || { x: npcTile[0], y: npcTile[1] + 3 };
-      await gotoPlace({ map: Number(quest.finish.map), at: [stand.x, stand.y], tolerance: 2 }, `trả ${quest.label}`);
+      // Within finish_reach px of the officer is enough: Giang Lăng's 87,108
+      // could only be walked up to 84,108 (2026-10-24 04:01).
+      await gotoPlace({
+        map: Number(quest.finish.map), at: [stand.x, stand.y], tolerance: 2,
+        near: Number(macro.finish_reach ?? 64), nearTo: tileCenter(npcTile),
+      }, `trả ${quest.label}`);
       const serial = (commandSerial += 1);
       const since = Date.now();
       const error = await postGamePacket(OP_QUEST_FINISH, [["i32", serial], ["i32", quest.quest], ["i32", 1]]);

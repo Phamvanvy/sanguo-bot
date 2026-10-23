@@ -739,6 +739,11 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual({"map": 2016, "at": [183, 117], "tolerance": 3}, macro["dig"])
         # The quest popup waits for "Nhận" (03:51): pressed like the user does.
         self.assertEqual([0.778, 0.769], macro["offer_accept_point"])
+        # Stuck where the grid sees a way (Nam Việt 127,110): go round, and an
+        # officer only has to be within reach (Giang Lăng 84,108 for 87,108).
+        content_js = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn("const aside = detourTile(here, place.at, stuck);", content_js)
+        self.assertIn("near: Number(macro.finish_reach ?? 64), nearTo: tileCenter(npcTile),", content_js)
         # Shared walking / fighting settings come from the farm macro.
         self.assertEqual(cfg["activity_macros"]["farm_spots"]["skill_points"], macro["skill_points"])
         source = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
@@ -1373,7 +1378,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.20.2"', manifest)
+        self.assertIn('"version": "0.20.3"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
