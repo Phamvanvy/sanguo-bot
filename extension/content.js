@@ -2331,18 +2331,23 @@
           const walk = await walkToCoord(token, macro, { label: `cửa ${door.join(",")}`, goto: door, portal: true, map_size: size }, []);
           if (walk.how !== "map") {
             appendDiagnostic("cong_cao", { flow, message: `chưa qua được cửa ${door.join(",")}: ${walk.note}` });
-            if (walk.refused && latestWorld?.meFighting === true) await fightUntilClear(token, macro, 60, { whileFighting: true });
+            if (walk.refused) await fightUntilClear(token, macro, 30, { idle: false });
           }
           continue;
         }
-        // "Trạng thái chiến đấu không thể dịch chuyển": finish the fight first.
-        if (latestWorld?.meFighting === true) {
-          say(`${label}: đang bị đánh, đánh xong mới dịch chuyển được`, "cong_cao_travel");
-          say(`${label}: ${describeFight(await fightUntilClear(token, macro, 60, { whileFighting: true }))}`, "cong_cao_travel");
-        }
+        // Teleport first and fight only when the game says no for a fight
+        // ("Trạng thái chiến đấu không thể dịch chuyển"): the probe's combat
+        // mark stayed on with nothing hitting us (2026-10-24 03:54), and going
+        // by it the flow fought the air for a minute before every trip.
         const target = Number(place.via?.map || place.map);
         say(`${label}: dịch chuyển tới map ${target}`, "cong_cao_travel");
-        await travelToLobby(token, macro, { label, lobby_map: target }, flow);
+        try {
+          await travelToLobby(token, macro, { label, lobby_map: target }, flow);
+        } catch (error) {
+          if (!/chiến đấu/i.test(error.message)) throw error;
+          say(`${label}: game không cho dịch chuyển khi đang chiến đấu, đánh con đang đánh mình`, "cong_cao_travel");
+          say(`${label}: ${describeFight(await fightUntilClear(token, macro, 30, { idle: false }))}`, "cong_cao_travel");
+        }
       }
       throw walkFailed(`không tới được ${label} (map ${place.map}) sau 8 chặng`);
     };
