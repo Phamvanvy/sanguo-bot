@@ -737,6 +737,8 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual((80, 1139, 3, 1311, 2234), (macro["shop_id"], macro["notice_item"], macro["notice_price"],
                                                      macro["pearl_item"], macro["pick_item"]))
         self.assertEqual({"map": 2016, "at": [183, 117], "tolerance": 3}, macro["dig"])
+        # The quest popup waits for "Nhận" (03:51): pressed like the user does.
+        self.assertEqual([0.778, 0.769], macro["offer_accept_point"])
         # Shared walking / fighting settings come from the farm macro.
         self.assertEqual(cfg["activity_macros"]["farm_spots"]["skill_points"], macro["skill_points"])
         source = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
@@ -1371,7 +1373,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.20.0"', manifest)
+        self.assertIn('"version": "0.20.1"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

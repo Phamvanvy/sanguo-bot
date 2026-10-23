@@ -314,6 +314,11 @@ activity_macros:
     # gửi đúng gói client gửi trong lượt user làm tay (log 03:30-03:33): mua
     # SHOP_BUY 302 ở tiệm 80, dùng đồ USEITEM 145, nhận QUEST_ACCEPT 131, trả
     # QUEST_FINISH 137 khi đứng cạnh quan trả nhiệm vụ.
+    # Dùng Công cáo (n) thì game hiện popup nhiệm vụ "Trở về" / "Nhận" và chờ người
+    # bấm (2026-10-24 03:51): bấm "Nhận" để client tự nhận và tự đóng popup. Không
+    # ăn thì gửi lệnh nhận rồi bấm X. Đo trên ảnh user 1920x1080 (canvas 1920x960).
+    offer_accept_point: [0.778, 0.769]
+    offer_close_point: [0.832, 0.164]
     pearl_item: 1311
     notice_item: 1139
     pick_item: 2234

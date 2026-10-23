@@ -2336,7 +2336,10 @@
           continue;
         }
         // "Trạng thái chiến đấu không thể dịch chuyển": finish the fight first.
-        if (latestWorld?.meFighting === true) await fightUntilClear(token, macro, 60, { whileFighting: true });
+        if (latestWorld?.meFighting === true) {
+          say(`${label}: đang bị đánh, đánh xong mới dịch chuyển được`, "cong_cao_travel");
+          say(`${label}: ${describeFight(await fightUntilClear(token, macro, 60, { whileFighting: true }))}`, "cong_cao_travel");
+        }
         const target = Number(place.via?.map || place.map);
         say(`${label}: dịch chuyển tới map ${target}`, "cong_cao_travel");
         await travelToLobby(token, macro, { label, lobby_map: target }, flow);
@@ -2381,13 +2384,21 @@
         mark.restUntil = Date.now() + 2 * 60 * 1000;
         return "dùng mà game không giao nhiệm vụ";
       }
-      let accepted = await waitNews(since, 2.5, (got) => got.kind === "accepted" && got.questId === quest.quest);
-      let how = "client tự nhận";
+      // The client draws the quest with "Nhận" / "Trở về" and waits for a
+      // person (2026-10-24 03:51: our own QUEST_ACCEPT took the quest, and
+      // the popup stayed over the game). So press "Nhận" like the user does:
+      // the client sends the accept itself and closes it.
+      const taken = (got) => ["accepted", "accept_fail"].includes(got.kind) && got.questId === quest.quest;
+      await domWait(token, Number(macro.offer_popup_seconds ?? 0.8));
+      let how = "bấm Nhận";
+      if (macro.offer_accept_point) await domClick(token, macro.offer_accept_point);
+      let accepted = await waitNews(since, 4, taken);
       if (!accepted) {
         const error = await postGamePacket(OP_QUEST_ACCEPT, [["i32", quest.quest]]);
         if (error) throw new Error(error);
-        accepted = await waitNews(since, 4, (got) => ["accepted", "accept_fail"].includes(got.kind) && got.questId === quest.quest);
-        how = "gửi lệnh nhận";
+        accepted = await waitNews(since, 4, taken);
+        how = "bấm Nhận không ăn, gửi lệnh nhận rồi đóng popup";
+        if (macro.offer_close_point) await domClick(token, macro.offer_close_point);
       }
       if (accepted?.kind !== "accepted") {
         mark.restUntil = Date.now() + 10 * 60 * 1000;
