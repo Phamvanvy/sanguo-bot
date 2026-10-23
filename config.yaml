@@ -348,17 +348,19 @@ activity_macros:
       - {item: 1142, quest: 569, label: "(3) Vương tử Hung Nô",
          boss: {map: 816, at: [52, 15]}, finish: {map: 816, npc: [67, 99]}}
       - {item: 1143, quest: 570, label: "(4) Cắt viện trợ",
-         boss: {map: 832, at: [35, 38], via: {map: 816, door: [161, 17]}}, finish: {map: 816, npc: [67, 99]}}
+         boss: {map: 832, at: [35, 38], via: {map: 816, door: [161, 17], exit: 1}}, finish: {map: 816, npc: [67, 99]}}
       - {item: 1144, quest: 571, label: "(5) Hành động chém đầu",
          boss: {map: 896, at: [9, 178]}, finish: {map: 896, npc: [87, 105]}}
       - {item: 1145, quest: 572, label: "(6) Đánh bại sỹ hào",
-         boss: {map: 880, at: [32, 25], via: {map: 896, door: [50, 182]}}, finish: {map: 896, npc: [87, 105]}}
+         boss: {map: 880, at: [32, 25], via: {map: 896, door: [50, 182], exit: 2}}, finish: {map: 896, npc: [87, 105]}}
       - {item: 1146, quest: 573, label: "(7) Cái chết của Tư Mã Hùng",
          boss: {map: 1056, at: [156, 16]}, finish: {map: 1056, npc: [45, 155]}}
-    # Ra khỏi hang bằng cửa của nó (về map `to`).
+    # Ra khỏi hang bằng cửa của nó (về map `to`). exit = số cửa trong Areas/<map/16>/info.xml:
+    # đứng sát cửa mà đi không qua (832 kẹt ở 8,53, 2026-10-24) thì gửi lệnh qua cửa
+    # TOUCHEXIT 116 như client gửi khi bước vào cửa (server cho trong 100px).
     cave_exits:
-      832: {door: [8, 56], to: 816}
-      880: {door: [92, 56], to: 896}
+      832: {door: [8, 56], to: 816, exit: 0}
+      880: {door: [92, 56], to: 896, exit: 0}
   co_mo_hard: &co_mo_hard
     label: "Phó bản Cổ Mộ (khó)"
     description: "Vào bản khó qua NPC rồi đánh 3 boss ở 3 phòng"

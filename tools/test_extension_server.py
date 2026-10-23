@@ -744,6 +744,10 @@ class ExtensionServerTest(unittest.TestCase):
         content_js = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn("const aside = detourTile(here, place.at, stuck);", content_js)
         self.assertIn("near: Number(macro.finish_reach ?? 64), nearTo: tileCenter(npcTile),", content_js)
+        # A door the walk will not take: the client's own TOUCHEXIT, exit = area << 16 | id
+        # ("00340000" leaving 832 in the user's round).
+        self.assertEqual(0, macro["cave_exits"][832]["exit"])
+        self.assertIn("const exitId = (Math.floor(mapId / 16) << 16) | Number(gate.exit);", content_js)
         # Shared walking / fighting settings come from the farm macro.
         self.assertEqual(cfg["activity_macros"]["farm_spots"]["skill_points"], macro["skill_points"])
         source = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
@@ -1378,7 +1382,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.20.3"', manifest)
+        self.assertIn('"version": "0.20.4"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

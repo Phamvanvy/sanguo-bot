@@ -2305,6 +2305,36 @@
     // cave target, take its door; else the T.Giới Map teleport. stop() is
     // asked between legs, so a quest that turns ready on the way ends the trip.
     const walkFailed = (message) => Object.assign(new Error(message), { walkFailed: true });
+    // Standing by a door the walk would not take (Sóc Phương sơn động 8,53
+    // by 8,56, 2026-10-24 04:25): send the TOUCHEXIT the client sends on
+    // stepping in - int serial | int clock | int exit (area << 16 | exit id,
+    // "00340000" in the user's own round). The server only wants us within
+    // 100 px of the exit (PlayerPacketHandler.touchExit).
+    const touchExit = async (mapId, gate) => {
+      const me = latestWorld?.me;
+      const door = tileCenter(gate.door);
+      const away = me ? Math.round(Math.hypot(me.x - door.x, me.y - door.y)) : Infinity;
+      if (away > Number(macro.touch_exit_reach ?? 90)) return `còn cách cửa ${away}px, chưa gửi lệnh qua cửa`;
+      if (!latestWorld?.clock) return "chưa có đồng hồ game để gửi lệnh qua cửa";
+      const serial = (commandSerial += 1);
+      const since = Date.now();
+      const exitId = (Math.floor(mapId / 16) << 16) | Number(gate.exit);
+      const error = await postGamePacket(OP_TOUCH_EXIT, [
+        ["i32", serial], ["i32", latestWorld.clock.t + (Date.now() - latestWorld.clock.at)], ["i32", exitId],
+      ]);
+      if (error) throw new Error(error);
+      const deadline = since + 10000;
+      while (Date.now() < deadline) {
+        if (mapSwitchedAt > since) {
+          await domWait(token, macro.map_load_seconds || 1.5);
+          return `gửi lệnh qua cửa ${exitId.toString(16)} từ ${away}px, sang map ${latestWorld?.mapId}`;
+        }
+        const refused = (latestWorld?.replies || []).find((reply) => reply.serial === serial && !reply.ok);
+        if (refused) return `game không cho qua cửa: ${refused.message}`;
+        await domWait(token, 0.3);
+      }
+      return `gửi lệnh qua cửa ${exitId.toString(16)} mà chưa sang map`;
+    };
     // An open tile 6-10 steps from where we stand, reachable on the grid, the
     // nearest to the goal on foot, and not within 4 tiles of a spot we already
     // got stuck on (our own spot is added here).
@@ -2366,14 +2396,16 @@
           return walk.note;
         }
         const cave = caves[here];
-        const door = place.via && here === place.via.map ? place.via.door
-          : (cave && [place.map, place.via?.map].includes(Number(cave.to)) ? cave.door : null);
-        if (door) {
+        const gate = place.via && here === place.via.map ? place.via
+          : (cave && [place.map, place.via?.map].includes(Number(cave.to)) ? cave : null);
+        if (gate) {
+          const door = gate.door;
           say(`${label}: qua cửa ${door.join(",")} ở map ${here}`, "cong_cao_walk");
           const walk = await walkToCoord(token, macro, { label: `cửa ${door.join(",")}`, goto: door, portal: true, map_size: size }, []);
           if (walk.how !== "map") {
             appendDiagnostic("cong_cao", { flow, message: `chưa qua được cửa ${door.join(",")}: ${walk.note}` });
             if (walk.refused) await fightUntilClear(token, macro, 30, { idle: false });
+            else if (gate.exit != null) say(`${label}: ${await touchExit(here, gate)}`, "cong_cao_walk");
           }
           continue;
         }
