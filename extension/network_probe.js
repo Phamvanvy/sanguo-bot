@@ -579,10 +579,48 @@
     }, 6000);
   }
 
+  // Công cáo triều đình (user, 2026-10-24): buy it at the jeweller, use it,
+  // do the random quest, hand it in, dig pearls in Nam Việt with the pick.
+  // None of that is in the logs yet and the live packets differ from
+  // sangobuildVn, so one manual round is recorded in full: every packet we
+  // send but the steady fight / walk / keepalive stream, and the server's
+  // quest, shop and item answers with their text readable.
+  const ACTION_QUIET_OUT = new Set([1, 101, 105, 113, 133, 164, 181, 185, 188, 196, 314, 2039, 2099, 2555]);
+  // QUEST_*_SERVER 125-139, QUEST_PREDESC/POSTDESC 150/152, QUEST_LIST 160,
+  // AREAQUEST_INFO 161, QUEST_ABANDON 173, SHOP_* 301/303/305,
+  // QUEST_UNFINISHDESC 333, USEITEM_FAIL 340, QUEST_ACCEPT_FAIL 343,
+  // GRID_EXCHANGE 345 (OpCode.java).
+  const ACTION_REPLIES = new Set([125, 126, 127, 128, 130, 132, 135, 138, 139, 150, 152,
+    160, 161, 173, 301, 303, 305, 333, 340, 343, 345]);
+  const textDecoder = new TextDecoder("utf-8");
+  function readableText(segment) {
+    return textDecoder.decode(segment.subarray(2))
+      .replace(/[\u0000-\u001f�]+/g, "·")
+      .replace(/·(.?·)+/g, "·")
+      .slice(0, 600);
+  }
+  function hexHead(segment, count) {
+    return Array.from(segment.subarray(2, 2 + count), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+  function traceAction(segment, outgoing, opcode) {
+    if (TRACE_SECRET.has(opcode)) return;
+    if (outgoing) {
+      if (ACTION_QUIET_OUT.has(opcode)) return;
+      remember({ type: "action_sent", message: `>${opcode}(${segment.length}) ${hexHead(segment, 96)}` });
+      dumpTraceLater(`quanh lúc gửi ${opcode}`);
+    } else if (ACTION_REPLIES.has(opcode)) {
+      remember({
+        type: "action_reply",
+        message: `<${opcode}(${segment.length}) ${hexHead(segment, 64)} "${readableText(segment)}"`,
+      });
+    }
+  }
+
   function readSegment(segment, outgoing) {
     const opcode = (segment[0] << 8) | segment[1];
     const reader = segmentReader(segment);
     traceSegment(segment, outgoing, opcode);
+    try { traceAction(segment, outgoing, opcode); } catch (_) { /* diagnostics only */ }
     try {
       if (outgoing) {
         if (opcode === OP_MOVE_CLIENT) readOwnMove(reader);
