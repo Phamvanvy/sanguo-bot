@@ -725,6 +725,68 @@ class ExtensionServerTest(unittest.TestCase):
         for name in ["Bạo đồ quân Kinh Sở", "Xạ thủ quân Kinh Sở", "Tây khương sĩ binh", "Hung nô thị vệ"]:
             self.assertFalse(any(pattern.search(name) for pattern in patterns), name)
 
+    def test_cong_cao_quests_reach_boss_officer_and_dig_spot_on_the_walk_grids(self):
+        # user, 2026-10-24: buy Công cáo (3 Trân châu), do its quest, dig pearls
+        # at Nam Việt 183,117 with the pick it gives.
+        cfg = extension_server.load_config()
+        macro = cfg["activity_macros"]["cong_cao"]
+        self.assertEqual("cong_cao_loop", macro["runner"])
+        self.assertIn("cong_cao", {flow["id"] for flow in extension_server.flow_catalog(cfg)})
+        # The packets the client sent in the user's round (log 03:31): shop 80,
+        # item 1139 for 3 x item 1311; the pick 2234 used at 183,117 on map 2016.
+        self.assertEqual((80, 1139, 3, 1311, 2234), (macro["shop_id"], macro["notice_item"], macro["notice_price"],
+                                                     macro["pearl_item"], macro["pick_item"]))
+        self.assertEqual({"map": 2016, "at": [183, 117], "tolerance": 3}, macro["dig"])
+        # Shared walking / fighting settings come from the farm macro.
+        self.assertEqual(cfg["activity_macros"]["farm_spots"]["skill_points"], macro["skill_points"])
+        source = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
+        grids = json.loads(source[source.index("{"):source.rindex("}") + 1])
+
+        def reachable(map_id, start):
+            grid = grids[str(map_id)]
+            bits = base64.b64decode(grid["blocked"])
+            w, h = grid["w"], grid["h"]
+            is_open = lambda x, y: 0 <= x < w and 0 <= y < h and not (bits[(y * w + x) >> 3] >> ((y * w + x) & 7)) & 1
+            seen = {tuple(start)}
+            queue = [tuple(start)]
+            while queue:
+                x, y = queue.pop()
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        step = (x + dx, y + dy)
+                        if step in seen or not is_open(*step) or (dx and dy and not (is_open(x + dx, y) and is_open(x, y + dy))):
+                            continue
+                        seen.add(step)
+                        queue.append(step)
+            return seen
+
+        caves = {int(key): value for key, value in macro["cave_exits"].items()}
+        for quest in macro["quests"]:
+            # Công cáo triều đình (n) is item 1139 + n and hands out quest 566 + n.
+            self.assertEqual(quest["quest"] - 566, quest["item"] - 1139, quest["label"])
+            boss, finish = quest["boss"], quest["finish"]
+            officer = reachable(finish["map"], finish["npc"])
+            if "via" in boss:
+                # Into the cave from the officer's region, then the boss from its way out.
+                self.assertEqual(finish["map"], boss["via"]["map"], quest["label"])
+                self.assertIn(tuple(boss["via"]["door"]), officer, quest["label"])
+                self.assertEqual(finish["map"], caves[boss["map"]]["to"], quest["label"])
+                self.assertIn(tuple(boss["at"]), reachable(boss["map"], caves[boss["map"]]["door"]), quest["label"])
+            else:
+                self.assertEqual(finish["map"], boss["map"], quest["label"])
+                self.assertIn(tuple(boss["at"]), officer, quest["label"])
+        self.assertIn((183, 117), reachable(2016, [88, 26]))
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('"cong_cao_loop",', content)
+        self.assertIn('else if (macro.runner === "cong_cao_loop") await runCongCao(token, macro, flow);', content)
+        self.assertIn('["u8", grid], ["i32", itemId], ["i32", -1], ["i32", world.actorId], ["i32", clock],', content)
+        self.assertIn('[["i32", serial], ["i32", quest.quest], ["i32", 1]]', content)
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        self.assertIn("world.clock = { t: reader.i32(), at: Date.now() };", probe)
+        self.assertIn('if (kind === "i16") return new Uint8Array([(Number(value) >> 8) & 0xff, Number(value) & 0xff]);', probe)
+        # Only a quest an item hands out (start NPC -1) is news; map quests come by the dozen.
+        self.assertIn("if (startNpc !== -1) return;", probe)
+
     def test_refused_doors_are_walked_off_and_into_again(self):
         # user, 2026-09-29: turned away while attacked, the character freezes on
         # the door's spot; only walking off a little and back in gets through.
@@ -1309,7 +1371,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.19.8"', manifest)
+        self.assertIn('"version": "0.20.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

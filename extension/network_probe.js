@@ -131,6 +131,16 @@
   // we can read off the server source, so they are copied from a real click.
   const OP_TOUCHNPC_CLIENT = 120;        // int npc instanceId | int questId
   const OP_NOTIFY_CLIENT = 174;          // int questId | byte notifyId | byte type (3 = question) | byte answer
+  // Quests an item hands out (Công cáo triều đình, 2026-10-24); the live
+  // bodies match OpCode.java. Kept as world.quests for the flow to wait on.
+  const OP_QUEST_START_ADDED = 125;      // int startNpc (-1 = from an item) | int finishNpc | int questId | byte level | STR name
+  const OP_QUEST_FINISH_ADDED = 127;     // int finishNpc | int questId | byte notify: the quest can be handed in
+  const OP_QUEST_ACCEPTED = 132;         // int questId | ...
+  const OP_QUEST_FINISHED = 135;         // int questId
+  const OP_QUEST_FINISH_FAIL = 138;      // int questId | byte reason (1 no quest, 2 not done)
+  const OP_USEITEM_FAIL = 340;           // int itemId | STR message ("Nhiệm vụ đã tồn tại")
+  const OP_QUEST_ACCEPT_FAIL = 343;      // int questId | STR message
+  const OP_SHOP_BUY_SERVER = 303;        // int serial | int itemId | short count | ...
   const TYPE_PLAYER = 1;
   const TYPE_CREATURE = 3;             // server TYPE_CREATURE (client SPRITE_TYPE_NPC)
   const TYPES_WITH_IMAGE = new Set([3, 5, 6]);  // Tool.recvUnitView reads an imageId for these
@@ -157,6 +167,8 @@
     dialogs: [],                       // recent NPC popups: { kind, questId, message, options, notifyId, at }
     touches: [],                       // NPC touches sent (ours and the client's own)
     answers: [],                       // popup answers sent (ours and the client's own)
+    clock: null,                       // { t, at }: the client's server clock in its last MOVE_CLIENT
+    quests: [],                        // recent quest / item-use news: { kind, questId, itemId, message, at }
   };
 
   // The game's own socket, so a flow can send exactly what a UI button sends.
@@ -165,9 +177,10 @@
 
   // One UA frame (web/client/src/net/ua-framing.js frameSegment + ua-codec.js
   // UASegmentWriter): 'U' | 'A' | int32 total | int16 opcode | body.
-  // fields: ["i32", n], ["u8", n] and ["str", s] - the shapes our commands need.
+  // fields: ["i32", n], ["i16", n], ["u8", n] and ["str", s] - the shapes our commands need.
   function packField(kind, value) {
     if (kind === "u8") return new Uint8Array([Number(value) & 0xff]);
+    if (kind === "i16") return new Uint8Array([(Number(value) >> 8) & 0xff, Number(value) & 0xff]);
     if (kind === "i32") {
       const bytes = new Uint8Array(4);
       let rest = Number(value);
@@ -326,9 +339,46 @@
     if (reader.u8() === 1) world.npcIds.add(instanceId);
   }
 
+  function readQuestNews(reader, opcode) {
+    const news = { kind: "", questId: 0, itemId: 0, message: "", at: Date.now() };
+    if (opcode === OP_QUEST_START_ADDED) {
+      const startNpc = reader.i32();
+      news.finishNpc = reader.i32();
+      news.questId = reader.i32();
+      reader.u8();
+      news.message = reader.str();
+      // A map's own quests come by the dozen on every map change; only one an
+      // item hands out (start NPC -1) is news to a flow.
+      if (startNpc !== -1) return;
+      news.kind = "offer";
+    } else if (opcode === OP_QUEST_FINISH_ADDED) {
+      news.finishNpc = reader.i32();
+      news.questId = reader.i32();
+      news.kind = "ready";
+    } else if (opcode === OP_QUEST_ACCEPTED || opcode === OP_QUEST_FINISHED) {
+      news.questId = reader.i32();
+      news.kind = opcode === OP_QUEST_ACCEPTED ? "accepted" : "finished";
+    } else if (opcode === OP_QUEST_FINISH_FAIL) {
+      news.questId = reader.i32();
+      news.kind = "finish_fail";
+      news.message = `lý do ${reader.u8()}`;
+    } else if (opcode === OP_USEITEM_FAIL) {
+      news.itemId = reader.i32();
+      news.kind = "use_fail";
+      news.message = reader.str();
+    } else {
+      news.questId = reader.i32();
+      news.kind = "accept_fail";
+      news.message = reader.str();
+    }
+    world.quests = [...world.quests.slice(-29), news];
+  }
+
   // GameRole.processNotifyServer: int time | short x | short y | byte dir | short state
   function readOwnMove(reader) {
-    reader.i32();
+    // The client's copy of the server clock: USEITEM_CLIENT sends it too, and
+    // the server takes Time.currTime minus it for the lag (useItem).
+    world.clock = { t: reader.i32(), at: Date.now() };
     const x = reader.i16();
     const y = reader.i16();
     reader.u8();
@@ -675,7 +725,12 @@
         readBag(reader);
       } else if (opcode === OP_SYNC_PLAYER_SERVER) {
         readOwnSync(reader);
-      } else if (opcode === OP_INSTANCE_CLEAR_SERVER || opcode === OP_WORLD_TELEPORT_SERVER) {
+      } else if (opcode === OP_QUEST_START_ADDED || opcode === OP_QUEST_FINISH_ADDED
+        || opcode === OP_QUEST_ACCEPTED || opcode === OP_QUEST_FINISHED || opcode === OP_QUEST_FINISH_FAIL
+        || opcode === OP_USEITEM_FAIL || opcode === OP_QUEST_ACCEPT_FAIL) {
+        readQuestNews(reader, opcode);
+      } else if (opcode === OP_INSTANCE_CLEAR_SERVER || opcode === OP_WORLD_TELEPORT_SERVER
+        || opcode === OP_SHOP_BUY_SERVER) {
         world.replies = [...world.replies.slice(-9),
           { serial: reader.i32(), ok: true, type: opcode, message: "", at: Date.now() }];
       } else if (opcode === OP_ERROR) {

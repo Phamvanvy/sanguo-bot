@@ -184,7 +184,7 @@ activity_macros:
     round_delay_seconds: 0.4
     # 0 = lặp đến khi bấm Stop trong extension.
     max_cycles: 0
-  farm_spots:
+  farm_spots: &farm_spots
     label: "Farm quái"
     description: "Chạy qua lại các bãi đông quái ở map trung lập (hoặc khắp map / giữ 1 bãi), đến khi Stop"
     icon: "🌾"
@@ -300,6 +300,60 @@ activity_macros:
     goto_max_legs: 12
     arrive_settle_seconds: 0.8
     map_load_seconds: 1.5
+  cong_cao:
+    # Đi đường, đánh, dịch chuyển, rớt mạng: như Farm quái.
+    <<: *farm_spots
+    label: "Công cáo triều đình"
+    description: "Mua Công cáo, làm nhiệm vụ Triều đình, đào trân châu ở Nam Việt, lặp đến khi hết trân châu hoặc Stop"
+    icon: "📜"
+    runner: "cong_cao_loop"
+    # User, 2026-10-24: mua Công cáo ở Thương nhân châu báu (3 Trân châu), dùng ra
+    # ngẫu nhiên Công cáo triều đình (1)-(9), dùng món đó nhận nhiệm vụ, giết 1
+    # boss, trả nhiệm vụ được Cuốc đào ngọc trai (Trung), tới Nam Việt 183,117
+    # dùng cuốc ra 4-5 Trân châu (cuốc hồi 5 phút - Items/item.xml 2234). Mọi bước
+    # gửi đúng gói client gửi trong lượt user làm tay (log 03:30-03:33): mua
+    # SHOP_BUY 302 ở tiệm 80, dùng đồ USEITEM 145, nhận QUEST_ACCEPT 131, trả
+    # QUEST_FINISH 137 khi đứng cạnh quan trả nhiệm vụ.
+    pearl_item: 1311
+    notice_item: 1139
+    pick_item: 2234
+    shop_id: 80
+    notice_price: 3
+    # Mỗi lần mua tối đa buy_batch Công cáo; giữ lại keep_pearls trân châu.
+    buy_batch: 5
+    keep_pearls: 0
+    # Chỗ đào (game coords = pixel / 8): góc đông nam Nam Việt, user đứng 183,117 ±3.
+    dig: {map: 2016, at: [183, 117], tolerance: 3}
+    dig_cooldown_seconds: 300
+    dig_retry_seconds: 60
+    # Đứng ở chỗ boss tối đa boss_wait_seconds (boss có thể đang chờ hồi), không
+    # xong thì để nhiệm vụ đó boss_rest_seconds rồi quay lại.
+    boss_wait_seconds: 300
+    boss_rest_seconds: 600
+    boss_radius: 300
+    # Nhiệm vụ theo Quests/index.xml (item n = quest 566 + n). Tọa độ boss / quan
+    # trả nhiệm vụ lấy từ chữ nhiệm vụ, khớp chữ bản live (log 03:31). Boss trong
+    # hang: via = map và cửa vào hang (Areas/51, 56 info.xml).
+    # Chưa làm: (1) 1140 Học thức uyên bác - trả lời câu hỏi Bách Hiểu Sinh;
+    # (8) 1147 Nam Hải và (9) 1148 Tây Kiệt - chưa biết map bản live. Mấy món đó
+    # cứ để trong túi.
+    quests:
+      - {item: 1141, quest: 568, label: "(2) Giết Hàn Tiêu",
+         boss: {map: 848, at: [43, 63]}, finish: {map: 848, npc: [93, 102]}}
+      - {item: 1142, quest: 569, label: "(3) Vương tử Hung Nô",
+         boss: {map: 816, at: [52, 15]}, finish: {map: 816, npc: [67, 99]}}
+      - {item: 1143, quest: 570, label: "(4) Cắt viện trợ",
+         boss: {map: 832, at: [35, 38], via: {map: 816, door: [161, 17]}}, finish: {map: 816, npc: [67, 99]}}
+      - {item: 1144, quest: 571, label: "(5) Hành động chém đầu",
+         boss: {map: 896, at: [9, 178]}, finish: {map: 896, npc: [87, 105]}}
+      - {item: 1145, quest: 572, label: "(6) Đánh bại sỹ hào",
+         boss: {map: 880, at: [32, 25], via: {map: 896, door: [50, 182]}}, finish: {map: 896, npc: [87, 105]}}
+      - {item: 1146, quest: 573, label: "(7) Cái chết của Tư Mã Hùng",
+         boss: {map: 1056, at: [156, 16]}, finish: {map: 1056, npc: [45, 155]}}
+    # Ra khỏi hang bằng cửa của nó (về map `to`).
+    cave_exits:
+      832: {door: [8, 56], to: 816}
+      880: {door: [92, 56], to: 896}
   co_mo_hard: &co_mo_hard
     label: "Phó bản Cổ Mộ (khó)"
     description: "Vào bản khó qua NPC rồi đánh 3 boss ở 3 phòng"

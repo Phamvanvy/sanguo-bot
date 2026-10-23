@@ -43,6 +43,7 @@
     "dungeon_tour",
     "throw_away_once",
     "farm_spot_loop",
+    "cong_cao_loop",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -2229,6 +2230,348 @@
     }
   }
 
+  // "Công cáo triều đình" (user, 2026-10-24): buy the notice (3 Trân châu at
+  // the jeweller's shop 80), use it for a random "Công cáo triều đình (n)",
+  // use that for its quest - kill one boss, hand in at the region's officer
+  // for a Cuốc đào ngọc trai - and dig with the pick at Nam Việt 183,117 for
+  // 4-5 Trân châu (5 min cooldown). Every step is the packet the real client
+  // sent in the user's own round (logs/extension-network.log, 03:30-03:33):
+  // SHOP_LIST 300 / SHOP_BUY 302, USEITEM 145, QUEST_ACCEPT 131, QUEST_FINISH
+  // 137. Bosses and officers come from Quests/index.xml (567-575); the item n
+  // is quest 566 + n and the quest's finish condition needs the item still in
+  // the bag, so a quest goes on until it is handed in. Travel is the T.Giới
+  // Map teleport, then walks on the walk grids; two bosses live in caves
+  // entered by a door of their region.
+  const OP_USE_ITEM = 145;
+  const OP_QUEST_ACCEPT = 131;
+  const OP_QUEST_FINISH = 137;
+  const OP_SHOP_LIST = 300;
+  const OP_SHOP_BUY = 302;
+  async function runCongCao(token, macro, flow) {
+    const unit = Number(macro.coord_unit || 8);
+    const pearlItem = Number(macro.pearl_item ?? 1311);
+    const noticeItem = Number(macro.notice_item ?? 1139);
+    const pickItem = Number(macro.pick_item ?? 2234);
+    const price = Number(macro.notice_price ?? 3);
+    const quests = (macro.quests || []).map((quest) => ({ ...quest, item: Number(quest.item), quest: Number(quest.quest) }));
+    const caves = macro.cave_exits || {};
+    const digCooldownMs = Number(macro.dig_cooldown_seconds ?? 300) * 1000;
+    const state = new Map(quests.map((quest) => [quest.quest, { accepted: false, readyAt: 0, restUntil: 0 }]));
+    const stats = { bought: 0, done: 0, dug: 0, pearls: 0 };
+    let nextDigAt = 0;
+    let resumes = 0;
+    const status = () => `Công cáo: xong ${stats.done} nhiệm vụ, đào ${stats.dug} lần (+${stats.pearls} trân châu), mua ${stats.bought}`;
+    const say = (message, step = "cong_cao") => {
+      updateDomFlow(flow, `${status()} - ${message}`, step);
+      appendDiagnostic("cong_cao", { flow, message: `${message}; ${describeWorld()}` });
+    };
+    const count = (bag, itemId) => bag.filter((item) => item.itemId === itemId).reduce((sum, item) => sum + item.count, 0);
+    const news = (since, test) => (latestWorld?.quests || []).find((item) => item.at >= since && test(item));
+    const waitNews = async (since, seconds, test) => {
+      const deadline = Date.now() + seconds * 1000;
+      while (Date.now() < deadline) {
+        const found = news(since, test);
+        if (found) return found;
+        await domWait(token, 0.2);
+      }
+      return null;
+    };
+    // The ready mark (QUEST_FINISH_ADDED) comes when the boss dies and again on
+    // entering the officer's map; a hand-in or a refused one clears it.
+    const isReady = (quest) => {
+      const mark = state.get(quest.quest);
+      const last = [...(latestWorld?.quests || [])].reverse().find((item) => item.questId === quest.quest
+        && item.at > (mark.clearedAt || 0) && ["ready", "finished", "finish_fail"].includes(item.kind));
+      if (last?.kind === "ready") mark.readyAt = last.at;
+      return Boolean(mark.readyAt);
+    };
+    // USEITEM_CLIENT: byte grid (-1 = any) | int itemId | int instanceId (-1
+    // for a stack) | int target (us) | int clock - the client's copy of the
+    // server clock, read off its last MOVE_CLIENT.
+    const useItem = async (grid, itemId) => {
+      const world = latestWorld;
+      if (!world?.actorId) throw new Error("Chưa biết mã nhân vật - bấm F5 tab game rồi chạy lại");
+      if (!world.clock) throw new Error("Chưa đọc được đồng hồ game (nhân vật chưa đi bước nào) - đi một bước rồi chạy lại");
+      const clock = world.clock.t + (Date.now() - world.clock.at);
+      const error = await postGamePacket(OP_USE_ITEM, [
+        ["u8", grid], ["i32", itemId], ["i32", -1], ["i32", world.actorId], ["i32", clock],
+      ]);
+      if (error) throw new Error(error);
+    };
+    const tileCenter = ([x, y]) => ({ x: (x + 0.5) * unit, y: (y + 0.5) * unit });
+
+    // To a tile of a map: on it already, walk; in a cave whose door leads
+    // there (or to the door's region), walk out; standing in the region of a
+    // cave target, take its door; else the T.Giới Map teleport. stop() is
+    // asked between legs, so a quest that turns ready on the way ends the trip.
+    const walkFailed = (message) => Object.assign(new Error(message), { walkFailed: true });
+    const gotoPlace = async (place, label, stop = () => false) => {
+      for (let leg = 0; leg < 8; leg += 1) {
+        ensureDomActive(token);
+        if (stop()) return "dừng giữa đường";
+        const here = latestWorld?.mapId;
+        // Between a door and the new map's GOMAP: not a map to leave.
+        if (here == null) {
+          await domWait(token, 1);
+          continue;
+        }
+        const size = walkGridFor(here)?.size;
+        if (here === place.map) {
+          const walk = await walkToCoord(token, macro, {
+            label, goto: place.at, map_size: size, goto_tolerance: Number(place.tolerance ?? 2),
+          }, []);
+          if (["timeout", "blocked"].includes(walk.how)) throw walkFailed(`không đi tới ${label} ${place.at.join(",")}: ${walk.note}`);
+          return walk.note;
+        }
+        const cave = caves[here];
+        const door = place.via && here === place.via.map ? place.via.door
+          : (cave && [place.map, place.via?.map].includes(Number(cave.to)) ? cave.door : null);
+        if (door) {
+          say(`${label}: qua cửa ${door.join(",")} ở map ${here}`, "cong_cao_walk");
+          const walk = await walkToCoord(token, macro, { label: `cửa ${door.join(",")}`, goto: door, portal: true, map_size: size }, []);
+          if (walk.how !== "map") {
+            appendDiagnostic("cong_cao", { flow, message: `chưa qua được cửa ${door.join(",")}: ${walk.note}` });
+            if (walk.refused && latestWorld?.meFighting === true) await fightUntilClear(token, macro, 60, { whileFighting: true });
+          }
+          continue;
+        }
+        // "Trạng thái chiến đấu không thể dịch chuyển": finish the fight first.
+        if (latestWorld?.meFighting === true) await fightUntilClear(token, macro, 60, { whileFighting: true });
+        const target = Number(place.via?.map || place.map);
+        say(`${label}: dịch chuyển tới map ${target}`, "cong_cao_travel");
+        await travelToLobby(token, macro, { label, lobby_map: target }, flow);
+      }
+      throw walkFailed(`không tới được ${label} (map ${place.map}) sau 8 chặng`);
+    };
+
+    const buyNotices = async (pearls) => {
+      const wanted = Math.min(Number(macro.buy_batch ?? 5), Math.floor((pearls - Number(macro.keep_pearls ?? 0)) / price));
+      if (wanted < 1) return false;
+      // The shop list first, as the client asks for it when the menu opens.
+      await postGamePacket(OP_SHOP_LIST, [["i32", (commandSerial += 1)], ["i16", 1], ["i32", Number(macro.shop_id ?? 80)]]);
+      await domWait(token, 0.5);
+      const reply = await sendGameCommand(token, macro, OP_SHOP_BUY, [
+        ["i32", Number(macro.shop_id ?? 80)], ["i32", noticeItem], ["i16", wanted],
+      ]);
+      if (!reply) throw new Error("Game không trả lời lệnh mua Công cáo");
+      if (!reply.ok) throw new Error(`Game không bán Công cáo: ${reply.message}`);
+      stats.bought += wanted;
+      say(`mua ${wanted} Công cáo (${wanted * price} trân châu)`);
+      return true;
+    };
+
+    // Use the item n: the server offers its quest (QUEST_START_ADDED from -1);
+    // the client accepts it itself, or we do. "Nhiệm vụ đã tồn tại" = ours
+    // already, from before the flow started.
+    const acceptQuest = async (item, quest) => {
+      const mark = state.get(quest.quest);
+      const since = Date.now();
+      await useItem(item.grid, item.itemId);
+      const answer = await waitNews(since, 4, (got) => (got.kind === "use_fail" && got.itemId === item.itemId)
+        || (["offer", "accepted"].includes(got.kind) && got.questId === quest.quest));
+      if (answer?.kind === "use_fail") {
+        if (/tồn tại/i.test(answer.message)) {
+          mark.accepted = true;
+          return `đã nhận từ trước (${answer.message})`;
+        }
+        mark.restUntil = Date.now() + 10 * 60 * 1000;
+        return `game không cho dùng: ${answer.message}`;
+      }
+      if (!answer) {
+        mark.restUntil = Date.now() + 2 * 60 * 1000;
+        return "dùng mà game không giao nhiệm vụ";
+      }
+      let accepted = await waitNews(since, 2.5, (got) => got.kind === "accepted" && got.questId === quest.quest);
+      let how = "client tự nhận";
+      if (!accepted) {
+        const error = await postGamePacket(OP_QUEST_ACCEPT, [["i32", quest.quest]]);
+        if (error) throw new Error(error);
+        accepted = await waitNews(since, 4, (got) => ["accepted", "accept_fail"].includes(got.kind) && got.questId === quest.quest);
+        how = "gửi lệnh nhận";
+      }
+      if (accepted?.kind !== "accepted") {
+        mark.restUntil = Date.now() + 10 * 60 * 1000;
+        return `không nhận được: ${accepted?.message || "game không trả lời"}`;
+      }
+      mark.accepted = true;
+      mark.readyAt = 0;
+      mark.clearedAt = Date.now();
+      return `đã nhận (${how})`;
+    };
+
+    // QUEST_FINISH_CLIENT: int serial | int questId | int branch (1, as the
+    // client sends), standing by the officer like the client does.
+    const handIn = async (quest) => {
+      const npcTile = quest.finish.npc.map(Number);
+      const grid = walkGridFor(Number(quest.finish.map));
+      const stand = (grid && nearestOpen(grid, { x: npcTile[0], y: npcTile[1] + 3 }, 3)) || { x: npcTile[0], y: npcTile[1] + 3 };
+      await gotoPlace({ map: Number(quest.finish.map), at: [stand.x, stand.y], tolerance: 2 }, `trả ${quest.label}`);
+      const serial = (commandSerial += 1);
+      const since = Date.now();
+      const error = await postGamePacket(OP_QUEST_FINISH, [["i32", serial], ["i32", quest.quest], ["i32", 1]]);
+      if (error) throw new Error(error);
+      const deadline = Date.now() + 6000;
+      const mark = state.get(quest.quest);
+      while (Date.now() < deadline) {
+        if (news(since, (got) => got.kind === "finished" && got.questId === quest.quest)) {
+          mark.accepted = false;
+          mark.readyAt = 0;
+          mark.clearedAt = Date.now();
+          stats.done += 1;
+          return "đã trả";
+        }
+        const refused = (latestWorld?.replies || []).find((reply) => reply.serial === serial && !reply.ok)
+          || news(since, (got) => got.kind === "finish_fail" && got.questId === quest.quest);
+        if (refused) {
+          mark.readyAt = 0;
+          mark.clearedAt = Date.now();
+          // 3 "Không có nhiệm vụ chỉ định": not ours any more.
+          if (/không có nhiệm vụ/i.test(refused.message)) mark.accepted = false;
+          return `game không nhận: ${refused.message}`;
+        }
+        await domWait(token, 0.2);
+      }
+      return "game không trả lời lệnh trả nhiệm vụ";
+    };
+
+    // To the boss and fight what is there until the quest turns ready; the
+    // boss may be dead and coming back, so the spot is held boss_wait_seconds.
+    const killBoss = async (quest) => {
+      const place = { map: Number(quest.boss.map), at: quest.boss.at.map(Number), tolerance: 2, via: quest.boss.via };
+      const note = await gotoPlace(place, quest.label, () => isReady(quest));
+      if (isReady(quest)) return "xong rồi (game báo trên đường)";
+      appendDiagnostic("cong_cao", { flow, message: `${quest.label}: tới chỗ boss: ${note}` });
+      const bossAt = tileCenter(place.at);
+      const deadline = Date.now() + Number(macro.boss_wait_seconds ?? 300) * 1000;
+      while (!isReady(quest)) {
+        ensureDomActive(token);
+        if (Date.now() > deadline) {
+          state.get(quest.quest).restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+          return `chờ ${macro.boss_wait_seconds ?? 300}s không hạ được boss, để sau`;
+        }
+        const me = latestWorld?.me;
+        if (latestWorld?.mapId !== place.map || (me && Math.hypot(me.x - bossAt.x, me.y - bossAt.y) > Number(macro.leash_radius ?? 320))) {
+          await gotoPlace(place, quest.label, () => isReady(quest));
+          continue;
+        }
+        updateDomFlow(flow, `${status()} - ${quest.label}: đánh ở ${place.at.join(",")}`, "cong_cao_fight");
+        const fight = await fightUntilClear(token, macro, 30, { bossAt, radius: Number(macro.boss_radius ?? 300) });
+        if (!isReady(quest) && fight.cleared && !fight.landed) {
+          updateDomFlow(flow, `${status()} - ${quest.label}: không thấy boss, chờ hồi`, "cong_cao_wait");
+          await domWait(token, Number(macro.boss_poll_seconds ?? 3));
+        }
+      }
+      return "đã hạ boss";
+    };
+
+    const dig = async (bagBefore) => {
+      const place = { map: Number(macro.dig.map), at: macro.dig.at.map(Number), tolerance: Number(macro.dig.tolerance ?? 3) };
+      await gotoPlace(place, "chỗ đào trân châu");
+      const since = Date.now();
+      await useItem(-1, pickItem);
+      const failed = await waitNews(since, Number(macro.dig_seconds ?? 6), (got) => got.kind === "use_fail" && got.itemId === pickItem);
+      if (failed) {
+        nextDigAt = Date.now() + Number(macro.dig_retry_seconds ?? 60) * 1000;
+        return `game không cho đào: ${failed.message}`;
+      }
+      const after = await readBag(token, macro);
+      const gained = after ? count(after, pearlItem) - count(bagBefore, pearlItem) : 0;
+      nextDigAt = Date.now() + digCooldownMs;
+      stats.dug += 1;
+      stats.pearls += Math.max(0, gained);
+      return `đào xong, trân châu ${gained >= 0 ? "+" : ""}${gained}`;
+    };
+
+    say(`bắt đầu; ${quests.length} loại nhiệm vụ: ${quests.map((quest) => `${quest.item}=${quest.label}`).join(", ")}`, "cong_cao_start");
+    for (;;) {
+      try {
+        ensureDomActive(token);
+        if (!latestWorld?.frames || !latestWorld.me) {
+          updateDomFlow(flow, `${status()} - chờ dữ liệu game (${describeWorld()})`, "cong_cao_wait");
+          await domWait(token, 1);
+          continue;
+        }
+        const bag = await readBag(token, macro);
+        if (!bag) throw new Error("Không đọc được túi đồ từ gói tin - reload extension rồi F5 tab game");
+        const pearls = count(bag, pearlItem);
+        const notices = count(bag, noticeItem);
+        const picks = count(bag, pickItem);
+        const now = Date.now();
+        if (macro.dig && picks > 0 && now >= nextDigAt) {
+          say(`đi đào trân châu (còn ${picks} cuốc, ${pearls} trân châu)`, "cong_cao_dig");
+          try {
+            say(await dig(bag), "cong_cao_dig");
+          } catch (error) {
+            if (!error.walkFailed) throw error;
+            nextDigAt = Date.now() + Number(macro.dig_retry_seconds ?? 60) * 1000;
+            say(`chưa đào được: ${error.message}`, "cong_cao_dig");
+          }
+          continue;
+        }
+        // Each quest whose item is in the bag: accepted, ready or not.
+        const held = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).restUntil <= now);
+        const fresh = held.find((quest) => !state.get(quest.quest).accepted);
+        if (fresh) {
+          const item = bag.find((entry) => entry.itemId === fresh.item);
+          say(`${fresh.label}: ${await acceptQuest(item, fresh)}`, "cong_cao_accept");
+          continue;
+        }
+        const active = held.filter((quest) => state.get(quest.quest).accepted);
+        if (active.length) {
+          // Ready ones first, then the one on this map, then the list's order.
+          const here = latestWorld?.mapId;
+          const quest = active.find(isReady)
+            || active.find((item) => [Number(item.boss.map), Number(item.finish.map)].includes(here)) || active[0];
+          try {
+            if (!isReady(quest)) say(`${quest.label}: ${await killBoss(quest)}`, "cong_cao_fight");
+            if (isReady(quest)) say(`${quest.label}: ${await handIn(quest)}`, "cong_cao_finish");
+          } catch (error) {
+            if (!error.walkFailed) throw error;
+            state.get(quest.quest).restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+            say(`${quest.label}: ${error.message}, để sau`, "cong_cao_walk");
+          }
+          continue;
+        }
+        if (notices > 0) {
+          const item = bag.find((entry) => entry.itemId === noticeItem);
+          const since = Date.now();
+          await useItem(item.grid, noticeItem);
+          const failed = await waitNews(since, 2, (got) => got.kind === "use_fail" && got.itemId === noticeItem);
+          if (failed) throw new Error(`Game không cho mở Công cáo: ${failed.message}`);
+          const after = await readBag(token, macro);
+          const got = (after || []).filter((entry) => entry.itemId > noticeItem && entry.itemId <= noticeItem + 12
+            && count(after, entry.itemId) > count(bag, entry.itemId)).map((entry) => entry.name);
+          say(`mở Công cáo: ${got.join(", ") || "chưa thấy món mới trong túi"}`, "cong_cao_open");
+          continue;
+        }
+        if (pearls >= price && await buyNotices(pearls)) continue;
+        // Nothing to do now, but a pick cooling down or a quest set aside
+        // (boss not up) will be: wait for the sooner of the two.
+        const resting = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).restUntil > now);
+        const wakeAt = Math.min(macro.dig && picks > 0 ? nextDigAt : Infinity,
+          ...resting.map((quest) => state.get(quest.quest).restUntil));
+        if (wakeAt < Infinity) {
+          updateDomFlow(flow, `${status()} - hết việc, chờ ${Math.ceil((wakeAt - now) / 1000)}s`
+            + ` (${picks} cuốc${resting.length ? `, để sau: ${resting.map((quest) => quest.label).join(", ")}` : ""})`, "cong_cao_wait");
+          await domWait(token, Math.min(10, Math.max(1, (wakeAt - now) / 1000)));
+          continue;
+        }
+        const skipped = bag.filter((entry) => entry.itemId > noticeItem && entry.itemId <= noticeItem + 12
+          && !quests.some((quest) => quest.item === entry.itemId)).map((entry) => entry.name);
+        updateDomFlow(flow, `${status()} - hết trân châu, hết cuốc`
+          + (skipped.length ? `; còn Công cáo flow chưa làm: ${skipped.join(", ")}` : ""), "done");
+        return;
+      } catch (error) {
+        const closed = error.socketClosed;
+        const codes = (macro.resume_close_codes || [1006]).map(Number);
+        if (!closed || !codes.includes(closed.code) || resumes >= Number(macro.max_resumes ?? 20)) throw error;
+        resumes += 1;
+        appendDiagnostic("cong_cao", { flow, message: `${error.message}; chờ vào lại (lần ${resumes})` });
+        await awaitReconnect(token, macro, flow, closed);
+      }
+    }
+  }
+
   // A bell when a dungeon is done, for a user away from the screen (user,
   // 2026-09-14). Synthesised with Web Audio: no sound file to ship.
   function playChime() {
@@ -3221,6 +3564,7 @@
         else if (macro.runner === "dungeon_tour") await runDungeonTour(token, macro, flow);
         else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);
         else if (macro.runner === "farm_spot_loop") await runFarmSpot(token, macro, flow);
+        else if (macro.runner === "cong_cao_loop") await runCongCao(token, macro, flow);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {

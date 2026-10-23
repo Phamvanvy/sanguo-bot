@@ -40,7 +40,8 @@ const codecs = {
 // 1024, Kinh Sở 1056, Ô Sào 2000, Nam Việt 2016, Nam Hải 2032 (map id = area
 // folder * 16). The last three are only in Game/Sanguo1.0-Data: the live Nam
 // Hải is 2032 - the 2011 one, 864, the server refuses ("Map này không thể đến
-// được", 2026-10-08).
+// được", 2026-10-08). Công cáo triều đình also walks into two caves: Sóc
+// Phương sơn động 832 and Giang Lăng tàng binh động 880.
 // Maps whose 2011 layout is not the live one: taken from the later data first.
 // Kinh Sở 1056: the 2011 grid cuts the map in two - from 93,143 and 59,109,
 // where the character really stood, no spot could be reached (2026-10-08) -
@@ -51,6 +52,7 @@ const DEFAULT_MAPS = [
   768, 769, 770, 771, 772, 773, 1137, 1138, 1139, 1140, 1141,
   432, 433, 448, 449, 450, 976, 977, 978,
   816, 848, 896, 1024, 1056, 2000, 2016, 2032,
+  832, 880,
 ];
 
 /** GamePackage.loadNPCCollision: per decor animation, its blocking boxes. */
