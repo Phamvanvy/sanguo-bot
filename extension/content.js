@@ -2719,8 +2719,9 @@
             ["i32", quest.quest], ["i32", Number(macro.quiz_var_index ?? 0)], ["i32", Number(macro.quiz_var_value ?? 1)],
           ]);
           if (synced) throw new Error(synced);
-          // The popup the client drew stays up: close it by its X.
-          await domWait(token, 0.5);
+          // The question popup the client drew stays up (user's screenshot,
+          // 10:57): close it by its own X once it is surely there.
+          await domWait(token, Number(macro.quiz_close_delay_seconds ?? 1));
           if (macro.quiz_close_point) await domClick(token, macro.quiz_close_point);
           say(`${quest.label}: ${touched ? "game đã bấm NPC" : "bấm NPC"}, gửi trả lời mục 1 "Trương Giác"`, "cong_cao_quiz");
           await waitNews(clickedAt, 4, (got) => got.kind === "ready" && quest.ids.includes(got.questId));

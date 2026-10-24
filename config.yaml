@@ -389,7 +389,10 @@ activity_macros:
     # ...và VM_VARIABLE_SYNC 162: biến 0 của nhiệm vụ = 1 (client tự chấm rồi báo server).
     quiz_var_index: 0
     quiz_var_value: 1
-    quiz_close_point: [0.842, 0.145]
+    # Nút X của popup câu hỏi: ảnh user 10:57, 1455,388 trên màn 1920x1080 (canvas 960 cao
+    # từ y=80). Mục 1 "Trương Giác" ở 960,568 = 0.5,0.508.
+    quiz_close_point: [0.758, 0.321]
+    quiz_close_delay_seconds: 1
     # Game dẫn đường: đứng yên tracker_still_seconds là tới; tới chỗ boss mà
     # tracker_quiet_seconds không có gì để đánh thì bấm N.Vụ lần nữa.
     tracker_still_seconds: 4

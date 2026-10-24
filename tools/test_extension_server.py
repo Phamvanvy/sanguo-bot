@@ -761,6 +761,8 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual((1, 0, 0, 1), (macro["quiz_notify_id"], macro["quiz_answer"],
                                         macro["quiz_var_index"], macro["quiz_var_value"]))
         self.assertIn("const synced = await postGamePacket(OP_VM_VARIABLE_SYNC, [", content_js)
+        # The question popup's own X (user's screenshot 10:57).
+        self.assertEqual([0.758, 0.321], macro["quiz_close_point"])
         self.assertIn("if (!quest.boss) say(`${quest.label}: ${await doByTracker(quest)}`, \"cong_cao_finish\");", content_js)
         # Teleport straight to the target map first; doors only where the game refuses.
         self.assertIn("if (await hopTo(Number(place.map), label)) continue;", content_js)
@@ -1412,7 +1414,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.21.6"', manifest)
+        self.assertIn('"version": "0.21.7"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
