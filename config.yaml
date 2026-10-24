@@ -386,6 +386,9 @@ activity_macros:
       - {item: 1151, quest: [581, 578], label: "(12) Dũng sỹ U Hoành", map: 656, finish_map: 848}
     quiz_notify_id: 1
     quiz_answer: 0
+    # ...và VM_VARIABLE_SYNC 162: biến 0 của nhiệm vụ = 1 (client tự chấm rồi báo server).
+    quiz_var_index: 0
+    quiz_var_value: 1
     quiz_close_point: [0.842, 0.145]
     # Game dẫn đường: đứng yên tracker_still_seconds là tới; tới chỗ boss mà
     # tracker_quiet_seconds không có gì để đánh thì bấm N.Vụ lần nữa.

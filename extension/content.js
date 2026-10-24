@@ -2248,6 +2248,7 @@
   const OP_SHOP_LIST = 300;
   const OP_SHOP_BUY = 302;
   const OP_QUEST_LIST = 159;
+  const OP_VM_VARIABLE_SYNC = 162;
   async function runCongCao(token, macro, flow) {
     const unit = Number(macro.coord_unit || 8);
     const pearlItem = Number(macro.pearl_item ?? 1311);
@@ -2698,6 +2699,16 @@
             ["i32", quest.quest], ["u8", Number(macro.quiz_notify_id ?? 1)], ["u8", NOTIFY_QUESTION], ["u8", Number(macro.quiz_answer ?? 0)],
           ]);
           if (error) throw new Error(error);
+          // The quest VM that judges the answer runs in the client: on the right
+          // one it sets the quest's variable 0 ("answered right") to 1 and tells
+          // the server with VM_VARIABLE_SYNC_CLIENT 162 - int questId | int
+          // index | int value ("00000237 00000000 00000001" right after the
+          // 174 both times the user answered, 10:12:50 / 10:13:03). Without it
+          // the server never sees the quest done (10:29: "Không thể hoàn thành").
+          const synced = await postGamePacket(OP_VM_VARIABLE_SYNC, [
+            ["i32", quest.quest], ["i32", Number(macro.quiz_var_index ?? 0)], ["i32", Number(macro.quiz_var_value ?? 1)],
+          ]);
+          if (synced) throw new Error(synced);
           // The popup the client drew stays up: close it by its X.
           await domWait(token, 0.5);
           if (macro.quiz_close_point) await domClick(token, macro.quiz_close_point);
