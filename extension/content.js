@@ -2644,6 +2644,8 @@
         }
         const still = Date.now() - lastChange >= stillMs;
         if (moved && still) return `game dẫn tới map ${latestWorld?.mapId} ${spot?.split(":")[1]} (${clicks} lần bấm N.Vụ)`;
+        // Two clicks and not a step: already where the quest wants us.
+        if (!moved && still && clicks >= 2) return `đứng yên sau ${clicks} lần bấm N.Vụ, coi như đã ở nơi (map ${latestWorld?.mapId} ${spot?.split(":")[1]})`;
         if (!clickedAt || (still && Date.now() - clickedAt >= reclickMs)) {
           await domClick(token, macro.quest_tracker_point);
           clickedAt = Date.now();
@@ -2673,17 +2675,25 @@
         for (let hop = 0; hop < 2 && quest.map && latestWorld?.mapId !== Number(quest.map); hop += 1) {
           if (!(await hopTo(Number(quest.map), quest.label))) break;
         }
-        say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest) || Boolean(quest.quiz && (asked() || touchedSince())))}`, "cong_cao_walk");
+        // Bách Hiểu Sinh within reach already (the next (1) right after the
+        // last one): no trip - the client has nowhere to walk, and waiting for
+        // it to set off hung the flow by him (2026-10-24 10:34).
+        const quizNpc = () => {
+          const name = new RegExp(macro.quiz_npc || "Bách Hiểu Sinh", "i");
+          const me = latestWorld?.me;
+          return me && (latestWorld?.creatures || []).filter((unit) => name.test(unit[5] || ""))
+            .map(([id, x, y]) => ({ id, d: Math.hypot(x - me.x, y - me.y) })).sort((a, b) => a.d - b.d)[0];
+        };
+        if (!(quest.quiz && quizNpc()?.d < 80)) {
+          say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest) || Boolean(quest.quiz && (asked() || touchedSince())))}`, "cong_cao_walk");
+        }
         if (quest.quiz && !isReady(quest)) {
           // The question is drawn by the client's own quest VM when Bách Hiểu
           // Sinh is touched (Quests/567.xml action Question(...)): no QUESTION
           // packet comes (2026-10-24 10:05, the client touched him on arrival
           // and the popup showed). So: touched (by the client, else by us),
           // give the popup a moment, click option 1.
-          const name = new RegExp(macro.quiz_npc || "Bách Hiểu Sinh", "i");
-          const me = latestWorld?.me;
-          const npc = me && (latestWorld?.creatures || []).filter((unit) => name.test(unit[5] || ""))
-            .map(([id, x, y]) => ({ id, d: Math.hypot(x - me.x, y - me.y) })).sort((a, b) => a.d - b.d)[0];
+          const npc = quizNpc();
           const touched = (latestWorld?.touches || []).find((touch) => touch.at >= since && (!npc || touch.target === npc.id));
           if (!touched) {
             if (!npc || npc.d >= 80) throw walkFailed(`${quest.label}: tới nơi mà không thấy ${macro.quiz_npc || "Bách Hiểu Sinh"} gần đây`);
