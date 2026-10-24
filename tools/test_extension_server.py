@@ -753,6 +753,8 @@ class ExtensionServerTest(unittest.TestCase):
         # when our own walk gets stuck.
         self.assertEqual([0.078, 0.276], macro["quest_tracker_point"])
         self.assertIn("const fresh = !mine.length && held.find((quest) => !state.get(quest.quest).accepted);", content_js)
+        # Công cáo already in the bag are used up before any is opened or bought.
+        self.assertIn("if (!mine.length && !stocked.length && !notices && pearls >= price && await buyNotices(pearls)) continue;", content_js)
         self.assertIn("if (await followTracker(place, label)) return \"game tự dẫn đường\";", content_js)
         self.assertIn("world.questList = { ids, at: Date.now() };",
                       (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8"))
@@ -1390,7 +1392,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.20.5"', manifest)
+        self.assertIn('"version": "0.20.6"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

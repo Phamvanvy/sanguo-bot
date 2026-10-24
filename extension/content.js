@@ -2709,7 +2709,12 @@
           }
           continue;
         }
-        if (!mine.length && notices > 0) {
+        // Whatever Công cáo the bag already holds is used up first (user,
+        // 2026-10-24: "có rồi thì không mua nữa, làm hết đi đã"): a quest's
+        // item set aside for later still counts, so nothing new is opened
+        // or bought while one is left - the wait below covers it.
+        const stocked = quests.filter((quest) => count(bag, quest.item) > 0);
+        if (!mine.length && !stocked.length && notices > 0) {
           const item = bag.find((entry) => entry.itemId === noticeItem);
           const since = Date.now();
           await useItem(item.grid, noticeItem);
@@ -2721,7 +2726,7 @@
           say(`mở Công cáo: ${got.join(", ") || "chưa thấy món mới trong túi"}`, "cong_cao_open");
           continue;
         }
-        if (!mine.length && pearls >= price && await buyNotices(pearls)) continue;
+        if (!mine.length && !stocked.length && !notices && pearls >= price && await buyNotices(pearls)) continue;
         // Nothing to do now, but a pick cooling down or a quest set aside
         // (boss not up) will be: wait for the sooner of the two.
         const resting = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).restUntil > now);
