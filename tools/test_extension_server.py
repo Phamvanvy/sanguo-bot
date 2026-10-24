@@ -748,6 +748,14 @@ class ExtensionServerTest(unittest.TestCase):
         # ("00340000" leaving 832 in the user's round).
         self.assertEqual(0, macro["cave_exits"][832]["exit"])
         self.assertIn("const exitId = (Math.floor(mapId / 16) << 16) | Number(gate.exit);", content_js)
+        # One quest at a time (user, 2026-10-24): the quest list says which we hold, a
+        # new one only once none is, and the N.Vụ tracker's single row leads the way
+        # when our own walk gets stuck.
+        self.assertEqual([0.078, 0.276], macro["quest_tracker_point"])
+        self.assertIn("const fresh = !mine.length && held.find((quest) => !state.get(quest.quest).accepted);", content_js)
+        self.assertIn("if (await followTracker(place, label)) return \"game tự dẫn đường\";", content_js)
+        self.assertIn("world.questList = { ids, at: Date.now() };",
+                      (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8"))
         # Shared walking / fighting settings come from the farm macro.
         self.assertEqual(cfg["activity_macros"]["farm_spots"]["skill_points"], macro["skill_points"])
         source = (PROJECT_ROOT / "extension" / "walk_grids.js").read_text(encoding="utf-8")
@@ -1382,7 +1390,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.20.4"', manifest)
+        self.assertIn('"version": "0.20.5"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

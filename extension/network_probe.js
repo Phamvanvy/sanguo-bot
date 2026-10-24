@@ -141,6 +141,11 @@
   const OP_USEITEM_FAIL = 340;           // int itemId | STR message ("Nhiệm vụ đã tồn tại")
   const OP_QUEST_ACCEPT_FAIL = 343;      // int questId | STR message
   const OP_SHOP_BUY_SERVER = 303;        // int serial | int itemId | short count | ...
+  // The quests we hold: byte count | per quest int id | int startNpc | int
+  // finishNpc | byte level | STR name | etf ... (live: "02 0000023c ffffffff
+  // 00380046 00 ..."). Past the name come compressed blobs, so only the ids
+  // of item-given quests are taken: an int followed by start NPC -1.
+  const OP_QUEST_LIST_SERVER = 160;
   const TYPE_PLAYER = 1;
   const TYPE_CREATURE = 3;             // server TYPE_CREATURE (client SPRITE_TYPE_NPC)
   const TYPES_WITH_IMAGE = new Set([3, 5, 6]);  // Tool.recvUnitView reads an imageId for these
@@ -168,6 +173,7 @@
     touches: [],                       // NPC touches sent (ours and the client's own)
     answers: [],                       // popup answers sent (ours and the client's own)
     clock: null,                       // { t, at }: the client's server clock in its last MOVE_CLIENT
+    questList: null,                   // { ids, at }: item-given quests we hold, from the last QUEST_LIST
     quests: [],                        // recent quest / item-use news: { kind, questId, itemId, message, at }
   };
 
@@ -725,6 +731,14 @@
         readBag(reader);
       } else if (opcode === OP_SYNC_PLAYER_SERVER) {
         readOwnSync(reader);
+      } else if (opcode === OP_QUEST_LIST_SERVER) {
+        const ids = [];
+        for (let at = 3; at + 8 <= segment.length; at += 1) {
+          if (segment[at + 4] !== 0xff || segment[at + 5] !== 0xff || segment[at + 6] !== 0xff || segment[at + 7] !== 0xff) continue;
+          const id = (segment[at] << 24) | (segment[at + 1] << 16) | (segment[at + 2] << 8) | segment[at + 3];
+          if (id > 0 && id < 0x10000) ids.push(id);
+        }
+        world.questList = { ids, at: Date.now() };
       } else if (opcode === OP_QUEST_START_ADDED || opcode === OP_QUEST_FINISH_ADDED
         || opcode === OP_QUEST_ACCEPTED || opcode === OP_QUEST_FINISHED || opcode === OP_QUEST_FINISH_FAIL
         || opcode === OP_USEITEM_FAIL || opcode === OP_QUEST_ACCEPT_FAIL) {

@@ -319,6 +319,15 @@ activity_macros:
     # ăn thì gửi lệnh nhận rồi bấm X. Đo trên ảnh user 1920x1080 (canvas 1920x960).
     offer_accept_point: [0.778, 0.769]
     offer_close_point: [0.832, 0.164]
+    # Chỉ giữ 1 nhiệm vụ Công cáo một lúc (user, 2026-10-24) nên khung N.Vụ bên trái
+    # chỉ có 1 dòng: bấm vào đó game tự dẫn đường tới boss / tới quan trả (dịch chuyển,
+    # qua cửa...). Dùng khi bot tự đi bị kẹt; cùng một cửa thử door_tries lần không qua
+    # cũng chuyển sang bấm. Đo trên ảnh user 1920x1080 (dòng "Tiêu diệt ...", 150,345).
+    quest_tracker_point: [0.078, 0.276]
+    tracker_walk_seconds: 180
+    tracker_reclick_seconds: 15
+    tracker_reach: 64
+    door_tries: 2
     pearl_item: 1311
     notice_item: 1139
     pick_item: 2234
