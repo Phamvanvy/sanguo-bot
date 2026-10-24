@@ -2659,28 +2659,36 @@
       if (!isReady(quest)) {
         const since = Date.now();
         const asked = () => (latestWorld?.dialogs || []).find((dialog) => dialog.kind === "question" && dialog.at >= since);
-        say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest) || Boolean(quest.quiz && asked()))}`, "cong_cao_walk");
+        const touchedSince = () => (latestWorld?.touches || []).some((touch) => touch.at >= since);
+        say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest) || Boolean(quest.quiz && (asked() || touchedSince())))}`, "cong_cao_walk");
         if (quest.quiz && !isReady(quest)) {
-          let question = asked();
-          if (!question) {
-            // Not touched on arrival: touch him, as a click on him would.
-            const name = new RegExp(macro.quiz_npc || "Bách Hiểu Sinh", "i");
-            const me = latestWorld?.me;
-            const npc = me && (latestWorld?.creatures || []).filter((unit) => name.test(unit[5] || ""))
-              .map(([id, x, y]) => ({ id, d: Math.hypot(x - me.x, y - me.y) })).sort((a, b) => a.d - b.d)[0];
-            if (npc && npc.d < 80) await postGamePacket(OP_TOUCH_NPC, [["i32", npc.id], ["i32", -1]]);
-            const deadline = Date.now() + 6000;
-            while (!(question = asked()) && Date.now() < deadline) await domWait(token, 0.3);
+          // The question is drawn by the client's own quest VM when Bách Hiểu
+          // Sinh is touched (Quests/567.xml action Question(...)): no QUESTION
+          // packet comes (2026-10-24 10:05, the client touched him on arrival
+          // and the popup showed). So: touched (by the client, else by us),
+          // give the popup a moment, click option 1.
+          const name = new RegExp(macro.quiz_npc || "Bách Hiểu Sinh", "i");
+          const me = latestWorld?.me;
+          const npc = me && (latestWorld?.creatures || []).filter((unit) => name.test(unit[5] || ""))
+            .map(([id, x, y]) => ({ id, d: Math.hypot(x - me.x, y - me.y) })).sort((a, b) => a.d - b.d)[0];
+          const touched = (latestWorld?.touches || []).find((touch) => touch.at >= since && (!npc || touch.target === npc.id));
+          if (!touched) {
+            if (!npc || npc.d >= 80) throw walkFailed(`${quest.label}: tới nơi mà không thấy ${macro.quiz_npc || "Bách Hiểu Sinh"} gần đây`);
+            await postGamePacket(OP_TOUCH_NPC, [["i32", npc.id], ["i32", -1]]);
           }
-          if (!question) throw walkFailed(`${quest.label}: tới nơi mà chưa thấy câu hỏi`);
-          await domWait(token, 0.6);
+          await domWait(token, Number(macro.quiz_popup_seconds ?? 1.5));
+          const clickedAt = Date.now();
           await domClick(token, macro.quiz_option_point || [0.5, 0.508]);
-          say(`${quest.label}: trả lời "${question.message}" chọn mục 1`, "cong_cao_quiz");
-          await waitNews(since, 5, (got) => got.kind === "ready" && quest.ids.includes(got.questId));
-          if (!isReady(quest)) {
-            mark.restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
-            return "trả lời mà game chưa báo xong, để sau";
-          }
+          const question = asked();
+          say(`${quest.label}: ${touched ? "game đã bấm NPC" : "bấm NPC"}, chọn mục 1 "Trương Giác"`
+            + (question ? ` (câu hỏi: ${question.message})` : ""), "cong_cao_quiz");
+          await waitNews(clickedAt, 4, (got) => got.kind === "ready" && quest.ids.includes(got.questId));
+          // He takes it back himself (finish NPC 0x3500a1 is him): the hand-in
+          // says for sure whether the answer counted.
+          const result = await finishQuest(quest);
+          if (result.done) return result.note;
+          mark.restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+          return `bấm mục 1 rồi trả mà ${result.note}, để sau`;
         }
         const deadline = Date.now() + Number(macro.boss_wait_seconds ?? 300) * 1000;
         let quietSince = 0;
