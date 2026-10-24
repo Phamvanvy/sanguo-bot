@@ -2689,11 +2689,19 @@
             await postGamePacket(OP_TOUCH_NPC, [["i32", npc.id], ["i32", -1]]);
           }
           await domWait(token, Number(macro.quiz_popup_seconds ?? 1.5));
+          // The answer the client sends when "1. Trương Giác" is picked (user by
+          // hand, 2026-10-24 10:12:50): NOTIFY 174, questId | notifyId 1 | type 3
+          // (question) | answer 0 - the server's quest marks it done at once
+          // (<127). A click on the option missed it (10:11).
           const clickedAt = Date.now();
-          await domClick(token, macro.quiz_option_point || [0.5, 0.508]);
-          const question = asked();
-          say(`${quest.label}: ${touched ? "game đã bấm NPC" : "bấm NPC"}, chọn mục 1 "Trương Giác"`
-            + (question ? ` (câu hỏi: ${question.message})` : ""), "cong_cao_quiz");
+          const error = await postGamePacket(OP_NOTIFY_CLIENT, [
+            ["i32", quest.quest], ["u8", Number(macro.quiz_notify_id ?? 1)], ["u8", NOTIFY_QUESTION], ["u8", Number(macro.quiz_answer ?? 0)],
+          ]);
+          if (error) throw new Error(error);
+          // The popup the client drew stays up: close it by its X.
+          await domWait(token, 0.5);
+          if (macro.quiz_close_point) await domClick(token, macro.quiz_close_point);
+          say(`${quest.label}: ${touched ? "game đã bấm NPC" : "bấm NPC"}, gửi trả lời mục 1 "Trương Giác"`, "cong_cao_quiz");
           await waitNews(clickedAt, 4, (got) => got.kind === "ready" && quest.ids.includes(got.questId));
           // He takes it back himself (finish NPC 0x3500a1 is him): the hand-in
           // says for sure whether the answer counted.

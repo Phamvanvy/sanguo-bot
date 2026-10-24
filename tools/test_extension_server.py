@@ -757,6 +757,8 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual(list(range(1140, 1152)),
                          sorted(quest["item"] for quest in macro["quests"] + macro["tracker_quests"]))
         self.assertEqual([1140], [quest["item"] for quest in macro["tracker_quests"] if quest.get("quiz")])
+        # (1)'s answer is the packet the client sent when the user picked "Trương Giác".
+        self.assertEqual((1, 0), (macro["quiz_notify_id"], macro["quiz_answer"]))
         self.assertIn("if (!quest.boss) say(`${quest.label}: ${await doByTracker(quest)}`, \"cong_cao_finish\");", content_js)
         # Teleport straight to the target map first; doors only where the game refuses.
         self.assertIn("if (await hopTo(Number(place.map), label)) continue;", content_js)
@@ -1408,7 +1410,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.21.3"', manifest)
+        self.assertIn('"version": "0.21.4"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

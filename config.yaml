@@ -373,8 +373,9 @@ activity_macros:
     # khi game báo xong, bấm lại cho game dẫn tới quan rồi trả. quest: mã nhiệm vụ
     # (theo Items/item.xml; (10)-(12) mỗi nước một mã, Thục là mã đầu). quiz: (1) là
     # câu hỏi của Bách Hiểu Sinh (Tây Vực 65,106) - mục 1 "Trương Giác" là đúng
-    # (Quests/567.xml), sai thì mất Công cáo; bấm mục 1 ở quiz_option_point như popup
-    # NPC các phó bản.
+    # (Quests/567.xml), sai thì mất Công cáo. Trả lời bằng gói client gửi khi user bấm
+    # mục 1 (10:12:50): NOTIFY 174 questId 567 | notifyId 1 | kiểu 3 | đáp án 0 (bấm
+    # màn hình ở 0.5,0.508 thì trượt); rồi bấm X đóng popup NPC client vẽ.
     tracker_quests:
       # map / finish_map: dịch chuyển tới đó trước rồi mới bấm N.Vụ (user, 2026-10-24:
       # "đang ở map khác thì nên dịch chuyển đến map nv"); boss theo mẫu quái trong
@@ -383,7 +384,9 @@ activity_macros:
       - {item: 1149, quest: [576, 579], label: "(10) Danh tướng thiên hạ", map: 624, finish_map: 848}
       - {item: 1150, quest: [580, 577], label: "(11) Quân Sơn Việt thô lỗ", map: 688, finish_map: 848}
       - {item: 1151, quest: [581, 578], label: "(12) Dũng sỹ U Hoành", map: 656, finish_map: 848}
-    quiz_option_point: [0.5, 0.508]
+    quiz_notify_id: 1
+    quiz_answer: 0
+    quiz_close_point: [0.842, 0.145]
     # Game dẫn đường: đứng yên tracker_still_seconds là tới; tới chỗ boss mà
     # tracker_quiet_seconds không có gì để đánh thì bấm N.Vụ lần nữa.
     tracker_still_seconds: 4
