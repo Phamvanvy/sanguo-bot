@@ -348,9 +348,7 @@ activity_macros:
     # Nhiệm vụ theo Quests/index.xml (item n = quest 566 + n). Tọa độ boss / quan
     # trả nhiệm vụ lấy từ chữ nhiệm vụ, khớp chữ bản live (log 03:31). Boss trong
     # hang: via = map và cửa vào hang (Areas/51, 56 info.xml).
-    # Chưa làm: (1) 1140 Học thức uyên bác - trả lời câu hỏi Bách Hiểu Sinh;
-    # (8) 1147 Nam Hải và (9) 1148 Tây Kiệt - chưa biết map bản live. Mấy món đó
-    # cứ để trong túi.
+    # Các loại còn lại ở tracker_quests: game tự dẫn đường.
     quests:
       - {item: 1141, quest: 568, label: "(2) Giết Hàn Tiêu",
          boss: {map: 848, at: [43, 63]}, finish: {map: 848, npc: [93, 102]}}
@@ -364,6 +362,25 @@ activity_macros:
          boss: {map: 880, at: [32, 25], via: {map: 896, door: [50, 182], exit: 2}}, finish: {map: 896, npc: [87, 105]}}
       - {item: 1146, quest: 573, label: "(7) Cái chết của Tư Mã Hùng",
          boss: {map: 1056, at: [156, 16]}, finish: {map: 1056, npc: [45, 155]}}
+    # Công cáo có 12 loại (user, 2026-10-24). Loại không ghi đường ở trên: bấm dòng
+    # nhiệm vụ trên khung N.Vụ cho game tự dẫn tới boss, đánh ở chỗ nhân vật dừng tới
+    # khi game báo xong, bấm lại cho game dẫn tới quan rồi trả. quest: mã nhiệm vụ
+    # (theo Items/item.xml; (10)-(12) mỗi nước một mã, Thục là mã đầu). quiz: (1) là
+    # câu hỏi của Bách Hiểu Sinh (Tây Vực 65,106) - mục 1 "Trương Giác" là đúng
+    # (Quests/567.xml), sai thì mất Công cáo; bấm mục 1 ở quiz_option_point như popup
+    # NPC các phó bản.
+    tracker_quests:
+      - {item: 1140, quest: 567, label: "(1) Học thức uyên bác", quiz: true}
+      - {item: 1147, quest: 574, label: "(8) Quân Tây Kiệt mật báo"}
+      - {item: 1148, quest: 575, label: "(9) Dẹp yên Tây Kiệt"}
+      - {item: 1149, quest: [576, 579], label: "(10) Danh tướng thiên hạ"}
+      - {item: 1150, quest: [580, 577], label: "(11) Quân Sơn Việt thô lỗ"}
+      - {item: 1151, quest: [581, 578], label: "(12) Dũng sỹ U Hoành"}
+    quiz_option_point: [0.5, 0.508]
+    # Game dẫn đường: đứng yên tracker_still_seconds là tới; tới chỗ boss mà
+    # tracker_quiet_seconds không có gì để đánh thì bấm N.Vụ lần nữa.
+    tracker_still_seconds: 4
+    tracker_quiet_seconds: 20
     # Ra khỏi hang bằng cửa của nó (về map `to`). exit = số cửa trong Areas/<map/16>/info.xml:
     # đứng sát cửa mà đi không qua (832 kẹt ở 8,53, 2026-10-24) thì gửi lệnh qua cửa
     # TOUCHEXIT 116 như client gửi khi bước vào cửa (server cho trong 100px).

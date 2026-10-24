@@ -752,7 +752,12 @@ class ExtensionServerTest(unittest.TestCase):
         # new one only once none is, and the N.Vụ tracker's single row leads the way
         # when our own walk gets stuck.
         self.assertEqual([0.078, 0.276], macro["quest_tracker_point"])
-        self.assertIn("const fresh = !mine.length && held.find((quest) => !state.get(quest.quest).accepted);", content_js)
+        self.assertIn("const fresh = !mine.length && held.find((quest) => !state.get(quest.item).accepted);", content_js)
+        # All 12 Công cáo (user: "nv max là 1-12"): walked to, or led by the client.
+        self.assertEqual(list(range(1140, 1152)),
+                         sorted(quest["item"] for quest in macro["quests"] + macro["tracker_quests"]))
+        self.assertEqual([1140], [quest["item"] for quest in macro["tracker_quests"] if quest.get("quiz")])
+        self.assertIn("if (!quest.boss) say(`${quest.label}: ${await doByTracker(quest)}`, \"cong_cao_finish\");", content_js)
         # "Đào trân châu": the same runner, only digging.
         dig = cfg["activity_macros"]["dig_pearls"]
         self.assertEqual(("cong_cao_loop", True, macro["dig"]), (dig["runner"], dig["dig_only"], dig["dig"]))
@@ -1397,7 +1402,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.20.8"', manifest)
+        self.assertIn('"version": "0.21.0"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

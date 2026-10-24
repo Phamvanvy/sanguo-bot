@@ -2254,10 +2254,18 @@
     const noticeItem = Number(macro.notice_item ?? 1139);
     const pickItem = Number(macro.pick_item ?? 2234);
     const price = Number(macro.notice_price ?? 3);
-    const quests = (macro.quests || []).map((quest) => ({ ...quest, item: Number(quest.item), quest: Number(quest.quest) }));
+    // Every Công cáo (1)-(12) (user, 2026-10-24: "nv max là 1-12"). Those in
+    // `quests` have their boss and officer written down and are walked to;
+    // `tracker_quests` let the client lead the way (N.Vụ tracker). Some hand
+    // out a different quest by nation, so `quest` may list several ids and
+    // the one the game really gives is kept in quest.quest.
+    const quests = [...(macro.quests || []), ...(macro.tracker_quests || [])].map((quest) => {
+      const ids = [].concat(quest.quest).map(Number);
+      return { ...quest, item: Number(quest.item), ids, quest: ids[0] };
+    });
     const caves = macro.cave_exits || {};
     const digCooldownMs = Number(macro.dig_cooldown_seconds ?? 300) * 1000;
-    const state = new Map(quests.map((quest) => [quest.quest, { accepted: false, readyAt: 0, restUntil: 0 }]));
+    const state = new Map(quests.map((quest) => [quest.item, { accepted: false, readyAt: 0, restUntil: 0 }]));
     const stats = { bought: 0, done: 0, dug: 0, pearls: 0 };
     let nextDigAt = 0;
     let resumes = 0;
@@ -2282,10 +2290,13 @@
     // The ready mark (QUEST_FINISH_ADDED) comes when the boss dies and again on
     // entering the officer's map; a hand-in or a refused one clears it.
     const isReady = (quest) => {
-      const mark = state.get(quest.quest);
-      const last = [...(latestWorld?.quests || [])].reverse().find((item) => item.questId === quest.quest
+      const mark = state.get(quest.item);
+      const last = [...(latestWorld?.quests || [])].reverse().find((item) => quest.ids.includes(item.questId)
         && item.at > (mark.clearedAt || 0) && ["ready", "finished", "finish_fail"].includes(item.kind));
-      if (last?.kind === "ready") mark.readyAt = last.at;
+      if (last?.kind === "ready") {
+        mark.readyAt = last.at;
+        quest.quest = last.questId;
+      }
       return Boolean(mark.readyAt);
     };
     // USEITEM_CLIENT: byte grid (-1 = any) | int itemId | int instanceId (-1
@@ -2317,28 +2328,15 @@
       if (!macro.quest_tracker_point) return false;
       const goal = place.nearTo || tileCenter(place.at);
       const reach = Number(place.near || macro.tracker_reach || 64);
-      const deadline = Date.now() + Number(macro.tracker_walk_seconds ?? 180) * 1000;
-      const reclickMs = Number(macro.tracker_reclick_seconds ?? 15) * 1000;
-      let clickedAt = 0;
-      let clicks = 0;
-      while (Date.now() < deadline) {
-        ensureDomActive(token);
-        const world = latestWorld;
-        if (world?.mapId === place.map && world.me && Math.hypot(world.me.x - goal.x, world.me.y - goal.y) <= reach) {
-          say(`${label}: tới nơi nhờ bấm nhiệm vụ trên khung N.Vụ (${clicks} lần)`, "cong_cao_walk");
-          return true;
-        }
-        const still = !world?.meMoving && Date.now() - (world?.meMovedAt || 0) >= 3000;
-        if (Date.now() - clickedAt >= reclickMs && (still || !clickedAt)) {
-          await domClick(token, macro.quest_tracker_point);
-          clickedAt = Date.now();
-          clicks += 1;
-          updateDomFlow(flow, `${status()} - ${label}: bấm nhiệm vụ trên khung N.Vụ cho game tự dẫn đường (lần ${clicks})`, "cong_cao_walk");
-        }
-        await domWait(token, 1);
+      const there = () => latestWorld?.mapId === place.map && latestWorld.me
+        && Math.hypot(latestWorld.me.x - goal.x, latestWorld.me.y - goal.y) <= reach;
+      try {
+        say(`${label}: ${await trackerTrip(label, there)}`, "cong_cao_walk");
+      } catch (error) {
+        if (!error.walkFailed) throw error;
+        say(error.message, "cong_cao_walk");
       }
-      say(`${label}: bấm nhiệm vụ ${clicks} lần mà ${Math.round(Number(macro.tracker_walk_seconds ?? 180))}s chưa tới`, "cong_cao_walk");
-      return false;
+      return Boolean(there());
     };
     // Our walk first; stuck, the tracker.
     const getThere = async (place, label, stop) => {
@@ -2500,11 +2498,11 @@
     // the client accepts it itself, or we do. "Nhiệm vụ đã tồn tại" = ours
     // already, from before the flow started.
     const acceptQuest = async (item, quest) => {
-      const mark = state.get(quest.quest);
+      const mark = state.get(quest.item);
       const since = Date.now();
       await useItem(item.grid, item.itemId);
       const answer = await waitNews(since, 4, (got) => (got.kind === "use_fail" && got.itemId === item.itemId)
-        || (["offer", "accepted"].includes(got.kind) && got.questId === quest.quest));
+        || (["offer", "accepted"].includes(got.kind) && quest.ids.includes(got.questId)));
       if (answer?.kind === "use_fail") {
         if (/tồn tại/i.test(answer.message)) {
           mark.accepted = true;
@@ -2517,6 +2515,7 @@
         mark.restUntil = Date.now() + 2 * 60 * 1000;
         return "dùng mà game không giao nhiệm vụ";
       }
+      quest.quest = answer.questId;
       // The client draws the quest with "Nhận" / "Trở về" and waits for a
       // person (2026-10-24 03:51: our own QUEST_ACCEPT took the quest, and
       // the popup stayed over the game). So press "Nhận" like the user does:
@@ -2545,6 +2544,36 @@
 
     // QUEST_FINISH_CLIENT: int serial | int questId | int branch (1, as the
     // client sends), standing by the officer like the client does.
+    const finishQuest = async (quest) => {
+      const serial = (commandSerial += 1);
+      const since = Date.now();
+      const error = await postGamePacket(OP_QUEST_FINISH, [["i32", serial], ["i32", quest.quest], ["i32", 1]]);
+      if (error) throw new Error(error);
+      const deadline = Date.now() + 6000;
+      const mark = state.get(quest.item);
+      while (Date.now() < deadline) {
+        if (news(since, (got) => got.kind === "finished" && got.questId === quest.quest)) {
+          mark.accepted = false;
+          mark.readyAt = 0;
+          mark.clearedAt = Date.now();
+          stats.done += 1;
+          return { done: true, note: "đã trả" };
+        }
+        const refused = (latestWorld?.replies || []).find((reply) => reply.serial === serial && !reply.ok)
+          || news(since, (got) => got.kind === "finish_fail" && got.questId === quest.quest);
+        if (refused) {
+          // 3 "Không có nhiệm vụ chỉ định": not ours any more; 4: not done.
+          if (/không có nhiệm vụ/i.test(refused.message)) mark.accepted = false;
+          if (/không có nhiệm vụ|不能完成/i.test(refused.message)) {
+            mark.readyAt = 0;
+            mark.clearedAt = Date.now();
+          }
+          return { done: false, note: `game không nhận: ${refused.message}` };
+        }
+        await domWait(token, 0.2);
+      }
+      return { done: false, note: "game không trả lời lệnh trả nhiệm vụ" };
+    };
     const handIn = async (quest) => {
       const npcTile = quest.finish.npc.map(Number);
       const grid = walkGridFor(Number(quest.finish.map));
@@ -2555,32 +2584,114 @@
         map: Number(quest.finish.map), at: [stand.x, stand.y], tolerance: 2,
         near: Number(macro.finish_reach ?? 64), nearTo: tileCenter(npcTile),
       }, `trả ${quest.label}`);
-      const serial = (commandSerial += 1);
-      const since = Date.now();
-      const error = await postGamePacket(OP_QUEST_FINISH, [["i32", serial], ["i32", quest.quest], ["i32", 1]]);
-      if (error) throw new Error(error);
-      const deadline = Date.now() + 6000;
-      const mark = state.get(quest.quest);
+      return (await finishQuest(quest)).note;
+    };
+
+    // The client leads: click the N.Vụ row, wait for us to set off, then for
+    // a stop of tracker_still_seconds on one spot (the MOVE packets keep
+    // coming while we stand, so "still" is our position not changing).
+    const trackerTrip = async (label, stop = () => false) => {
+      if (!macro.quest_tracker_point) throw walkFailed("chưa có quest_tracker_point trong config");
+      const deadline = Date.now() + Number(macro.tracker_walk_seconds ?? 180) * 1000;
+      const stillMs = Number(macro.tracker_still_seconds ?? 4) * 1000;
+      const reclickMs = Number(macro.tracker_reclick_seconds ?? 15) * 1000;
+      let clicks = 0;
+      let clickedAt = 0;
+      let moved = false;
+      let last = null;
+      let lastChange = Date.now();
       while (Date.now() < deadline) {
-        if (news(since, (got) => got.kind === "finished" && got.questId === quest.quest)) {
-          mark.accepted = false;
-          mark.readyAt = 0;
-          mark.clearedAt = Date.now();
-          stats.done += 1;
-          return "đã trả";
+        ensureDomActive(token);
+        if (stop()) return `dừng giữa đường (${clicks} lần bấm)`;
+        const me = latestWorld?.me;
+        const spot = me && `${latestWorld.mapId}:${Math.floor(me.x / unit)},${Math.floor(me.y / unit)}`;
+        if (spot !== last) {
+          if (last && clickedAt) moved = true;
+          last = spot;
+          lastChange = Date.now();
         }
-        const refused = (latestWorld?.replies || []).find((reply) => reply.serial === serial && !reply.ok)
-          || news(since, (got) => got.kind === "finish_fail" && got.questId === quest.quest);
-        if (refused) {
-          mark.readyAt = 0;
-          mark.clearedAt = Date.now();
-          // 3 "Không có nhiệm vụ chỉ định": not ours any more.
-          if (/không có nhiệm vụ/i.test(refused.message)) mark.accepted = false;
-          return `game không nhận: ${refused.message}`;
+        const still = Date.now() - lastChange >= stillMs;
+        if (moved && still) return `game dẫn tới map ${latestWorld?.mapId} ${spot?.split(":")[1]} (${clicks} lần bấm N.Vụ)`;
+        if (!clickedAt || (still && Date.now() - clickedAt >= reclickMs)) {
+          await domClick(token, macro.quest_tracker_point);
+          clickedAt = Date.now();
+          lastChange = Date.now();
+          clicks += 1;
+          updateDomFlow(flow, `${status()} - ${label}: bấm nhiệm vụ trên khung N.Vụ cho game tự dẫn đường (lần ${clicks})`, "cong_cao_walk");
         }
-        await domWait(token, 0.2);
+        await domWait(token, 0.5);
       }
-      return "game không trả lời lệnh trả nhiệm vụ";
+      throw walkFailed(`${label}: bấm N.Vụ ${clicks} lần, ${Math.round(Number(macro.tracker_walk_seconds ?? 180))}s chưa tới nơi`);
+    };
+
+    // A quest with nothing written down: the client walks us to its boss,
+    // we fight there until the game calls it done, the client walks us to
+    // the officer, we hand it in. quiz (1, Bách Hiểu Sinh): the client takes
+    // us to him, his question's first option is the right one ("Trương
+    // Giác", Quests/567.xml E_AnswerQuestion(1, 0)) and he takes it back.
+    const doByTracker = async (quest) => {
+      const mark = state.get(quest.item);
+      if (!isReady(quest)) {
+        const since = Date.now();
+        const asked = () => (latestWorld?.dialogs || []).find((dialog) => dialog.kind === "question" && dialog.at >= since);
+        say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest) || Boolean(quest.quiz && asked()))}`, "cong_cao_walk");
+        if (quest.quiz && !isReady(quest)) {
+          let question = asked();
+          if (!question) {
+            // Not touched on arrival: touch him, as a click on him would.
+            const name = new RegExp(macro.quiz_npc || "Bách Hiểu Sinh", "i");
+            const me = latestWorld?.me;
+            const npc = me && (latestWorld?.creatures || []).filter((unit) => name.test(unit[5] || ""))
+              .map(([id, x, y]) => ({ id, d: Math.hypot(x - me.x, y - me.y) })).sort((a, b) => a.d - b.d)[0];
+            if (npc && npc.d < 80) await postGamePacket(OP_TOUCH_NPC, [["i32", npc.id], ["i32", -1]]);
+            const deadline = Date.now() + 6000;
+            while (!(question = asked()) && Date.now() < deadline) await domWait(token, 0.3);
+          }
+          if (!question) throw walkFailed(`${quest.label}: tới nơi mà chưa thấy câu hỏi`);
+          await domWait(token, 0.6);
+          await domClick(token, macro.quiz_option_point || [0.5, 0.508]);
+          say(`${quest.label}: trả lời "${question.message}" chọn mục 1`, "cong_cao_quiz");
+          await waitNews(since, 5, (got) => got.kind === "ready" && quest.ids.includes(got.questId));
+          if (!isReady(quest)) {
+            mark.restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+            return "trả lời mà game chưa báo xong, để sau";
+          }
+        }
+        const deadline = Date.now() + Number(macro.boss_wait_seconds ?? 300) * 1000;
+        let quietSince = 0;
+        while (!isReady(quest)) {
+          ensureDomActive(token);
+          if (Date.now() > deadline) {
+            mark.restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+            return `chờ ${macro.boss_wait_seconds ?? 300}s không hạ được boss, để sau`;
+          }
+          updateDomFlow(flow, `${status()} - ${quest.label}: đánh ở chỗ game dẫn tới`, "cong_cao_fight");
+          const fight = await fightUntilClear(token, macro, 30, { radius: Number(macro.boss_radius ?? 300) });
+          if (isReady(quest)) break;
+          if (fight.cleared && !fight.landed) {
+            quietSince ||= Date.now();
+            // Nothing here for a while: maybe not there yet - let the client
+            // lead on - or the boss is down and will come back.
+            if (Date.now() - quietSince >= Number(macro.tracker_quiet_seconds ?? 20) * 1000) {
+              quietSince = 0;
+              say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest))}`, "cong_cao_walk");
+            } else {
+              await domWait(token, Number(macro.boss_poll_seconds ?? 3));
+            }
+          } else {
+            quietSince = 0;
+          }
+        }
+      }
+      // Done: to the officer the client's way, and hand it in once there.
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        say(`trả ${quest.label}: ${await trackerTrip(`trả ${quest.label}`)}`, "cong_cao_walk");
+        const result = await finishQuest(quest);
+        if (result.done || !mark.accepted || !isReady(quest)) return result.note;
+        say(`trả ${quest.label}: ${result.note} (lần ${attempt})`, "cong_cao_finish");
+      }
+      mark.restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+      return "3 lần tới quan mà game không nhận, để sau";
     };
 
     // To the boss and fight what is there until the quest turns ready; the
@@ -2595,7 +2706,7 @@
       while (!isReady(quest)) {
         ensureDomActive(token);
         if (Date.now() > deadline) {
-          state.get(quest.quest).restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+          state.get(quest.item).restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
           return `chờ ${macro.boss_wait_seconds ?? 300}s không hạ được boss, để sau`;
         }
         const me = latestWorld?.me;
@@ -2646,8 +2757,12 @@
       while (Date.now() < deadline) {
         const list = latestWorld?.questList;
         if (list && list.at >= since) {
-          for (const quest of quests) state.get(quest.quest).accepted = list.ids.includes(quest.quest);
-          const held = quests.filter((quest) => state.get(quest.quest).accepted).map((quest) => quest.label);
+          for (const quest of quests) {
+            const held = quest.ids.find((id) => list.ids.includes(id));
+            state.get(quest.item).accepted = Boolean(held);
+            if (held) quest.quest = held;
+          }
+          const held = quests.filter((quest) => state.get(quest.item).accepted).map((quest) => quest.label);
           say(`danh sách nhiệm vụ: ${held.length ? `đang giữ ${held.join(", ")}` : "chưa giữ Công cáo nào"}`, "cong_cao_start");
           return true;
         }
@@ -2703,11 +2818,11 @@
           continue;
         }
         // Each quest whose item is in the bag: accepted, ready or not.
-        const held = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).restUntil <= now);
+        const held = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.item).restUntil <= now);
         // Ours, set aside or not: while one is, no other is taken.
-        const mine = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).accepted);
-        const active = held.filter((quest) => state.get(quest.quest).accepted);
-        const fresh = !mine.length && held.find((quest) => !state.get(quest.quest).accepted);
+        const mine = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.item).accepted);
+        const active = held.filter((quest) => state.get(quest.item).accepted);
+        const fresh = !mine.length && held.find((quest) => !state.get(quest.item).accepted);
         if (fresh) {
           const item = bag.find((entry) => entry.itemId === fresh.item);
           say(`${fresh.label}: ${await acceptQuest(item, fresh)}`, "cong_cao_accept");
@@ -2717,13 +2832,16 @@
           // Ready ones first, then the one on this map, then the list's order.
           const here = latestWorld?.mapId;
           const quest = active.find(isReady)
-            || active.find((item) => [Number(item.boss.map), Number(item.finish.map)].includes(here)) || active[0];
+            || active.find((item) => item.boss && [Number(item.boss.map), Number(item.finish.map)].includes(here)) || active[0];
           try {
-            if (!isReady(quest)) say(`${quest.label}: ${await killBoss(quest)}`, "cong_cao_fight");
-            if (isReady(quest)) say(`${quest.label}: ${await handIn(quest)}`, "cong_cao_finish");
+            if (!quest.boss) say(`${quest.label}: ${await doByTracker(quest)}`, "cong_cao_finish");
+            else {
+              if (!isReady(quest)) say(`${quest.label}: ${await killBoss(quest)}`, "cong_cao_fight");
+              if (isReady(quest)) say(`${quest.label}: ${await handIn(quest)}`, "cong_cao_finish");
+            }
           } catch (error) {
             if (!error.walkFailed) throw error;
-            state.get(quest.quest).restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
+            state.get(quest.item).restUntil = Date.now() + Number(macro.boss_rest_seconds ?? 600) * 1000;
             say(`${quest.label}: ${error.message}, để sau`, "cong_cao_walk");
           }
           continue;
@@ -2752,9 +2870,9 @@
         if (!mine.length && !anyNotice && pearls >= price && await buyNotices(pearls)) continue;
         // Nothing to do now, but a pick cooling down or a quest set aside
         // (boss not up) will be: wait for the sooner of the two.
-        const resting = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).restUntil > now);
+        const resting = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.item).restUntil > now);
         const wakeAt = Math.min(macro.dig && picks > 0 ? nextDigAt : Infinity,
-          ...resting.map((quest) => state.get(quest.quest).restUntil));
+          ...resting.map((quest) => state.get(quest.item).restUntil));
         if (wakeAt < Infinity) {
           updateDomFlow(flow, `${status()} - hết việc, chờ ${Math.ceil((wakeAt - now) / 1000)}s`
             + ` (${picks} cuốc${resting.length ? `, để sau: ${resting.map((quest) => quest.label).join(", ")}` : ""})`, "cong_cao_wait");
