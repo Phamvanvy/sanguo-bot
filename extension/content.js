@@ -2445,7 +2445,7 @@
         }
         const size = walkGridFor(here)?.size;
         if (here === place.map) {
-          const step = { label, goto: place.at, map_size: size, goto_tolerance: Number(place.tolerance ?? 2) };
+          const step = { label, goto: place.at, map_size: size, goto_tolerance: Number(place.tolerance ?? 2), avoid_units: true };
           // Close enough (an officer only has to be within reach) ends it too.
           const nearEnough = () => place.near && latestWorld?.me && latestWorld.mapId === place.map
             && Math.hypot(latestWorld.me.x - place.nearTo.x, latestWorld.me.y - place.nearTo.y) <= place.near;
@@ -2609,12 +2609,15 @@
     const handIn = async (quest) => {
       const npcTile = quest.finish.npc.map(Number);
       const grid = walkGridFor(Number(quest.finish.map));
-      const stand = (grid && nearestOpen(grid, { x: npcTile[0], y: npcTile[1] + 3 }, 3)) || { x: npcTile[0], y: npcTile[1] + 3 };
+      // A few tiles off the officer, not beside him: camps are crowded and a
+      // Map click on another NPC opens its panel (Sóc Phương 2026-10-24 11:26).
+      const off = Number(macro.finish_stand_tiles ?? 5);
+      const stand = (grid && nearestOpen(grid, { x: npcTile[0], y: npcTile[1] + off }, 3)) || { x: npcTile[0], y: npcTile[1] + off };
       // Within finish_reach px of the officer is enough: Giang Lăng's 87,108
       // could only be walked up to 84,108 (2026-10-24 04:01).
       await getThere({
-        map: Number(quest.finish.map), at: [stand.x, stand.y], tolerance: 2,
-        near: Number(macro.finish_reach ?? 64), nearTo: tileCenter(npcTile),
+        map: Number(quest.finish.map), at: [stand.x, stand.y], tolerance: 3,
+        near: Number(macro.finish_reach ?? 80), nearTo: tileCenter(npcTile),
       }, `trả ${quest.label}`);
       return (await finishQuest(quest)).note;
     };
@@ -3448,6 +3451,24 @@
       if (backOff) {
         const below = { x: goal.x, y: goal.y + 3 };
         tile = doorApproach.get(doorKey) || (grid && nearestOpen(grid, below, 2)) || below;
+      }
+      // avoid_units (Công cáo, 2026-10-24 11:26): a Map click on a tile a unit
+      // stands on touches it - Sóc Phương's merchant beside the officer had
+      // his shop opened four times. Click a free open tile next to it instead.
+      if (step.avoid_units && !backOff && !doors && grid && unitOver(tile)) {
+        let free = null;
+        for (let ring = 1; ring <= 3 && !free; ring += 1) {
+          for (let dy = -ring; dy <= ring && !free; dy += 1) {
+            for (let dx = -ring; dx <= ring && !free; dx += 1) {
+              const aside = { x: tile.x + dx, y: tile.y + dy };
+              if (Math.max(Math.abs(dx), Math.abs(dy)) === ring && grid.open(aside.x, aside.y) && !unitOver(aside)) free = aside;
+            }
+          }
+        }
+        if (free) {
+          legs.push(`tránh ${unitOver(tile)[5] || "NPC"} ở ${tile.x},${tile.y}`);
+          tile = free;
+        }
       }
       const final = hop === route.length - 1 && !backOff;
       if (doors && final && route.length > 4) doorApproach.set(doorKey, route[route.length - 4]);

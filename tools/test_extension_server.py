@@ -743,7 +743,8 @@ class ExtensionServerTest(unittest.TestCase):
         # officer only has to be within reach (Giang Lăng 84,108 for 87,108).
         content_js = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn("const aside = detourTile(here, place.at, stuck);", content_js)
-        self.assertIn("near: Number(macro.finish_reach ?? 64), nearTo: tileCenter(npcTile),", content_js)
+        self.assertIn("near: Number(macro.finish_reach ?? 80), nearTo: tileCenter(npcTile),", content_js)
+        self.assertIn("if (step.avoid_units && !backOff && !doors && grid && unitOver(tile)) {", content_js)
         # A door the walk will not take: the client's own TOUCHEXIT, exit = area << 16 | id
         # ("00340000" leaving 832 in the user's round).
         self.assertEqual(0, macro["cave_exits"][832]["exit"])
@@ -1414,7 +1415,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.21.7"', manifest)
+        self.assertIn('"version": "0.21.8"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
