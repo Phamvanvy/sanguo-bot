@@ -362,6 +362,12 @@ activity_macros:
          boss: {map: 880, at: [32, 25], via: {map: 896, door: [50, 182], exit: 2}}, finish: {map: 896, npc: [87, 105]}}
       - {item: 1146, quest: 573, label: "(7) Cái chết của Tư Mã Hùng",
          boss: {map: 1056, at: [156, 16]}, finish: {map: 1056, npc: [45, 155]}}
+      # (8), (9): map sau 2011 (Game/Sanguo1.0-Data Areas 127, 126) - boss mẫu 1908 /
+      # 1813, quan mẫu 1893 / 1801 (Nam Hải 2032 là bản live, 864 không tới được).
+      - {item: 1147, quest: 574, label: "(8) Quân Tây Kiệt mật báo",
+         boss: {map: 2032, at: [133, 77]}, finish: {map: 2032, npc: [101, 73]}}
+      - {item: 1148, quest: 575, label: "(9) Dẹp yên Tây Kiệt",
+         boss: {map: 2016, at: [151, 133]}, finish: {map: 2016, npc: [87, 45]}}
     # Công cáo có 12 loại (user, 2026-10-24). Loại không ghi đường ở trên: bấm dòng
     # nhiệm vụ trên khung N.Vụ cho game tự dẫn tới boss, đánh ở chỗ nhân vật dừng tới
     # khi game báo xong, bấm lại cho game dẫn tới quan rồi trả. quest: mã nhiệm vụ
@@ -370,12 +376,13 @@ activity_macros:
     # (Quests/567.xml), sai thì mất Công cáo; bấm mục 1 ở quiz_option_point như popup
     # NPC các phó bản.
     tracker_quests:
-      - {item: 1140, quest: 567, label: "(1) Học thức uyên bác", quiz: true}
-      - {item: 1147, quest: 574, label: "(8) Quân Tây Kiệt mật báo"}
-      - {item: 1148, quest: 575, label: "(9) Dẹp yên Tây Kiệt"}
-      - {item: 1149, quest: [576, 579], label: "(10) Danh tướng thiên hạ"}
-      - {item: 1150, quest: [580, 577], label: "(11) Quân Sơn Việt thô lỗ"}
-      - {item: 1151, quest: [581, 578], label: "(12) Dũng sỹ U Hoành"}
+      # map / finish_map: dịch chuyển tới đó trước rồi mới bấm N.Vụ (user, 2026-10-24:
+      # "đang ở map khác thì nên dịch chuyển đến map nv"); boss theo mẫu quái trong
+      # Areas/<map/16>/info.xml. Map không dịch chuyển tới được thì game tự dẫn.
+      - {item: 1140, quest: 567, label: "(1) Học thức uyên bác", quiz: true, map: 848, finish_map: 848}
+      - {item: 1149, quest: [576, 579], label: "(10) Danh tướng thiên hạ", map: 624, finish_map: 848}
+      - {item: 1150, quest: [580, 577], label: "(11) Quân Sơn Việt thô lỗ", map: 688, finish_map: 848}
+      - {item: 1151, quest: [581, 578], label: "(12) Dũng sỹ U Hoành", map: 656, finish_map: 848}
     quiz_option_point: [0.5, 0.508]
     # Game dẫn đường: đứng yên tracker_still_seconds là tới; tới chỗ boss mà
     # tracker_quiet_seconds không có gì để đánh thì bấm N.Vụ lần nữa.

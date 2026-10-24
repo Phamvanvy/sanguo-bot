@@ -759,7 +759,11 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertEqual([1140], [quest["item"] for quest in macro["tracker_quests"] if quest.get("quiz")])
         self.assertIn("if (!quest.boss) say(`${quest.label}: ${await doByTracker(quest)}`, \"cong_cao_finish\");", content_js)
         # Teleport straight to the target map first; doors only where the game refuses.
-        self.assertIn("await travelToLobby(token, { ...macro, travel_attempts: 1 }, { label, lobby_map: Number(place.map) }, flow);", content_js)
+        self.assertIn("if (await hopTo(Number(place.map), label)) continue;", content_js)
+        self.assertIn("await travelToLobby(token, { ...macro, travel_attempts: 1 }, { label, lobby_map: mapId }, flow);", content_js)
+        # Led by the client: to the quest's map first when it is known (user, 2026-10-24).
+        self.assertEqual({1140: 848, 1149: 624, 1150: 688, 1151: 656},
+                         {quest["item"]: quest["map"] for quest in macro["tracker_quests"]})
         # "Đào trân châu": the same runner, only digging.
         dig = cfg["activity_macros"]["dig_pearls"]
         self.assertEqual(("cong_cao_loop", True, macro["dig"]), (dig["runner"], dig["dig_only"], dig["dig"]))
@@ -1404,7 +1408,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.21.2"', manifest)
+        self.assertIn('"version": "0.21.3"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)

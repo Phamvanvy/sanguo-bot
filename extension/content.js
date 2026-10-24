@@ -2407,6 +2407,30 @@
     // Maps the T.Giới Map will not take us to straight ("Map này không thể
     // đến được"): reached through their region's door instead.
     const noTeleport = new Set((macro.no_teleport_maps || []).map(Number));
+    // One T.Giới Map teleport to mapId, unless the game said before it will
+    // not take us there. true = tried and worth looking where we are now;
+    // false = not possible, go another way.
+    const hopTo = async (mapId, label) => {
+      if (!mapId || noTeleport.has(mapId) || latestWorld?.mapId === mapId) return false;
+      say(`${label}: dịch chuyển thẳng tới map ${mapId}`, "cong_cao_travel");
+      try {
+        await travelToLobby(token, { ...macro, travel_attempts: 1 }, { label, lobby_map: mapId }, flow);
+        return true;
+      } catch (error) {
+        if (/chiến đấu/i.test(error.message)) {
+          say(`${label}: ${describeFight(await fightUntilClear(token, macro, 30, { idle: false }))}`, "cong_cao_travel");
+          return true;
+        }
+        if (/Đã ở trong/i.test(error.message)) {
+          await domWait(token, 1);
+          return true;
+        }
+        if (!/không thể đến|không có/i.test(error.message)) throw error;
+        noTeleport.add(mapId);
+        say(`${label}: ${error.message}; đi đường khác`, "cong_cao_travel");
+        return false;
+      }
+    };
     const gotoPlace = async (place, label, stop = () => false) => {
       const doorTries = new Map();
       for (let leg = 0; leg < 8; leg += 1) {
@@ -2447,25 +2471,7 @@
         // Teleport straight there whenever the game lets us: walking out of a
         // cave or across a region to its door took a minute or more a trip
         // (user, 2026-10-24: "dịch chuyển được thì nên dịch chuyển").
-        if (!noTeleport.has(Number(place.map))) {
-          say(`${label}: dịch chuyển thẳng tới map ${place.map}`, "cong_cao_travel");
-          try {
-            await travelToLobby(token, { ...macro, travel_attempts: 1 }, { label, lobby_map: Number(place.map) }, flow);
-            continue;
-          } catch (error) {
-            if (/chiến đấu/i.test(error.message)) {
-              say(`${label}: ${describeFight(await fightUntilClear(token, macro, 30, { idle: false }))}`, "cong_cao_travel");
-              continue;
-            }
-            if (/Đã ở trong/i.test(error.message)) {
-              await domWait(token, 1);
-              continue;
-            }
-            if (!/không thể đến|không có/i.test(error.message)) throw error;
-            noTeleport.add(Number(place.map));
-            say(`${label}: ${error.message}; đi qua cửa`, "cong_cao_travel");
-          }
-        }
+        if (await hopTo(Number(place.map), label)) continue;
         const cave = caves[here];
         const gate = place.via && here === place.via.map ? place.via
           : (cave && [place.map, place.via?.map].includes(Number(cave.to)) ? cave : null);
@@ -2660,6 +2666,12 @@
         const since = Date.now();
         const asked = () => (latestWorld?.dialogs || []).find((dialog) => dialog.kind === "question" && dialog.at >= since);
         const touchedSince = () => (latestWorld?.touches || []).some((touch) => touch.at >= since);
+        // Teleport to the boss's map first when we know it: the client's own
+        // way can be a long walk across maps (user, 2026-10-24).
+        // Twice at most: the first may only have cleared a fight.
+        for (let hop = 0; hop < 2 && quest.map && latestWorld?.mapId !== Number(quest.map); hop += 1) {
+          if (!(await hopTo(Number(quest.map), quest.label))) break;
+        }
         say(`${quest.label}: ${await trackerTrip(quest.label, () => isReady(quest) || Boolean(quest.quiz && (asked() || touchedSince())))}`, "cong_cao_walk");
         if (quest.quiz && !isReady(quest)) {
           // The question is drawn by the client's own quest VM when Bách Hiểu
@@ -2718,6 +2730,7 @@
       }
       // Done: to the officer the client's way, and hand it in once there.
       for (let attempt = 1; attempt <= 3; attempt += 1) {
+        if (quest.finish_map) await hopTo(Number(quest.finish_map), `trả ${quest.label}`);
         say(`trả ${quest.label}: ${await trackerTrip(`trả ${quest.label}`)}`, "cong_cao_walk");
         const result = await finishQuest(quest);
         if (result.done || !mark.accepted || !isReady(quest)) return result.note;
