@@ -2404,6 +2404,9 @@
       }
       return best;
     };
+    // Maps the T.Giới Map will not take us to straight ("Map này không thể
+    // đến được"): reached through their region's door instead.
+    const noTeleport = new Set((macro.no_teleport_maps || []).map(Number));
     const gotoPlace = async (place, label, stop = () => false) => {
       const doorTries = new Map();
       for (let leg = 0; leg < 8; leg += 1) {
@@ -2440,6 +2443,28 @@
           if (nearEnough()) return `${walk.note}; đủ gần`;
           if (["timeout", "blocked"].includes(walk.how)) throw walkFailed(`không đi tới ${label} ${place.at.join(",")}: ${walk.note}`);
           return walk.note;
+        }
+        // Teleport straight there whenever the game lets us: walking out of a
+        // cave or across a region to its door took a minute or more a trip
+        // (user, 2026-10-24: "dịch chuyển được thì nên dịch chuyển").
+        if (!noTeleport.has(Number(place.map))) {
+          say(`${label}: dịch chuyển thẳng tới map ${place.map}`, "cong_cao_travel");
+          try {
+            await travelToLobby(token, { ...macro, travel_attempts: 1 }, { label, lobby_map: Number(place.map) }, flow);
+            continue;
+          } catch (error) {
+            if (/chiến đấu/i.test(error.message)) {
+              say(`${label}: ${describeFight(await fightUntilClear(token, macro, 30, { idle: false }))}`, "cong_cao_travel");
+              continue;
+            }
+            if (/Đã ở trong/i.test(error.message)) {
+              await domWait(token, 1);
+              continue;
+            }
+            if (!/không thể đến|không có/i.test(error.message)) throw error;
+            noTeleport.add(Number(place.map));
+            say(`${label}: ${error.message}; đi qua cửa`, "cong_cao_travel");
+          }
         }
         const cave = caves[here];
         const gate = place.via && here === place.via.map ? place.via

@@ -758,6 +758,8 @@ class ExtensionServerTest(unittest.TestCase):
                          sorted(quest["item"] for quest in macro["quests"] + macro["tracker_quests"]))
         self.assertEqual([1140], [quest["item"] for quest in macro["tracker_quests"] if quest.get("quiz")])
         self.assertIn("if (!quest.boss) say(`${quest.label}: ${await doByTracker(quest)}`, \"cong_cao_finish\");", content_js)
+        # Teleport straight to the target map first; doors only where the game refuses.
+        self.assertIn("await travelToLobby(token, { ...macro, travel_attempts: 1 }, { label, lobby_map: Number(place.map) }, flow);", content_js)
         # "Đào trân châu": the same runner, only digging.
         dig = cfg["activity_macros"]["dig_pearls"]
         self.assertEqual(("cong_cao_loop", True, macro["dig"]), (dig["runner"], dig["dig_only"], dig["dig"]))
@@ -1402,7 +1404,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.21.0"', manifest)
+        self.assertIn('"version": "0.21.1"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
