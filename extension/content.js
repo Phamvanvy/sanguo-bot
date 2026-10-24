@@ -2745,7 +2745,11 @@
           say(`mở Công cáo: ${got.join(", ") || "chưa thấy món mới trong túi"}`, "cong_cao_open");
           continue;
         }
-        if (!mine.length && !stocked.length && !notices && pearls >= price && await buyNotices(pearls)) continue;
+        // Bought only with no Công cáo at all left, any (n) included - also the
+        // ones this flow cannot do ((1) hỏi đáp, (8), (9)), which otherwise
+        // piled up until the bag was full (2026-10-24 05:44 "Không đủ ô").
+        const anyNotice = notices > 0 || bag.some((entry) => entry.itemId > noticeItem && entry.itemId <= noticeItem + 12);
+        if (!mine.length && !anyNotice && pearls >= price && await buyNotices(pearls)) continue;
         // Nothing to do now, but a pick cooling down or a quest set aside
         // (boss not up) will be: wait for the sooner of the two.
         const resting = quests.filter((quest) => count(bag, quest.item) > 0 && state.get(quest.quest).restUntil > now);
