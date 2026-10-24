@@ -2620,7 +2620,11 @@
       await useItem(-1, pickItem);
       const failed = await waitNews(since, Number(macro.dig_seconds ?? 6), (got) => got.kind === "use_fail" && got.itemId === pickItem);
       if (failed) {
-        nextDigAt = Date.now() + Number(macro.dig_retry_seconds ?? 60) * 1000;
+        // "Còn thừa 2 phút mới có thể tiếp tục dùng": come back right then.
+        const minutes = Number(/(\d+)\s*phút/i.exec(failed.message)?.[1] || 0);
+        const seconds = Number(/(\d+)\s*giây/i.exec(failed.message)?.[1] || 0);
+        const left = minutes * 60 + seconds;
+        nextDigAt = Date.now() + (left ? left + 3 : Number(macro.dig_retry_seconds ?? 60)) * 1000;
         return `game không cho đào: ${failed.message}`;
       }
       const after = await readBag(token, macro);
@@ -2662,7 +2666,7 @@
           await domWait(token, 1);
           continue;
         }
-        if (!synced && syncTries < 2) {
+        if (!macro.dig_only && !synced && syncTries < 2) {
           syncTries += 1;
           synced = await syncQuests();
         }
@@ -2672,6 +2676,21 @@
         const notices = count(bag, noticeItem);
         const picks = count(bag, pickItem);
         const now = Date.now();
+        // "Đào trân châu" (user, 2026-10-24): only dig, standing at the spot
+        // between cooldowns, until the picks run out.
+        if (macro.dig_only) {
+          if (!picks) {
+            updateDomFlow(flow, `${status()} - hết cuốc (còn ${pearls} trân châu)`, "done");
+            return;
+          }
+          const place = { map: Number(macro.dig.map), at: macro.dig.at.map(Number), tolerance: Number(macro.dig.tolerance ?? 3) };
+          if (now < nextDigAt) {
+            if (latestWorld?.mapId !== place.map) await gotoPlace(place, "chỗ đào trân châu");
+            updateDomFlow(flow, `${status()} - chờ cuốc hồi ${Math.ceil((nextDigAt - now) / 1000)}s (còn ${picks} cuốc, ${pearls} trân châu)`, "cong_cao_wait");
+            await domWait(token, Math.min(10, Math.max(1, (nextDigAt - now) / 1000)));
+            continue;
+          }
+        }
         if (macro.dig && picks > 0 && now >= nextDigAt) {
           say(`đi đào trân châu (còn ${picks} cuốc, ${pearls} trân châu)`, "cong_cao_dig");
           try {

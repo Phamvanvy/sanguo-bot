@@ -300,7 +300,7 @@ activity_macros:
     goto_max_legs: 12
     arrive_settle_seconds: 0.8
     map_load_seconds: 1.5
-  cong_cao:
+  cong_cao: &cong_cao
     # Đi đường, đánh, dịch chuyển, rớt mạng: như Farm quái.
     <<: *farm_spots
     label: "Công cáo triều đình"
@@ -370,6 +370,14 @@ activity_macros:
     cave_exits:
       832: {door: [8, 56], to: 816, exit: 0}
       880: {door: [92, 56], to: 896, exit: 0}
+  dig_pearls:
+    # Chỉ đào (user, 2026-10-24): đứng ở chỗ đào Nam Việt, cuốc hồi xong là đào
+    # (hồi 5 phút, server giữ - không bỏ qua được), hết cuốc thì dừng.
+    <<: *cong_cao
+    label: "Đào trân châu"
+    description: "Đứng ở Nam Việt 183,117, cuốc hồi xong là đào, đến khi hết cuốc"
+    icon: "🦪"
+    dig_only: true
   co_mo_hard: &co_mo_hard
     label: "Phó bản Cổ Mộ (khó)"
     description: "Vào bản khó qua NPC rồi đánh 3 boss ở 3 phòng"
