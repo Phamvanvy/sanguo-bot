@@ -828,8 +828,73 @@ class ExtensionServerTest(unittest.TestCase):
         probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
         self.assertIn("world.clock = { t: reader.i32(), at: Date.now() };", probe)
         self.assertIn('if (kind === "i16") return new Uint8Array([(Number(value) >> 8) & 0xff, Number(value) & 0xff]);', probe)
-        # Only a quest an item hands out (start NPC -1) is news; map quests come by the dozen.
-        self.assertIn("if (startNpc !== -1) return;", probe)
+        # Only a quest an item hands out (start NPC -1) is news; map quests come
+        # by the dozen and go on the quest board instead.
+        self.assertIn('setOnBoard("offers", news.questId, { questId: news.questId, npc: startNpc, name: news.message });', probe)
+
+    def test_candy_hunt_fights_only_the_halloween_tigers(self):
+        # user, 2026-10-27: tigers / elephants drop Halloween candy; soldiers
+        # and NPCs stand among the tigers and are left alone.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        self.assertIn('else if (macro.runner === "candy_loop") await runCandyHunt(token, macro, flow);', content)
+        self.assertIn('.filter((monster) => !only.length || only.some((pattern) => pattern.test(monster.name || "")));', content)
+        macro = extension_server.load_config()["activity_macros"]["candy_hunt"]
+        self.assertEqual(macro["runner"], "candy_loop")
+        self.assertEqual(macro["only_monster_patterns"], ["Mãnh hổ", "Voi chiến"])
+        self.assertEqual(macro["fight_faction"], 4)
+        self.assertIn("candy_hunt", [flow["id"] for flow in extension_server.flow_catalog()])
+        # It walks: clicks the prey on screen, roams a ring when none is in view.
+        self.assertIn("const click = await tap({ x: target.x, y: target.y - 12 });", content)
+        self.assertIn('return canvas?.id === "game" ? { ...macro, map_panel_screen: [canvas.width || 1280, canvas.height || 640] } : macro;', content)
+        self.assertEqual(macro["roam_radius"], 320)
+        # Spawn points from the event quest's links ("Nam Hải:57,94").
+        self.assertEqual(macro["spots"][2032][0], [57, 94])
+        self.assertEqual(macro["spots"][2016][0], [115, 112])
+        self.assertIn("const route = planRoute(grid, at, goal, 3);", content)
+
+    def test_full_auto_on_the_lab_is_the_packet_quest_loop(self):
+        # 2026-10-27: the lab draws every N.Vụ row yellow-green, so the Python
+        # full_auto took them all for done. On the lab Full auto reads the
+        # server's quest board and takes / hands in by packet; live keeps Python.
+        content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
+        probe = (PROJECT_ROOT / "extension" / "network_probe.js").read_text(encoding="utf-8")
+        self.assertIn('const questLoop = flow.id === "full_auto" && gameCanvas()?.id === "game";', content)
+        self.assertIn('await loadMacro(questLoop ? "full_auto_lab" : flow.id);', content)
+        self.assertIn('else if (macro.runner === "quest_loop") await runQuestLoop(token, macro, flow);', content)
+        self.assertIn('postGamePacket(OP_QUEST_ACCEPT, [["i32", quest.questId]])', content)
+        self.assertIn('["i32", serial], ["i32", quest.questId], ["i32", Number(macro.reward_branch ?? 1)],', content)
+        # The HUD is pinned to the sides on the lab.
+        self.assertIn('const x = point[2] === "left" ? Number(point[0])', content)
+        # 01:33:48: a chain's next quest is offered right after a hand-in, and
+        # the client's own NPC dialog stays open over the game; Esc closes it,
+        # only after the client touched an NPC.
+        self.assertIn("const work = () => ready().length > 0 || offers().length > 0;", content)
+        self.assertIn("if (!(latestWorld?.touches || []).some((touch) => touch.at > dialogClosedAt)) return;", content)
+        self.assertIn('await domPress(token, "Escape", "Escape", 27);', content)
+        # 01:39:36: a "go to Nhất Đăng" quest handed in from Thả Lan skipped the
+        # trip; an NPC id >> 12 is its map, and only there is a quest taken or
+        # handed in.
+        self.assertIn("const here = (quest) => !(quest.npc > 0) || Math.floor(quest.npc / 4096) === latestWorld?.mapId;", content)
+        self.assertIn("const ready = () => open(latestWorld?.questBoard?.ready).filter(here);", content)
+        # Gathering quests: the client gathers itself when led there; no skill
+        # is pressed meanwhile, and one within the server's 100 px is gathered
+        # by its packet when the client did not.
+        self.assertIn("const OP_GATHER_START = 198;", probe)
+        self.assertIn('else if (update.x != null) world.gatherables.set(instanceId, { x: update.x, y: update.y });', probe)
+        self.assertIn("if (gathering()) lastChange = Date.now();", content)
+        self.assertIn('postGamePacket(OP_GATHER_START, [["i32", (commandSerial += 1)], ["i32", spot.id]])', content)
+        # It went for NPCs: only faction 4 is fought there, other flows unchanged.
+        self.assertIn(".filter((monster) => faction == null || monster.faction === faction)", content)
+        # Board = ASMGameVM preConditionOk / finishConditionOk, by their add / remove packets.
+        self.assertIn("const OP_QUEST_START_REMOVED = 126;", probe)
+        self.assertIn("const OP_QUEST_FINISH_REMOVED = 128;", probe)
+        self.assertIn('setOnBoard(opcode === OP_QUEST_START_REMOVED ? "offers" : "ready", questId, null);', probe)
+        lab = extension_server.load_config()["activity_macros"]["full_auto_lab"]
+        self.assertTrue(lab["hidden"])
+        self.assertEqual(lab["runner"], "quest_loop")
+        self.assertEqual(lab["fight_faction"], 4)
+        self.assertEqual(lab["lab_quest_tracker_point"], [131, 169, "left"])
+        self.assertNotIn("full_auto_lab", [flow["id"] for flow in extension_server.flow_catalog()])
 
     def test_refused_doors_are_walked_off_and_into_again(self):
         # user, 2026-09-29: turned away while attacked, the character freezes on
@@ -856,7 +921,7 @@ class ExtensionServerTest(unittest.TestCase):
         # user, 2026-09-29: throw the list away before every dungeon reset.
         content = (PROJECT_ROOT / "extension" / "content.js").read_text(encoding="utf-8")
         self.assertIn("    await throwAwayBeforeReset(token, macro, flow);", content)
-        self.assertIn('(await api("/macro?id=throw_away_items")).macro', content)
+        self.assertIn('(await loadMacro("throw_away_items")).macro', content)
 
     def test_npc_map_click_is_retried_on_other_parts_of_the_sprite(self):
         # Thiên Long 976, 2026-09-29: standing on the NPC, our own Map marker
@@ -1030,7 +1095,7 @@ class ExtensionServerTest(unittest.TestCase):
         }}
         ids = [flow["id"] for flow in flow_catalog(cfg)]
         self.assertEqual(["full_auto", "farm", "attack", "dungeon", "reset"], ids)
-        default_ids = [flow["id"] for flow in flow_catalog()]
+        default_ids = [flow["id"] for flow in extension_server.flow_catalog()]
         self.assertEqual(
             ["co_mo_pipeline", "thien_long_pipeline", "ha_dong_pipeline", "instance_reset", "dungeon_tour"],
             default_ids[-5:],
@@ -1415,7 +1480,7 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertNotIn('type: "run-native"', content)
         self.assertNotIn('"debugger"', manifest)
         self.assertNotIn("chrome.debugger", background)
-        self.assertIn('"version": "0.21.8"', manifest)
+        self.assertIn('"version": "0.23.2"', manifest)
         self.assertIn("typeof PointerEvent", content)
         self.assertIn("new KeyboardEvent", content)
         self.assertIn('label: "Ô trái", overrides: { item_slot: "left" }', content)
@@ -1428,8 +1493,13 @@ class ExtensionServerTest(unittest.TestCase):
         self.assertIn('async function runBlessing', content)
         self.assertIn('flow === "blessing"', content)
         # The 4.4 web lab's screen width follows the window: its points are
-        # logical pixels from the canvas centre, not fractions.
-        self.assertIn("labPoint(macro.lab_ten_times_point) || macro.ten_times_point", content)
+        # logical pixels from the canvas centre, not fractions. Every flow's
+        # config goes through forThisClient, so a lab_xxx key replaces xxx on
+        # the lab only and play.minhchauh5.com keeps its config untouched.
+        self.assertIn('if (gameCanvas()?.id !== "game") return macro;', content)
+        self.assertIn("return { ...config, macro: forThisClient(config.macro) };", content)
+        self.assertNotIn("api(`/macro?id=${encodeURIComponent(flow.id)}`)", content)
+        self.assertIn("const tenTimesPoint = macro.ten_times_point || [0.66, 0.84];", content)
         self.assertIn("lab_ten_times_point: [208, 507]", (PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
         dom_click = content[content.index("async function domClick"):content.index("function dispatchKey")]
         self.assertIn('dispatchMouse(target, "mousedown"', dom_click)

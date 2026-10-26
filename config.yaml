@@ -1003,6 +1003,102 @@ activity_macros:
     detail_delay_seconds: 1.0
     confirm_delay_seconds: 0.8
     result_delay_seconds: 1.0
+  # Halloween 2026 (user, 2026-10-27): đánh hổ (Nam Hải 2032) hoặc voi (map 2016,
+  # user gọi Tây Kiệt) rớt kẹo để đổi quà. Cả hai map đều có walk grid nên đi được. Đứng ở chỗ đang
+  # đứng, chỉ đánh quái (phe 4) có tên khớp only_monster_patterns, lính và NPC
+  # đứng lẫn trong đó thì bỏ; quanh đây hết thì chờ hồi. Đổi quà user tự làm.
+  candy_hunt:
+    label: "Đánh hổ/voi lấy kẹo"
+    description: "Đứng tại chỗ, chỉ đánh hổ / voi sự kiện Halloween để lấy kẹo, đến khi Stop"
+    icon: "🍬"
+    runner: "candy_loop"
+    # Tên thấy trong game: "Mãnh hổ bạo chính" (ảnh user 02:23), "Mãnh hổ hà chính"
+    # (nhiệm vụ Halloween, Nam Hải 57,94), "Voi chiến Nam Việt" (map 2016, ảnh 02:24).
+    only_monster_patterns: ["Mãnh hổ", "Voi chiến"]
+    fight_faction: 4
+    hunt_radius: 500
+    # Thấy hổ / voi thì bấm vào nó trên màn hình (game nhắm nó và tự đi tới), bấm
+    # lại sau reaim_seconds nếu vẫn con đó; đánh từng đợt fight_round_seconds.
+    reaim_seconds: 6
+    fight_round_seconds: 8
+    # Không thấy con nào: đi theo walk grid tới bãi kế của map đang đứng (tọa độ
+    # game = px / 8, lấy từ link trong nhiệm vụ Halloween), tới nơi chờ
+    # spot_wait_seconds rồi sang bãi kế. Map không có trong spots: đi vòng 6 điểm
+    # cách chỗ bắt đầu roam_radius px. Mỗi lần bấm xa roam_step px rồi chờ
+    # roam_wait_seconds. roam_radius: 0 = đứng yên chờ.
+    spots:
+      2032: [[57, 94], [64, 98], [23, 93]]                  # Nam Hải: Mãnh hổ
+      2016: [[115, 112], [133, 127], [122, 135], [124, 147]]  # Nam Việt: Voi chiến
+    spot_reach_tiles: 4
+    spot_wait_seconds: 10
+    roam_radius: 320
+    roam_step: 140
+    roam_wait_seconds: 2
+    wait_seconds: 3
+    skill_points: *combat_skill_points
+    # Bản lab: cùng 4 nút kỹ năng như Full auto (đo lại trên ảnh user 02:23, khớp).
+    lab_skill_points:
+      - [240, 443, "right"]
+      - [168, 379, "right"]
+      - [265, 545, "right"]
+      - [178, 542, "right"]
+    lab_switch_target_point: null
+    lab_approach_idle_monsters: false
+    # Map vẽ gấp đôi như bản live (1 px map = 2 px logic màn hình).
+    world_scale: 2
+  # Thẻ "Full auto" trên test.hoiucminhchau.me (bản 4.4) chạy macro này thay cho
+  # flow Python: bản lab tô mọi dòng N.Vụ cùng màu xanh vàng nên Python tưởng
+  # dòng nào cũng xong (2026-10-27). play.minhchauh5.com vẫn chạy Python.
+  # Trả / nhận nhiệm vụ bằng gói QUEST_FINISH 137 / QUEST_ACCEPT 131 theo bảng
+  # nhiệm vụ server gửi (125-128); còn lại bấm dòng N.Vụ đầu cho game tự dẫn
+  # đường rồi đánh ở đó đến khi nhiệm vụ xong.
+  full_auto_lab:
+    hidden: true
+    runner: "quest_loop"
+    # Bản lab: [x, y, "left"/"right"] = pixel logic tính từ mép trái / phải canvas
+    # (cao 640). Đo trên ảnh tab Brave 1920x959 lúc 01:20 2026-10-27 (canvas cao
+    # 926 px, 1 px logic = 1.447 px): dòng N.Vụ đầu "Thương nhân người Hồ Tây Vực".
+    lab_quest_tracker_point: [131, 169, "left"]
+    # 4 nút kỹ năng (tím, lá, lửa, lốc); không có 2 bình thuốc "39" và nút Nói
+    # chuyện / Đánh.
+    lab_skill_points:
+      - [240, 443, "right"]
+      - [168, 379, "right"]
+      - [265, 545, "right"]
+      - [178, 542, "right"]
+    # Chưa đo trên bản lab: không bấm nút đổi mục tiêu, không bấm vào quái đứng
+    # yên (phép chiếu map -> màn hình đo trên bản live).
+    switch_target_point: null
+    approach_idle_monsters: false
+    tracker_walk_seconds: 180
+    tracker_reclick_seconds: 15
+    tracker_still_seconds: 4
+    # Đánh ở chỗ game dẫn tới tối đa objective_seconds mỗi lượt, từng đợt
+    # fight_round_seconds để thấy ngay nhiệm vụ xong / mới giao giữa trận.
+    objective_seconds: 240
+    fight_round_seconds: 10
+    fight_radius: 300
+    # Chỉ đánh quái (phe 4); lính các nước (phe 1-3) và NPC thường không có cờ NPC
+    # chức năng nên từng bị tính là quái và bị đánh (2026-10-27).
+    fight_faction: 4
+    # Trả xong chờ after_hand_in_seconds: nhiệm vụ kế của chuỗi giao ngay sau đó.
+    after_hand_in_seconds: 1
+    # Game tự chạm NPC khi dẫn tới nơi và mở hộp thoại nhiệm vụ; gói của ta không
+    # đóng nó (01:33:48 2026-10-27) nên bấm Esc, chỉ sau một lần chạm như vậy.
+    close_dialog_with_esc: true
+    dialog_settle_seconds: 0.8
+    # Nhiệm vụ thu thập: game tự thu thập khi dẫn tới (GATHER_START 198); trong
+    # lúc đó (tối đa gather_seconds mỗi lần) không bấm kỹ năng kẻo hủy. Game không
+    # tự thu thập thì gửi 198 cho điểm thu thập trong gather_reach px (server chỉ
+    # cho trong 100 px), mỗi điểm thử lại sau gather_retry_seconds.
+    gather_seconds: 8
+    gather_reach: 90
+    gather_retry_seconds: 30
+    # Server từ chối nhận / trả nhiệm vụ nào thì để nó refused_rest_seconds.
+    refused_rest_seconds: 600
+    reward_branch: 1
+    # idle_rounds lượt liền không đi, không quái, không có gì nhận / trả = hết việc.
+    idle_rounds: 3
 
 combat:
   hp_low_threshold_pct: 40

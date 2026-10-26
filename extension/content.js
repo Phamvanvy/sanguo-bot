@@ -44,6 +44,7 @@
     "throw_away_once",
     "farm_spot_loop",
     "cong_cao_loop",
+    "candy_loop",
   ]);
   // Running faster than the game's normal UI cadence can saturate its
   // renderer. The site guard measures debugger latency on that same thread
@@ -518,13 +519,49 @@
   // A point on the 4.4 web lab: [x from the canvas centre, y], in its logical
   // pixels. Its screen is 640 high but 1280-1600 wide to fit the window, and
   // panels stay centred, so a fraction measured once would drift with the
-  // window. Null on play.minhchauh5.com, whose points stay fractions.
+  // window. The HUD is pinned to the sides instead (N.Vụ list left, skills
+  // right): [x, y, "left"] / [x, y, "right"] count x from that edge. Null on
+  // play.minhchauh5.com, whose points stay fractions.
   function labPoint(point) {
     const canvas = gameCanvas();
     if (!point || canvas?.id !== "game") return null;
     const width = canvas.width || 1280;
     const height = canvas.height || 640;
-    return [(width / 2 + Number(point[0])) / width, Number(point[1]) / height];
+    const x = point[2] === "left" ? Number(point[0])
+      : point[2] === "right" ? width - Number(point[0])
+        : width / 2 + Number(point[0]);
+    return [x / width, Number(point[1]) / height];
+  }
+
+  // One flow config for both clients: on the 4.4 web lab every `lab_xxx`
+  // setting, at any depth, stands in for `xxx`; on play.minhchauh5.com the
+  // config is used as is. `_point` / `_points` values are screen points in
+  // labPoint's form; anything else (a delay, a count) is taken as written.
+  // Map coords (patrol_points, routes) are the server's and need no lab_.
+  function forThisClient(macro) {
+    if (gameCanvas()?.id !== "game") return macro;
+    const adapt = (value) => {
+      if (Array.isArray(value)) return value.map(adapt);
+      if (!value || typeof value !== "object") return value;
+      const adapted = {};
+      for (const [key, item] of Object.entries(value)) {
+        if (!key.startsWith("lab_")) adapted[key] = adapt(item);
+      }
+      for (const [key, item] of Object.entries(value)) {
+        if (!key.startsWith("lab_")) continue;
+        const name = key.slice(4);
+        adapted[name] = name.endsWith("_point") ? labPoint(item)
+          : name.endsWith("_points") && Array.isArray(item) ? item.map(labPoint)
+          : adapt(item);
+      }
+      return adapted;
+    };
+    return adapt(macro);
+  }
+
+  async function loadMacro(id) {
+    const config = await api(`/macro?id=${encodeURIComponent(id)}`);
+    return { ...config, macro: forThisClient(config.macro) };
   }
 
   // Points are fractions of the game canvas. When the tab is wider than the
@@ -683,8 +720,8 @@
   }
 
   async function runBlessing(token, macro) {
-    const tenTimesPoint = labPoint(macro.lab_ten_times_point) || macro.ten_times_point || [0.66, 0.84];
-    const okPoint = labPoint(macro.lab_ok_point) || macro.ok_point || [0.70, 0.64];
+    const tenTimesPoint = macro.ten_times_point || [0.66, 0.84];
+    const okPoint = macro.ok_point || [0.70, 0.64];
     updateFlowContext("blessing", 0, "open_panel");
     await domClick(token, macro.open_point || [0.73, 0.07]);
     await domDelay(macro.open_delay_seconds || 2, BLESSING_SPEED_FACTOR);
@@ -1496,7 +1533,7 @@
   async function throwAwayBeforeReset(token, macro, flow) {
     if (macro.throw_away_before_reset === false) return;
     try {
-      const card = (await api("/macro?id=throw_away_items")).macro || {};
+      const card = (await loadMacro("throw_away_items")).macro || {};
       if (!card.throw_away) return;
       updateDomFlow(flow, "Vứt đồ theo danh sách trước khi reset phó bản", "throw_away");
       const result = await throwAwayItems(token, { ...card, flow_name: flow }, flow);
@@ -1685,7 +1722,7 @@
     for (const [index, id] of plan.entries()) {
       const title = `Lượt ${index + 1}/${plan.length}`;
       if (exhausted.has(id)) continue;
-      const config = await api(`/macro?id=${encodeURIComponent(id)}`);
+      const config = await loadMacro(id);
       // Only from outside the instance: the game refuses inside one, and the
       // run before ended by walking out.
       let resetDone = index === 0;
@@ -1893,7 +1930,7 @@
         appendDiagnostic("tour_arrived", { flow, message: `${stop.label}: ${note}` });
       }
       const pick = picks.find((item) => item.pipeline === stop.pipeline);
-      const config = await api(`/macro?id=${encodeURIComponent(stop.pipeline)}`);
+      const config = await loadMacro(stop.pipeline);
       updateDomFlow(flow, title, "tour_run");
       await runDungeonPipeline(token, { ...config.macro, stages: pick.stages, finish_chime: false }, flow);
     }
@@ -2976,6 +3013,401 @@
     }
   }
 
+  // Full auto on the 4.4 web lab: the Python full_auto's loop - hand in what
+  // is done, take what is offered, else let the game lead to the next
+  // objective - read off the server's quest board (network_probe.js
+  // questBoard) instead of the N.Vụ list's colours: the lab draws every row
+  // yellow-green, so the Python flow took them all for done (2026-10-27).
+  // Taking and handing in are the client's own packets, QUEST_ACCEPT 131 and
+  // QUEST_FINISH 137; the server checks only its two sets, not that an NPC is
+  // near (ASMGameVM.pending / finishQuest). The objectives stay the client's:
+  // click the first N.Vụ row so it walks there, fight there until one is done.
+  const OP_GATHER_START = 198;  // int serial | int instanceId, within 100 px of it
+  async function runQuestLoop(token, macro, flow) {
+    const unit = Number(macro.coord_unit || 8);
+    const stats = { done: 0, taken: 0 };
+    const restUntil = new Map();
+    let takeBlockedUntil = 0;
+    let idleRounds = 0;
+    let resumes = 0;
+    const say = (message, step = "quest_loop") => {
+      updateDomFlow(flow, `Full auto: trả ${stats.done}, nhận ${stats.taken} - ${message}`, step);
+      appendDiagnostic("quest_loop", {
+        flow, message: `${message}; ${describeWorld()}; ${(latestWorld?.gatherables || []).length} điểm thu thập`,
+      });
+    };
+    // A quest the server refused is left alone a while, so one that can never
+    // be taken or handed in does not stall the loop.
+    const open = (list) => (list || []).filter((quest) => (restUntil.get(quest.questId) || 0) <= Date.now());
+    // An NPC id carries its map: id >> 12 (Thả Lan's 0x0b1089 on map 177 =
+    // 0xb1, Nhất Đăng's Đô úy 0x211066 on 529). Taken or handed in only on
+    // that map, as the client can: "Đến trại núi Bàn Việt" is done the moment
+    // it is taken, and handed in from Thả Lan it skipped the trip, while the
+    // chain's next quests are only offered in Nhất Đăng (2026-10-27 01:39:36).
+    const here = (quest) => !(quest.npc > 0) || Math.floor(quest.npc / 4096) === latestWorld?.mapId;
+    const ready = () => open(latestWorld?.questBoard?.ready).filter(here);
+    const offers = () => (Date.now() >= takeBlockedUntil ? open(latestWorld?.questBoard?.offers).filter(here) : []);
+    const readyElsewhere = () => open(latestWorld?.questBoard?.ready).filter((quest) => !here(quest));
+    // Work for the packets, which waits for no walk or fight: the next quest
+    // of a chain is offered the moment the last is handed in (2026-10-27
+    // 01:33:48, "Chuẩn bị trước khi mưa" sat untaken through a whole fight).
+    const work = () => ready().length > 0 || offers().length > 0;
+    // Walked to an NPC, the client touches it itself and draws its quest
+    // dialog; our packets do not close that, and it stays over the game
+    // eating the next N.Vụ click (01:33:48). Esc closes it (the lab's own key
+    // help: "mũi tên/Enter/Esc") - pressed only after such a touch.
+    let dialogClosedAt = Date.now();
+    const closeClientDialog = async () => {
+      if (macro.close_dialog_with_esc === false) return;
+      if (!(latestWorld?.touches || []).some((touch) => touch.at > dialogClosedAt)) return;
+      await domWait(token, Number(macro.dialog_settle_seconds ?? 0.8));
+      dialogClosedAt = Date.now();
+      await domPress(token, "Escape", "Escape", 27);
+      await domWait(token, 0.4);
+    };
+
+    // "Thu thập" quests: led to the herbs, the client gathers them itself
+    // (GATHER_START 198 four times for "Thiếu hụt thảo dược", 01:38:40-49).
+    // While it does, no skill is pressed - that would cancel it - and standing
+    // still is not "arrived" nor "nothing to do".
+    const gatherMs = Number(macro.gather_seconds ?? 8) * 1000;
+    const gathering = () => {
+      const gather = latestWorld?.gather;
+      return Boolean(gather?.startAt) && gather.startAt > (gather.cancelAt || 0) && Date.now() - gather.startAt < gatherMs;
+    };
+    // The client led us there and did not gather: one within the server's
+    // reach (100 px) is gathered by its packet, each spot once a while.
+    const triedSpots = new Map();
+    const gatherNear = async () => {
+      const me = latestWorld?.me;
+      if (!me) return false;
+      const reach = Number(macro.gather_reach ?? 90);
+      const spot = (latestWorld?.gatherables || [])
+        .filter(([id]) => Date.now() - (triedSpots.get(id) || 0) > Number(macro.gather_retry_seconds ?? 30) * 1000)
+        .map(([id, x, y]) => ({ id, d: Math.hypot(x - me.x, y - me.y) }))
+        .filter((item) => item.d <= reach).sort((a, b) => a.d - b.d)[0];
+      if (!spot) return false;
+      triedSpots.set(spot.id, Date.now());
+      const error = await postGamePacket(OP_GATHER_START, [["i32", (commandSerial += 1)], ["i32", spot.id]]);
+      if (error) throw new Error(error);
+      updateDomFlow(flow, `Full auto: trả ${stats.done}, nhận ${stats.taken} - thu thập (cách ${Math.round(spot.d)} px)`, "quest_gather");
+      await domWait(token, 1);
+      while (gathering() && !work()) await domWait(token, 0.5);
+      return true;
+    };
+    const rest = (quest) => restUntil.set(quest.questId, Date.now() + Number(macro.refused_rest_seconds ?? 600) * 1000);
+    const name = (quest) => `"${quest.name || `#${quest.questId}`}"`;
+    const news = (since, test) => (latestWorld?.quests || []).find((item) => item.at >= since && test(item));
+
+    // QUEST_FINISH_CLIENT: int serial | int questId | int branch (1, as the client sends).
+    const handIn = async (quest) => {
+      const serial = (commandSerial += 1);
+      const since = Date.now();
+      const error = await postGamePacket(OP_QUEST_FINISH, [
+        ["i32", serial], ["i32", quest.questId], ["i32", Number(macro.reward_branch ?? 1)],
+      ]);
+      if (error) throw new Error(error);
+      const deadline = Date.now() + 6000;
+      while (Date.now() < deadline) {
+        const got = news(since, (item) => item.questId === quest.questId && ["finished", "finish_fail"].includes(item.kind));
+        if (got?.kind === "finished") {
+          stats.done += 1;
+          return `trả ${name(quest)}`;
+        }
+        const refused = got || (latestWorld?.replies || []).find((reply) => reply.serial === serial && !reply.ok);
+        if (refused) {
+          rest(quest);
+          return `game không nhận trả ${name(quest)}: ${refused.message}`;
+        }
+        await domWait(token, 0.2);
+      }
+      rest(quest);
+      return `trả ${name(quest)}: game không trả lời`;
+    };
+
+    // QUEST_ACCEPT_CLIENT: int questId. The server queues it (ASMGameVM.pending)
+    // and answers QUEST_ACCEPTED 132 or QUEST_ACCEPT_FAIL 343.
+    const take = async (quest) => {
+      const since = Date.now();
+      const error = await postGamePacket(OP_QUEST_ACCEPT, [["i32", quest.questId]]);
+      if (error) throw new Error(error);
+      const deadline = Date.now() + Number(macro.accept_wait_seconds ?? 4) * 1000;
+      let got = null;
+      while (!got && Date.now() < deadline) {
+        await domWait(token, 0.2);
+        got = news(since, (item) => item.questId === quest.questId && ["accepted", "accept_fail"].includes(item.kind));
+      }
+      if (got?.kind === "accepted") {
+        stats.taken += 1;
+        return `nhận ${name(quest)}`;
+      }
+      rest(quest);
+      // 20 quests held already: nothing more can be taken until one is handed in.
+      if (/nhiều nhiệm vụ hơn/i.test(got?.message || "")) takeBlockedUntil = Date.now() + Number(macro.refused_rest_seconds ?? 600) * 1000;
+      return `không nhận được ${name(quest)}: ${got?.message || "game không trả lời"}`;
+    };
+
+    // The client leads: click the first N.Vụ row, wait for us to set off, then
+    // for a stop of tracker_still_seconds on one spot. Two clicks and not a
+    // step: already where the quest wants us, or nowhere left to go.
+    const followTracker = async () => {
+      const stillMs = Number(macro.tracker_still_seconds ?? 4) * 1000;
+      const reclickMs = Number(macro.tracker_reclick_seconds ?? 15) * 1000;
+      const deadline = Date.now() + Number(macro.tracker_walk_seconds ?? 180) * 1000;
+      const spotNow = () => latestWorld?.me
+        && `${latestWorld.mapId}:${Math.floor(latestWorld.me.x / unit)},${Math.floor(latestWorld.me.y / unit)}`;
+      let spot = spotNow();
+      let lastChange = Date.now();
+      let moved = false;
+      let clicks = 0;
+      let clickedAt = 0;
+      while (Date.now() < deadline) {
+        ensureDomActive(token);
+        if (work()) return { moved, note: "có nhiệm vụ để trả / nhận giữa đường" };
+        const now = spotNow();
+        if (now !== spot) {
+          if (clickedAt) moved = true;
+          spot = now;
+          lastChange = Date.now();
+        }
+        if (gathering()) lastChange = Date.now();
+        const still = Date.now() - lastChange >= stillMs;
+        if (moved && still) return { moved, note: `game dẫn tới map ${latestWorld?.mapId} ${spot?.split(":")[1]}` };
+        if (!moved && still && clicks >= 2) return { moved, note: `bấm N.Vụ ${clicks} lần mà không đi` };
+        if (!clickedAt || (still && Date.now() - clickedAt >= reclickMs)) {
+          await closeClientDialog();
+          await domClick(token, macro.quest_tracker_point);
+          clickedAt = Date.now();
+          lastChange = Date.now();
+          clicks += 1;
+          updateDomFlow(flow, `Full auto: trả ${stats.done}, nhận ${stats.taken} - bấm N.Vụ cho game dẫn đường (lần ${clicks})`, "quest_walk");
+        }
+        await domWait(token, 0.5);
+      }
+      return { moved, note: `${Math.round(Number(macro.tracker_walk_seconds ?? 180))}s chưa tới nơi` };
+    };
+
+    if (!macro.quest_tracker_point) throw new Error("Chưa có quest_tracker_point cho Full auto trong config");
+    for (;;) {
+      try {
+        ensureDomActive(token);
+        const done = ready();
+        if (done.length) {
+          say(await handIn(done[0]), "quest_hand_in");
+          idleRounds = 0;
+          // The chain's next quest comes right behind the hand-in.
+          await domWait(token, Number(macro.after_hand_in_seconds ?? 1));
+          continue;
+        }
+        const offered = offers();
+        if (offered.length) {
+          say(await take(offered[0]), "quest_take");
+          continue;
+        }
+        await closeClientDialog();
+        const trip = await followTracker();
+        say(`N.Vụ: ${trip.note}`, "quest_walk");
+        if (work()) continue;
+        const deadline = Date.now() + Number(macro.objective_seconds ?? 240) * 1000;
+        let fight = null;
+        let gathered = false;
+        while (!work() && Date.now() < deadline) {
+          if (gathering()) {
+            gathered = true;
+            updateDomFlow(flow, `Full auto: trả ${stats.done}, nhận ${stats.taken} - game đang thu thập`, "quest_gather");
+            await domWait(token, 0.5);
+            continue;
+          }
+          if (await gatherNear()) {
+            gathered = true;
+            continue;
+          }
+          // No monster near: no skill is pressed at all - with only NPCs
+          // around, the game turns the skills on them.
+          const foe = Number(macro.fight_faction ?? 4);
+          const near = monstersNear(latestWorld, Number(macro.fight_radius ?? 300), macro.ignore_monster_names || []);
+          if (!near.some((monster) => monster.faction === foe)) break;
+          updateDomFlow(flow, `Full auto: trả ${stats.done}, nhận ${stats.taken} - đánh ở chỗ game dẫn tới`, "quest_fight");
+          // Short rounds, so a quest done or offered mid-fight is seen soon.
+          fight = await fightUntilClear(token, macro, Number(macro.fight_round_seconds ?? 10), { radius: Number(macro.fight_radius ?? 300) });
+          if (fight.cleared && !fight.landed) break;
+        }
+        if (work()) continue;
+        // Nowhere to walk and nothing to hit, idle_rounds times running: the
+        // client has nothing more for us, as the Python flow ends when no
+        // N.Vụ row is left.
+        idleRounds = !trip.moved && !gathered && fight && !fight.landed ? idleRounds + 1 : 0;
+        if (idleRounds >= Number(macro.idle_rounds ?? 3)) {
+          const away = readyElsewhere().map((quest) => `${name(quest)} (map ${Math.floor(quest.npc / 4096)})`);
+          say(`hết việc: ${idleRounds} lần bấm N.Vụ không đi, không có quái, không có nhiệm vụ để nhận hay trả ở map này`
+            + (away.length ? `; còn chờ trả ở map khác: ${away.join(", ")}` : ""), "done");
+          return;
+        }
+      } catch (error) {
+        const closed = error.socketClosed;
+        const codes = (macro.resume_close_codes || [1006]).map(Number);
+        if (!closed || !codes.includes(closed.code) || resumes >= Number(macro.max_resumes ?? 20)) throw error;
+        resumes += 1;
+        appendDiagnostic("quest_loop", { flow, message: `${error.message}; chờ vào lại (lần ${resumes})` });
+        await awaitReconnect(token, macro, flow, closed);
+      }
+    }
+  }
+
+  // Halloween 2026 (user, 2026-10-27): tigers ("Mãnh hổ bạo chính", Nam Hải
+  // 2032) and elephants ("Voi chiến Nam Việt", map 2016 - the user's "Tây
+  // Kiệt") drop candy to trade for gifts. Only those are fought, by
+  // faction and name: soldiers and NPCs stand among them (the user's
+  // screenshots). One in view is clicked on the main screen - the game makes
+  // it the target and walks us up, so the skills go for it and not for
+  // whatever the game picks. None in view: walk to where they spawn (spots,
+  // per map), or a ring of roam_radius around where the flow started on a
+  // map with none written down (user: "nó k tự đi à").
+  async function runCandyHunt(token, macro, flow) {
+    const radius = Number(macro.hunt_radius ?? 500);
+    const faction = Number(macro.fight_faction ?? 4);
+    const only = (macro.only_monster_patterns || []).map((pattern) => new RegExp(pattern, "i"));
+    const preyNear = () => monstersNear(latestWorld, radius, macro.ignore_monster_names || [])
+      .filter((monster) => monster.faction === faction && only.some((pattern) => pattern.test(monster.name || "")));
+    const seen = new Set();
+    const killed = new Set();
+    let resumes = 0;
+    const status = () => {
+      const candy = (latestWorld?.bag || []).filter((item) => /kẹo/i.test(item.name || ""))
+        .reduce((sum, item) => sum + item.count, 0);
+      return `Kẹo: hạ ${killed.size} con, túi có ${candy} kẹo`;
+    };
+    // The lab's screen is as wide as the window: project onto its real
+    // logical size (the world drawn at world_scale, 2x as on live).
+    const view = () => {
+      const canvas = gameCanvas();
+      return canvas?.id === "game" ? { ...macro, map_panel_screen: [canvas.width || 1280, canvas.height || 640] } : macro;
+    };
+    const tap = async (point) => {
+      const size = walkGridFor(latestWorld?.mapId)?.size;
+      if (!size || !latestWorld?.me) return null;
+      const aim = screenPointOf(view(), point, latestWorld.me, size);
+      const spot = clearOfHud(aim) ? aim : towardsOnScreen(aim);
+      if (!spot) return null;
+      return describeClick(await domClick(token, spot));
+    };
+    const roamRadius = Number(macro.roam_radius ?? 320);
+    let home = null;
+    let ring = [];
+    let ringAt = 0;
+    // Where they spawn, per map, from the event quest's own links ("Mãnh hổ
+    // hà chính(Nam Hải:57,94)", "Voi chiến Nam Việt(Nam Việt:115,112)"): none
+    // in view, walk the walk grid from one to the next, waiting a while at
+    // each for the respawn.
+    const unit = Number(macro.coord_unit || 8);
+    let spotAt = 0;
+    let spotSince = 0;
+    const spotStep = async (spots) => {
+      const me = latestWorld.me;
+      const grid = walkGridFor(latestWorld.mapId);
+      const goal = { x: Number(spots[spotAt % spots.length][0]), y: Number(spots[spotAt % spots.length][1]) };
+      const at = { x: Math.floor(me.x / unit), y: Math.floor(me.y / unit) };
+      const label = `bãi ${(spotAt % spots.length) + 1}/${spots.length} (${goal.x},${goal.y})`;
+      if (Math.hypot(goal.x - at.x, goal.y - at.y) <= Number(macro.spot_reach_tiles ?? 4)) {
+        spotSince ||= Date.now();
+        if (Date.now() - spotSince >= Number(macro.spot_wait_seconds ?? 10) * 1000) {
+          spotAt += 1;
+          spotSince = 0;
+        }
+        updateDomFlow(flow, `${status()} - ở ${label}, chờ hổ / voi hồi`, "candy_wait");
+        await domWait(token, Number(macro.wait_seconds ?? 3));
+        return;
+      }
+      spotSince = 0;
+      const route = planRoute(grid, at, goal, 3);
+      // The farthest tile of the way still within roam_step px of us: one
+      // click on screen, the game walks it.
+      const reach = Number(macro.roam_step ?? 140);
+      const next = route && [...route].reverse()
+        .find((tile) => Math.hypot(tile.x * unit + unit / 2 - me.x, tile.y * unit + unit / 2 - me.y) <= reach);
+      updateDomFlow(flow, `${status()} - quanh đây không có hổ / voi, đi tới ${label}`, "candy_roam");
+      const click = next && await tap({ x: next.x * unit + unit / 2, y: next.y * unit + unit / 2 });
+      if (!click) {
+        spotAt += 1;
+        await domWait(token, Number(macro.wait_seconds ?? 3));
+        return;
+      }
+      await domWait(token, Number(macro.roam_wait_seconds ?? 2));
+      const now = latestWorld?.me;
+      const moved = now ? Math.round(Math.hypot(now.x - me.x, now.y - me.y)) : 0;
+      appendDiagnostic("candy_hunt", { flow, message: `tới ${label}: bấm ${click} tới ô ${next.x},${next.y} từ ${at.x},${at.y}, đi được ${moved} px; ${describeWorld()}` });
+    };
+    const roamStep = async () => {
+      const me = latestWorld?.me;
+      const spots = me && walkGridFor(latestWorld.mapId) && (macro.spots || {})[latestWorld.mapId];
+      if (spots?.length) {
+        await spotStep(spots);
+        return;
+      }
+      if (!me || roamRadius <= 0) {
+        updateDomFlow(flow, `${status()} - chờ hổ / voi hiện ra quanh đây`, "candy_wait");
+        await domWait(token, Number(macro.wait_seconds ?? 3));
+        return;
+      }
+      if (!home) {
+        home = { x: me.x, y: me.y };
+        ring = Array.from({ length: 6 }, (_, index) => ({
+          x: home.x + roamRadius * Math.cos((index * Math.PI) / 3),
+          y: home.y + roamRadius * Math.sin((index * Math.PI) / 3),
+        }));
+      }
+      let goal = ring[ringAt % ring.length];
+      if (Math.hypot(goal.x - me.x, goal.y - me.y) < 48) goal = ring[(ringAt += 1) % ring.length];
+      const distance = Math.hypot(goal.x - me.x, goal.y - me.y);
+      const share = Math.min(1, Number(macro.roam_step ?? 140) / distance);
+      const step = { x: me.x + (goal.x - me.x) * share, y: me.y + (goal.y - me.y) * share };
+      updateDomFlow(flow, `${status()} - quanh đây không có hổ / voi, đi tìm (điểm ${(ringAt % ring.length) + 1}/${ring.length})`, "candy_roam");
+      const click = await tap(step);
+      if (!click) {
+        ringAt += 1;
+        await domWait(token, Number(macro.wait_seconds ?? 3));
+        return;
+      }
+      await domWait(token, Number(macro.roam_wait_seconds ?? 2));
+      const now = latestWorld?.me;
+      const moved = now ? Math.round(Math.hypot(now.x - me.x, now.y - me.y)) : 0;
+      // Not a step: a wall or water that way - on to the next point.
+      if (moved < 16) ringAt += 1;
+      appendDiagnostic("candy_hunt", { flow, message: `đi tìm: bấm ${click} tới ${Math.round(step.x)},${Math.round(step.y)} từ ${me.x},${me.y}, đi được ${moved} px; ${describeWorld()}` });
+    };
+    let aimed = { id: 0, at: 0 };
+    if (!only.length) throw new Error("Chưa có only_monster_patterns cho flow này trong config");
+    for (;;) {
+      try {
+        ensureDomActive(token);
+        const prey = preyNear();
+        for (const monster of prey) seen.add(monster.id);
+        for (const kill of latestWorld?.kills || []) if (seen.has(kill.id)) killed.add(kill.id);
+        if (!prey.length) {
+          await roamStep();
+          continue;
+        }
+        const target = prey[0];
+        if (target.id !== aimed.id || Date.now() - aimed.at > Number(macro.reaim_seconds ?? 6) * 1000) {
+          const click = await tap({ x: target.x, y: target.y - 12 });
+          aimed = { id: target.id, at: Date.now() };
+          appendDiagnostic("candy_hunt", { flow, message: `nhắm ${target.name.trim()} ở ${target.x},${target.y} (cách ${Math.round(target.d)} px): ${click || "không bấm được"}; ${describeWorld()}` });
+          await domWait(token, 0.6);
+        }
+        updateDomFlow(flow, `${status()} - đánh ${target.name.trim()} (còn ${prey.length} con quanh đây)`, "candy_fight");
+        const fight = await fightUntilClear(token, macro, Number(macro.fight_round_seconds ?? 8), { radius });
+        appendDiagnostic("candy_hunt", { flow, message: `${status()}; ${describeFight(fight)}; ${describeWorld()}` });
+      } catch (error) {
+        const closed = error.socketClosed;
+        const codes = (macro.resume_close_codes || [1006]).map(Number);
+        if (!closed || !codes.includes(closed.code) || resumes >= Number(macro.max_resumes ?? 20)) throw error;
+        resumes += 1;
+        appendDiagnostic("candy_hunt", { flow, message: `${error.message}; chờ vào lại (lần ${resumes})` });
+        await awaitReconnect(token, macro, flow, closed);
+      }
+    }
+  }
+
   // A bell when a dungeon is done, for a user away from the screen (user,
   // 2026-09-14). Synthesised with Web Audio: no sound file to ship.
   function playChime() {
@@ -3874,8 +4306,8 @@
     if (!world?.me) return [];
     const ignored = new Set(ignoredNames);
     return world.creatures
-      .map(([id, x, y, hp, state, name, npc]) => ({
-        id, x, y, hp, state, name, npc, d: Math.hypot(x - world.me.x, y - world.me.y),
+      .map(([id, x, y, hp, state, name, npc, faction]) => ({
+        id, x, y, hp, state, name, npc, faction: faction ?? -1, d: Math.hypot(x - world.me.x, y - world.me.y),
       }))
       .filter((monster) => !monster.npc && !ignored.has(monster.name) && monster.d <= radius)
       .sort((a, b) => a.d - b.d);
@@ -3902,7 +4334,16 @@
     const world = latestWorld;
     if (!world?.frames || !world.me) return { state: "unknown", detail: describeWorld() };
     const radius = Number(over ?? macro.monster_radius ?? 250);
-    const around = monstersNear(world, radius, ignoreNames ?? macro.ignore_monster_names);
+    // fight_faction: only units of that faction are fought (Full auto on the
+    // lab: 4 = monsters). Nation soldiers and plain NPCs carry no functional
+    // flag, so they counted as monsters and the skills went for them
+    // (2026-10-27). Unset - every other flow - fights as before.
+    const faction = macro.fight_faction == null ? null : Number(macro.fight_faction);
+    // only_monster_patterns: and only these by name (Đánh hổ/voi lấy kẹo).
+    const only = (macro.only_monster_patterns || []).map((pattern) => new RegExp(pattern, "i"));
+    const around = monstersNear(world, radius, ignoreNames ?? macro.ignore_monster_names)
+      .filter((monster) => faction == null || monster.faction === faction)
+      .filter((monster) => !only.length || only.some((pattern) => pattern.test(monster.name || "")));
     // Monsters in the fight: attacking us (STATE_ATTACK) or wounded, and idle
     // full-health ones close by - a boss waits idle until hit (Thiên Long
     // trận). Ones that never die (e.g. "Tượng đá cơ quan") go on the ignore list.
@@ -3987,6 +4428,8 @@
         else if (macro.runner === "throw_away_once") await runThrowAway(token, macro, flow);
         else if (macro.runner === "farm_spot_loop") await runFarmSpot(token, macro, flow);
         else if (macro.runner === "cong_cao_loop") await runCongCao(token, macro, flow);
+        else if (macro.runner === "quest_loop") await runQuestLoop(token, macro, flow);
+        else if (macro.runner === "candy_loop") await runCandyHunt(token, macro, flow);
         else throw new Error(`Flow DOM chưa hỗ trợ: ${flow}`);
         domFlow = { state: "done", flow, message: "Flow hoàn tất" };
       } catch (error) {
@@ -4008,8 +4451,12 @@
   async function runFlow(flow, macroOverrides = {}) {
     try {
       let result;
-      if (DOM_RUNNERS.has(flow.runner)) {
-        const config = await api(`/macro?id=${encodeURIComponent(flow.id)}`);
+      // Full auto on the 4.4 web lab is the packet quest loop: the Python one
+      // reads the N.Vụ list by colour, which the lab draws all alike.
+      // play.minhchauh5.com keeps the Python flow.
+      const questLoop = flow.id === "full_auto" && gameCanvas()?.id === "game";
+      if (DOM_RUNNERS.has(flow.runner) || questLoop) {
+        const config = await loadMacro(questLoop ? "full_auto_lab" : flow.id);
         result = await startDomFlow(flow.id, { ...config.macro, ...macroOverrides });
       } else {
         domFlow = { state: "idle", message: "Sẵn sàng" };

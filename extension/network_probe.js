@@ -87,6 +87,11 @@
   // (Thiên Long trận: no boss ever showed up in the creature list), so landing
   // damage is the one signal that says the fight is still on (user, 2026-09-16).
   const OP_SKILL_ATTACK = 185;         // client -> server: int time | POINT | byte dir | int target | int skill
+  // Gathering a resource (herbs and the like for "thu thập" quests): the
+  // server takes it from within 100 px only (PlayerPacketHandler.gatherStart).
+  const OP_GATHER_START = 198;         // client -> server: int serial | int instanceId
+  const OP_GATHER_CANCEL = 410;        // client -> server: (empty)
+  const OP_GATHER_CANCELLED = 411;     // server -> client: int serial | byte reason
   const OP_SKILL_ATTACKED = 187;       // server -> client: int target | int time | int source
                                        //   | byte result (0 hit, 1 miss, 2 immune, 3 crit)
                                        //   | byte kind (0 physical, 1 magic, 4 heal) | int damage
@@ -134,7 +139,9 @@
   // Quests an item hands out (Công cáo triều đình, 2026-10-24); the live
   // bodies match OpCode.java. Kept as world.quests for the flow to wait on.
   const OP_QUEST_START_ADDED = 125;      // int startNpc (-1 = from an item) | int finishNpc | int questId | byte level | STR name
+  const OP_QUEST_START_REMOVED = 126;    // int startNpc | int questId: no longer ours to take
   const OP_QUEST_FINISH_ADDED = 127;     // int finishNpc | int questId | byte notify: the quest can be handed in
+  const OP_QUEST_FINISH_REMOVED = 128;   // int finishNpc | int questId: handed in, or no longer done
   const OP_QUEST_ACCEPTED = 132;         // int questId | ...
   const OP_QUEST_FINISHED = 135;         // int questId
   const OP_QUEST_FINISH_FAIL = 138;      // int questId | byte reason (1 no quest, 2 not done)
@@ -148,6 +155,7 @@
   const OP_QUEST_LIST_SERVER = 160;
   const TYPE_PLAYER = 1;
   const TYPE_CREATURE = 3;             // server TYPE_CREATURE (client SPRITE_TYPE_NPC)
+  const TYPE_GATHER = 5;               // GameObject.TYPE_GATHER: a resource to gather
   const TYPES_WITH_IMAGE = new Set([3, 5, 6]);  // Tool.recvUnitView reads an imageId for these
   const STATE_MOVING = 1;              // MOVE_CLIENT state bit, cleared when we stop
   const STATE_DIE = 8;                 // GameObject.STATE_DIE
@@ -160,6 +168,8 @@
     meFighting: null, meFightingAt: 0, // the game's own "in combat" mark on us; null = not heard yet
     bag: null, bagAt: 0,               // [{ grid, count, itemId, name, level, equip, instanceId }], filled grids only
     creatures: new Map(),              // instanceId -> { x, y, hp (0-200), state, name }
+    gatherables: new Map(),            // instanceId -> { x, y }: resources in view
+    gather: { startAt: 0, target: 0, cancelAt: 0 },  // our last GATHER_START (the client's or ours) and its end
     npcIds: new Set(),                 // creatures the server flags as functional NPCs
     attackFails: [],                   // recent ATTACK_FAILs: { reason, target, at } (14 = target out of sight)
     aim: null,                         // last target we pressed Đánh on: { target, at }
@@ -175,7 +185,13 @@
     clock: null,                       // { t, at }: the client's server clock in its last MOVE_CLIENT
     questList: null,                   // { ids, at }: item-given quests we hold, from the last QUEST_LIST
     quests: [],                        // recent quest / item-use news: { kind, questId, itemId, message, at }
+    // The server's own two sets (ASMGameVM preConditionOk / finishConditionOk),
+    // kept by its add / remove packets: quests an NPC offers us now, and quests
+    // done and waiting to be handed in. { questId, npc, name }, npc being the
+    // start / finish NPC.
+    questBoard: { offers: [], ready: [] },
   };
+  const questNames = new Map();
 
   // The game's own socket, so a flow can send exactly what a UI button sends.
   // Only one we have really decoded a frame from counts: the page opens others.
@@ -318,6 +334,7 @@
     world.meMoving = false;
     world.mapChangedAt = Date.now();
     world.creatures.clear();
+    world.gatherables.clear();
     world.npcIds.clear();
   }
 
@@ -335,6 +352,7 @@
     world.mapId = null;
     world.mapChangedAt = Date.now();
     world.creatures.clear();
+    world.gatherables.clear();
     world.npcIds.clear();
   }
 
@@ -345,6 +363,19 @@
     if (reader.u8() === 1) world.npcIds.add(instanceId);
   }
 
+  function setOnBoard(list, questId, entry) {
+    const board = world.questBoard;
+    const rest = board[list].filter((item) => item.questId !== questId);
+    world.questBoard = { ...board, [list]: entry ? [...rest, entry] : rest };
+  }
+
+  // QUEST_START_REMOVED / QUEST_FINISH_REMOVED: int npc | int questId.
+  function readQuestRemoved(reader, opcode) {
+    reader.i32();
+    const questId = reader.i32();
+    setOnBoard(opcode === OP_QUEST_START_REMOVED ? "offers" : "ready", questId, null);
+  }
+
   function readQuestNews(reader, opcode) {
     const news = { kind: "", questId: 0, itemId: 0, message: "", at: Date.now() };
     if (opcode === OP_QUEST_START_ADDED) {
@@ -353,14 +384,21 @@
       news.questId = reader.i32();
       reader.u8();
       news.message = reader.str();
+      questNames.set(news.questId, news.message);
       // A map's own quests come by the dozen on every map change; only one an
-      // item hands out (start NPC -1) is news to a flow.
-      if (startNpc !== -1) return;
+      // item hands out (start NPC -1) is news to a flow. The others go on the
+      // board for the quest loop to take.
+      if (startNpc !== -1) {
+        setOnBoard("offers", news.questId, { questId: news.questId, npc: startNpc, name: news.message });
+        return;
+      }
       news.kind = "offer";
     } else if (opcode === OP_QUEST_FINISH_ADDED) {
+      // Read here too, not only on the board: Công cáo waits on this news.
       news.finishNpc = reader.i32();
       news.questId = reader.i32();
       news.kind = "ready";
+      setOnBoard("ready", news.questId, { questId: news.questId, npc: news.finishNpc, name: questNames.get(news.questId) || "" });
     } else if (opcode === OP_QUEST_ACCEPTED || opcode === OP_QUEST_FINISHED) {
       news.questId = reader.i32();
       news.kind = opcode === OP_QUEST_ACCEPTED ? "accepted" : "finished";
@@ -527,6 +565,7 @@
     reader.i32();
     const instanceId = reader.i32();
     if (!outOfView && TYPES_WITH_IMAGE.has(type)) reader.u16();
+    if (type === TYPE_GATHER && outOfView) world.gatherables.delete(instanceId);
     if (type !== TYPE_CREATURE) return;
     if (outOfView) world.creatures.delete(instanceId);
     else if (!world.creatures.has(instanceId)) world.creatures.set(instanceId, { hp: 200, state: 0 });
@@ -556,6 +595,11 @@
     // really over instead of waiting out the damage grace (user, 2026-09-19).
     if ((((update.state ?? 0) & STATE_DIE) !== 0) || update.hp === 0) {
       world.kills = [...world.kills.slice(-19), { id: instanceId, at: Date.now() }];
+    }
+    if (type === TYPE_GATHER) {
+      if (((update.state ?? 0) & STATE_DIE) || update.hp === 0) world.gatherables.delete(instanceId);
+      else if (update.x != null) world.gatherables.set(instanceId, { x: update.x, y: update.y });
+      return;
     }
     if (type !== TYPE_CREATURE) return;
     if (head & 0x08) {                           // DETAIL: mask, then name / level / faction
@@ -688,6 +732,11 @@
         else if (opcode === OP_SKILL_ATTACK) {
           reader.skip(9);              // time, x, y, dir
           world.aim = { target: reader.i32(), at: Date.now() };
+        } else if (opcode === OP_GATHER_START) {
+          reader.i32();                // serial
+          world.gather = { ...world.gather, startAt: Date.now(), target: reader.i32() };
+        } else if (opcode === OP_GATHER_CANCEL) {
+          world.gather = { ...world.gather, cancelAt: Date.now() };
         } else if (opcode === OP_TOUCHNPC_CLIENT) {
           const target = reader.i32();
           const questId = reader.i32();
@@ -739,6 +788,10 @@
           if (id > 0 && id < 0x10000) ids.push(id);
         }
         world.questList = { ids, at: Date.now() };
+      } else if (opcode === OP_GATHER_CANCELLED) {
+        world.gather = { ...world.gather, cancelAt: Date.now() };
+      } else if (opcode === OP_QUEST_START_REMOVED || opcode === OP_QUEST_FINISH_REMOVED) {
+        readQuestRemoved(reader, opcode);
       } else if (opcode === OP_QUEST_START_ADDED || opcode === OP_QUEST_FINISH_ADDED
         || opcode === OP_QUEST_ACCEPTED || opcode === OP_QUEST_FINISHED || opcode === OP_QUEST_FINISH_FAIL
         || opcode === OP_USEITEM_FAIL || opcode === OP_QUEST_ACCEPT_FAIL) {
@@ -782,6 +835,8 @@
         world.actorId = reader.i32();
         world.actorName = reader.str();
       } else if (opcode === OP_ACTOR_LIST_SERVER) {
+        // Chọn NV: the next character's server sends its own board.
+        world.questBoard = { offers: [], ready: [] };
         reader.i32();                  // serial
         const actors = [];
         for (let count = reader.u8(); count > 0; count -= 1) {
@@ -821,8 +876,10 @@
         creatures.push([id, creature.x, creature.y, creature.hp, creature.state,
           creature.name || "", world.npcIds.has(id) ? 1 : 0, creature.faction ?? -1]);
       }
-      const { creatures: _all, npcIds: _npcs, ...summary } = world;
-      window.postMessage({ source: "sanguo-world", ...summary, creatures, at: Date.now() }, location.origin);
+      const gatherables = [...world.gatherables].filter(([, spot]) => spot.x != null)
+        .map(([id, spot]) => [id, spot.x, spot.y]);
+      const { creatures: _all, npcIds: _npcs, gatherables: _spots, ...summary } = world;
+      window.postMessage({ source: "sanguo-world", ...summary, creatures, gatherables, at: Date.now() }, location.origin);
     }, 150);
   }
   setInterval(publishWorld, 2000);
